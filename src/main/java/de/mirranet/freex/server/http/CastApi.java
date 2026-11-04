@@ -87,7 +87,7 @@ public final class CastApi {
      * device), without capabilities. Answers with URLs relative to this server.
      */
     private void start(Exchange ex) throws Exception {
-        MediaItem it = store.item(ex.param("id")).orElseThrow(ApiException::notFound);
+        MediaItem it = store.item(ex.user(), ex.param("id")).orElseThrow(ApiException::notFound);
         if (!it.type.playable() || it.file == null) throw ApiException.badRequest("Nicht abspielbar");
         Map<String, Object> body = ex.body();
         PlaybackPlanner.Quality quality = PlaybackPlanner.quality(Json.str(body, "quality", "original"));

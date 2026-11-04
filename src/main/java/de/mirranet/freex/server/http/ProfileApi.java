@@ -211,7 +211,7 @@ public final class ProfileApi {
             m.put("title", e.title());
             m.put("parentTitle", e.parentTitle());
             // The item as it is now (title from metadata, artwork); null once it left the library.
-            m.put("item", store.item(e.itemId()).map(it -> (Object) media.view(it, viewer, false)).orElse(null));
+            m.put("item", store.item(viewer, e.itemId()).map(it -> (Object) media.view(it, viewer, false)).orElse(null));
             if (userId == null || !userId.equals(viewer.id)) {
                 store.user(e.userId()).ifPresent(u -> {
                     Map<String, Object> um = new LinkedHashMap<>();

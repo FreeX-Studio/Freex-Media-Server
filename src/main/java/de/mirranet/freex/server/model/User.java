@@ -50,6 +50,16 @@ public final class User {
     /** Preferred subtitle language as ISO 639-1 code; empty = same as the audio preference. */
     public volatile String subtitleLanguage = "";
 
+    /** True: may see all libraries, including ones added later. Admins always may. */
+    public volatile boolean allLibraries = true;
+    /** The libraries this user may see when {@link #allLibraries} is false. */
+    public volatile java.util.Set<String> libraryIds = java.util.Set.of();
+
+    /** Whether this user may see the library with the given id. */
+    public boolean mayAccess(String libraryId) {
+        return admin || allLibraries || libraryIds.contains(libraryId);
+    }
+
     /**
      * off: never; forced: only forced subtitles (foreign-language parts); foreign: when the audio
      * is not in the subtitle language; always: whenever subtitles in that language exist.
@@ -92,6 +102,7 @@ public final class User {
         m.put("recoveryCodesLeft", totpEnabled ? recoveryCodes.size() : 0);
         m.put("passwordChangedAt", passwordChangedAt);
         m.put("avatar", avatarVersion);
+        m.put("libraries", admin || allLibraries ? "all" : new ArrayList<>(libraryIds));
         m.put("preferences", preferences());
         return m;
     }

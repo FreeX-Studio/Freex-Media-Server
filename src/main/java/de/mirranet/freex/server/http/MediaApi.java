@@ -169,7 +169,7 @@ public final class MediaApi {
 
     private void libraries(Exchange ex) throws IOException {
         List<Object> out = new ArrayList<>();
-        for (Library l : store.libraries()) {
+        for (Library l : store.librariesOf(ex.user())) {
             Map<String, Object> m = l.toPublic(store.countTopLevel(l.id));
             if (!ex.user().admin) m.remove("paths");
             out.add(m);
@@ -274,7 +274,7 @@ public final class MediaApi {
     // ================================================================== browsing
 
     private void libraryItems(Exchange ex) throws IOException {
-        Library l = store.library(ex.param("id")).orElseThrow(ApiException::notFound);
+        Library l = visibleLibrary(ex);
         User u = ex.user();
         String sort = ex.query("sort", "title");
         boolean desc = ex.query("order", sort.equals("title") ? "asc" : "desc").equals("desc");
@@ -320,7 +320,7 @@ public final class MediaApi {
     }
 
     private void item(Exchange ex) throws IOException {
-        MediaItem it = store.item(ex.param("id")).orElseThrow(ApiException::notFound);
+        MediaItem it = store.item(ex.user(), ex.param("id")).orElseThrow(ApiException::notFound);
         Map<String, Object> m = decorate(it, ex.user(), true);
         if (it.type == MediaItem.Type.SHOW || it.type == MediaItem.Type.SEASON) {
             List<Object> kids = new ArrayList<>();
@@ -339,7 +339,7 @@ public final class MediaApi {
     }
 
     private void children(Exchange ex) throws IOException {
-        MediaItem it = store.item(ex.param("id")).orElseThrow(ApiException::notFound);
+        MediaItem it = store.item(ex.user(), ex.param("id")).orElseThrow(ApiException::notFound);
         List<Object> kids = new ArrayList<>();
         for (MediaItem c : store.children(it.id)) kids.add(decorate(c, ex.user(), false));
         ex.ok(kids);
@@ -472,7 +472,7 @@ public final class MediaApi {
         List<Map.Entry<String, Progress>> started = new ArrayList<>();
         for (Map.Entry<String, Progress> e : store.progressOf(u.id).entrySet()) {
             Progress p = e.getValue();
-            if (!p.watched() && p.offsetMs() > 0 && store.item(e.getKey()).isPresent()) started.add(e);
+            if (!p.watched() && p.offsetMs() > 0 && store.item(u, e.getKey()).isPresent()) started.add(e);
         }
         started.sort(Comparator.comparingLong((Map.Entry<String, Progress> e) -> e.getValue().updatedAt()).reversed());
         List<Object> cont = new ArrayList<>();
@@ -489,7 +489,7 @@ public final class MediaApi {
         // Up next: shows with watch history, next episode, ordered by last activity.
         Map<String, Long> showActivity = new HashMap<>();
         for (Map.Entry<String, Progress> e : store.progressOf(u.id).entrySet()) {
-            MediaItem it = store.item(e.getKey()).orElse(null);
+            MediaItem it = store.item(u, e.getKey()).orElse(null);
             if (it == null || it.type != MediaItem.Type.EPISODE || !e.getValue().watched()) continue;
             MediaItem season = store.item(it.parentId).orElse(null);
             if (season == null || season.parentId == null) continue;
@@ -510,7 +510,7 @@ public final class MediaApi {
         for (Extension e : extensions) hubs.addAll(e.homeHubs(u));
 
         // Recently added per library.
-        for (Library l : store.libraries()) {
+        for (Library l : store.librariesOf(u)) {
             List<MediaItem> top = store.topLevel(l.id);
             top.sort(Comparator.comparingLong((MediaItem i) -> i.addedAt).reversed());
             List<Object> recent = new ArrayList<>();
@@ -527,7 +527,7 @@ public final class MediaApi {
 
     /** The "Recommended" tab of a library: rows built from the library's own content. */
     private void libraryHubs(Exchange ex) throws IOException {
-        Library l = store.library(ex.param("id")).orElseThrow(ApiException::notFound);
+        Library l = visibleLibrary(ex);
         User u = ex.user();
         List<Map<String, Object>> hubs = new ArrayList<>();
         List<MediaItem> top = store.topLevel(l.id);
@@ -631,6 +631,7 @@ public final class MediaApi {
             List<MediaItem> all = new ArrayList<>(store.allItems());
             all.sort(Comparator.comparing(i -> i.sortTitle));
             for (MediaItem it : all) {
+                if (!store.canSee(ex.user(), it)) continue;
                 boolean hit = it.title.toLowerCase(Locale.ROOT).contains(q)
                         || it.originalTitle.toLowerCase(Locale.ROOT).contains(q);
                 if (!hit) continue;
@@ -661,7 +662,7 @@ public final class MediaApi {
      * or a frame from the video.
      */
     private void image(Exchange ex) throws IOException {
-        MediaItem it = store.item(ex.param("id")).orElseThrow(ApiException::notFound);
+        MediaItem it = store.item(ex.user(), ex.param("id")).orElseThrow(ApiException::notFound);
         Path p = imagePath(it, ex.param("kind"));
         if (p == null) throw ApiException.notFound();
         FileSender.send(ex, p, IMAGE_CACHE_SECONDS);
@@ -726,8 +727,15 @@ public final class MediaApi {
 
     // ================================================================== playback
 
+    /** The library of the path parameter {id}, if shared with the user; 404 otherwise. */
+    private Library visibleLibrary(Exchange ex) {
+        Library l = store.library(ex.param("id")).orElseThrow(ApiException::notFound);
+        if (!store.canSee(ex.user(), l)) throw ApiException.notFound();
+        return l;
+    }
+
     private MediaItem playable(Exchange ex) {
-        MediaItem it = store.item(ex.param("id")).orElseThrow(ApiException::notFound);
+        MediaItem it = store.item(ex.user(), ex.param("id")).orElseThrow(ApiException::notFound);
         if (!it.type.playable() || it.file == null) throw ApiException.badRequest("Nicht abspielbar");
         return it;
     }
@@ -899,7 +907,7 @@ public final class MediaApi {
     }
 
     private void markWatched(Exchange ex, boolean watched) throws IOException {
-        MediaItem it = store.item(ex.param("id")).orElseThrow(ApiException::notFound);
+        MediaItem it = store.item(ex.user(), ex.param("id")).orElseThrow(ApiException::notFound);
         User u = ex.user();
         long now = System.currentTimeMillis();
         for (MediaItem leaf : leaves(it)) {

@@ -40,7 +40,8 @@ native apps for iOS, Android and TV are planned and will use the same API.
 - **Skip intro and credits** – detected automatically from the audio, with a *Next episode* countdown
 - **Chromecast** – cast from Chrome, with the browser as remote control
 - **Watch Together** – watch in sync with other users of your server
-- **Multi-user** – personal watch state, history, profile pictures and audio/subtitle language preferences
+- **Multi-user** – share all or only selected libraries per user; personal watch state, history, profile pictures
+  and audio/subtitle language preferences
 - **Secure by default** – two-factor sign-in, brute-force protection, per-device sessions, strict security headers
 - **Easy to run** – one self-contained jar, or a Debian package with a hardened systemd service
 - **Managed in the browser** – libraries, users and server settings, plus a live activity view for admins

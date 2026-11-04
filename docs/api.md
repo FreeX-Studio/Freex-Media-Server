@@ -34,6 +34,15 @@ curl -s https://media.example.org/api/hubs -H 'X-FreeX-Token: …'
 | `PUT` / `DELETE` | `/api/me/avatar` | Upload the profile picture as raw request body (JPEG/PNG/GIF, max. 10 MB) / remove it |
 | `GET` | `/api/users/{id}/avatar?v=` | Profile picture |
 
+### Users (admin)
+
+| Method | Path | |
+|---|---|---|
+| `GET` | `/api/users` | All users; `libraries` is `"all"` or the list of shared library ids |
+| `POST` | `/api/users` | `{username, password, admin, libraries: "all" \| [libraryId, …]}` |
+| `PUT` | `/api/users/{id}` | Change `admin`, `password`, `resetTwoFactor` or `libraries` |
+| `DELETE` | `/api/users/{id}` | Delete a user |
+
 ### Library and playback
 
 | Method | Path | |

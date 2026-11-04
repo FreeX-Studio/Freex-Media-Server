@@ -61,6 +61,11 @@ public final class TogetherService implements AutoCloseable {
         final Map<String, String> members = new ConcurrentHashMap<>();
         final List<Subscriber> subscribers = new CopyOnWriteArrayList<>();
 
+        /** The title currently played in the room. */
+        public String itemId() {
+            return itemId;
+        }
+
         Room(String code, String hostId, String itemId) {
             this.code = code;
             this.hostId = hostId;

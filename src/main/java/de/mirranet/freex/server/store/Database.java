@@ -151,6 +151,16 @@ public final class Database implements AutoCloseable {
                     "INSERT INTO watch_history (user_id, item_id, watched_at) "
                             + "SELECT user_id, item_id, updated_at FROM progress WHERE watched = 1 AND updated_at > 0",
             },
+            // 3: libraries per user (existing users keep access to everything)
+            {
+                    "ALTER TABLE users ADD COLUMN all_libraries INTEGER NOT NULL DEFAULT 1",
+                    """
+                    CREATE TABLE user_libraries (
+                        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        library_id TEXT NOT NULL,
+                        PRIMARY KEY (user_id, library_id)
+                    )""",
+            },
     };
 
     /** Maps one result row. */

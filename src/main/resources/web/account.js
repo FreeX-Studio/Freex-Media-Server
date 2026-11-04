@@ -511,15 +511,78 @@
 
     // ------------------------------------------------------------------ users
 
+    /**
+     * Choice of the libraries a user may see: all (also future ones) or selected ones.
+     * Returns the element and a function that gives "all" or the list of ids.
+     */
+    function libraryPicker(libraries, current, idPrefix) {
+        const all = h("input", {type: "radio", name: idPrefix + "-mode", value: "all"});
+        const some = h("input", {type: "radio", name: idPrefix + "-mode", value: "some"});
+        const selected = new Set(Array.isArray(current) ? current : []);
+        const boxes = libraries.map((l) => {
+            const cb = h("input", {type: "checkbox", value: l.id});
+            cb.checked = selected.has(l.id);
+            return {cb, el: h("label", {class: "check"}, cb, icon(l.type === "shows" ? "shows" : "movies"), l.name)};
+        });
+        const list = h("div", {class: "lib-picker"}, boxes.map((b) => b.el),
+            libraries.length ? null : h("p", {class: "muted"}, "Noch keine Bibliotheken angelegt."));
+        const sync = () => {
+            list.classList.toggle("disabled", all.checked);
+            boxes.forEach((b) => b.cb.disabled = all.checked);
+        };
+        (current === "all" || current == null ? all : some).checked = true;
+        all.addEventListener("change", sync);
+        some.addEventListener("change", sync);
+        sync();
+        const el = h("div", null,
+            h("label", {class: "check"}, all, "Alle Bibliotheken, auch neu hinzukommende"),
+            h("label", {class: "check"}, some, "Nur ausgewählte Bibliotheken:"),
+            list);
+        return {el, value: () => all.checked ? "all" : boxes.filter((b) => b.cb.checked).map((b) => b.cb.value)};
+    }
+
+    function librarySummary(u, libraries) {
+        if (u.admin) return "alle Bibliotheken (Administrator)";
+        if (u.libraries === "all") return "alle Bibliotheken";
+        const names = libraries.filter((l) => u.libraries.includes(l.id)).map((l) => l.name);
+        return names.length ? names.join(", ") : "keine Bibliothek freigegeben";
+    }
+
+    function editLibraries(u, libraries) {
+        const picker = libraryPicker(libraries, u.libraries, "el-" + u.id);
+        const error = h("div", {class: "error-text", role: "alert"});
+        const dialog = h("div", {class: "modal-back", onclick: (e) => e.target === dialog && dialog.remove()},
+            h("div", {class: "modal", role: "dialog", "aria-modal": "true", "aria-label": "Bibliotheken freigeben"},
+                h("h2", null, `Bibliotheken für ${u.username}`),
+                h("p", {class: "muted"}, "Nur freigegebene Bibliotheken erscheinen für diesen Benutzer, auch in Suche, Startseite und Watch Together."),
+                picker.el,
+                error,
+                h("div", {class: "btn-row"},
+                    h("button", {class: "btn primary", onclick: async () => {
+                            try {
+                                await api("PUT", `/api/users/${u.id}`, {libraries: picker.value()});
+                                dialog.remove();
+                                M.toast(`Freigaben für ${u.username} gespeichert`);
+                                M.render();
+                            } catch (e) {
+                                error.textContent = e.message;
+                            }
+                        }}, "Speichern"),
+                    h("button", {class: "btn", onclick: () => dialog.remove()}, "Abbrechen"))));
+        document.body.append(dialog);
+    }
+
     async function users(c) {
-        const list = await api("GET", "/api/users");
+        const [list, libraries] = await Promise.all([api("GET", "/api/users"), api("GET", "/api/libraries")]);
         const rows = h("div", {class: "list"}, list.map((u) => {
             const row = h("div", {class: "list-row"},
                 M.avatar(u),
                 h("div", {class: "grow"},
                     h("div", {class: "name"}, u.username, u.id === S.user.id ? h("span", {class: "pill"}, "Du") : null),
-                    h("div", {class: "detail-line"}, [u.admin ? "Administrator" : "Benutzer", u.twoFactor ? "Zwei-Faktor aktiv" : "ohne Zwei-Faktor"].join(", "))),
+                    h("div", {class: "detail-line"}, [u.admin ? "Administrator" : "Benutzer", u.twoFactor ? "Zwei-Faktor aktiv" : "ohne Zwei-Faktor"].join(", ")),
+                    h("div", {class: "detail-line"}, "Sieht: " + librarySummary(u, libraries))),
                 h("button", {class: "btn small", "data-menu": true, onclick: (e) => M.popup(e.currentTarget, [
+                        u.admin ? undefined : {label: "Bibliotheken freigeben", onclick: () => editLibraries(u, libraries)},
                         {label: "Passwort zurücksetzen", onclick: () => resetPassword(u)},
                         u.twoFactor ? {label: "Zwei-Faktor zurücksetzen", onclick: async () => {
                                 await api("PUT", `/api/users/${u.id}`, {resetTwoFactor: true});
@@ -546,16 +609,21 @@
         const name = h("input", {id: "u-name", autocomplete: "off"});
         const pass = h("input", {id: "u-pass", type: "password", autocomplete: "new-password"});
         const admin = h("input", {type: "checkbox"});
+        const picker = libraryPicker(libraries, "all", "new-user");
+        const pickerField = h("div", {class: "field"}, h("label", null, "Freigegebene Bibliotheken"), picker.el);
+        admin.addEventListener("change", () => pickerField.hidden = admin.checked);
         const error = h("div", {class: "error-text", role: "alert"});
         c.append(h("h1", null, "Benutzer"), rows, panel("Benutzer hinzufügen",
             field("u-name", "Benutzername", name),
             field("u-pass", "Passwort", pass, "Mindestens 10 Zeichen. Der Benutzer kann es danach selbst ändern."),
-            h("label", {class: "check"}, admin, "Administrator: darf Bibliotheken und Benutzer verwalten"),
+            h("label", {class: "check"}, admin, "Administrator: darf Bibliotheken und Benutzer verwalten und sieht alles"),
+            pickerField,
             error,
             h("button", {class: "btn primary", onclick: async () => {
                     error.textContent = "";
                     try {
-                        await api("POST", "/api/users", {username: name.value, password: pass.value, admin: admin.checked});
+                        await api("POST", "/api/users", {username: name.value, password: pass.value, admin: admin.checked,
+                            libraries: admin.checked ? "all" : picker.value()});
                         M.toast(`${name.value.trim()} angelegt`);
                         M.render();
                     } catch (e) {

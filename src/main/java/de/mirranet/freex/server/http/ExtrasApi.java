@@ -140,12 +140,21 @@ public final class ExtrasApi implements MediaApi.Extension {
         });
     }
 
+    /** Library or item of the path, only if shared with the user (404 otherwise). */
     private Library library(Exchange ex) {
-        return store.library(ex.param("id")).orElseThrow(ApiException::notFound);
+        return store.library(ex.param("id")).filter(l -> store.canSee(ex.user(), l)).orElseThrow(ApiException::notFound);
     }
 
     private MediaItem item(Exchange ex, String param) {
-        return store.item(ex.param(param)).orElseThrow(ApiException::notFound);
+        return store.item(ex.user(), ex.param(param)).orElseThrow(ApiException::notFound);
+    }
+
+    /** A collection of a library shared with the user, with only the items the user may see. */
+    private Resolved visibleCollection(Exchange ex) {
+        Resolved r = resolve(ex.param("cid")).orElseThrow(ApiException::notFound);
+        if (!ex.user().mayAccess(r.libraryId)) throw ApiException.notFound();
+        List<MediaItem> items = r.items.stream().filter(it -> store.canSee(ex.user(), it)).toList();
+        return new Resolved(r.id, r.libraryId, r.name, r.summary, r.auto, items, r.poster, r.backdrop);
     }
 
     // ================================================================== item extras
@@ -228,7 +237,7 @@ public final class ExtrasApi implements MediaApi.Extension {
     public List<Map<String, Object>> homeHubs(User u) {
         List<Object> items = new ArrayList<>();
         for (String id : lists.watchlist(u.id)) {
-            store.item(id).ifPresent(it -> items.add(media.view(it, u, false)));
+            store.item(u, id).ifPresent(it -> items.add(media.view(it, u, false)));
             if (items.size() >= 24) break;
         }
         if (items.isEmpty()) return List.of();
@@ -301,7 +310,7 @@ public final class ExtrasApi implements MediaApi.Extension {
         List<Object> items = new ArrayList<>();
         List<MediaItem> found = new ArrayList<>();
         for (String id : metadata.itemsWithPerson(pid)) {
-            store.item(id).ifPresent(it -> {
+            store.item(ex.user(), id).ifPresent(it -> {
                 // Guest roles in episodes link to the show.
                 MediaItem top = it;
                 while (top.parentId != null) top = store.item(top.parentId).orElse(top);
@@ -352,7 +361,7 @@ public final class ExtrasApi implements MediaApi.Extension {
             out.add(collectionView(autoId(e.getKey(), l.id), l.id, collectionName(md), e.getValue().size(), true));
         }
         for (ListStore.Collection c : lists.collectionsOf(l.id)) {
-            out.add(collectionView(c.id, l.id, c.name, (int) c.itemIds.stream().filter(id -> store.item(id).isPresent()).count(), false));
+            out.add(collectionView(c.id, l.id, c.name, (int) c.itemIds.stream().filter(id -> store.item(u, id).isPresent()).count(), false));
         }
         out.sort(Comparator.comparing(m -> String.valueOf(m.get("title")).toLowerCase()));
         return out;
@@ -406,7 +415,7 @@ public final class ExtrasApi implements MediaApi.Extension {
     }
 
     private void collection(Exchange ex) throws IOException {
-        Resolved r = resolve(ex.param("cid")).orElseThrow(ApiException::notFound);
+        Resolved r = visibleCollection(ex);
         Map<String, Object> m = collectionView(r.id, r.libraryId, r.name, r.items.size(), r.auto);
         m.put("summary", r.summary);
         List<Object> items = new ArrayList<>();
@@ -422,7 +431,7 @@ public final class ExtrasApi implements MediaApi.Extension {
     }
 
     private void collectionImage(Exchange ex) throws IOException {
-        Resolved r = resolve(ex.param("cid")).orElseThrow(ApiException::notFound);
+        Resolved r = visibleCollection(ex);
         String kind = ex.param("kind");
         String own = kind.equals("backdrop") ? r.backdrop : r.poster;
         if (own != null && Files.isRegularFile(Path.of(own))) {
@@ -499,7 +508,7 @@ public final class ExtrasApi implements MediaApi.Extension {
         List<Object> items = new ArrayList<>();
         String first = null;
         for (String id : p.itemIds) {
-            MediaItem it = store.item(id).orElse(null);
+            MediaItem it = store.item(u, id).orElse(null); // items of libraries no longer shared are left out
             if (it == null) continue;
             if (first == null) first = it.id;
             if (it.file != null) duration += it.file.durationMs;
@@ -530,7 +539,7 @@ public final class ExtrasApi implements MediaApi.Extension {
         if (lists.playlistsOf(ex.user().id).size() >= 200) throw ApiException.badRequest("Zu viele Playlists");
         List<String> ids = new ArrayList<>();
         String itemId = Json.str(body, "itemId", null);
-        if (itemId != null) ids.addAll(playableIds(store.item(itemId).orElseThrow(() -> ApiException.badRequest("Unbekannter Eintrag"))));
+        if (itemId != null) ids.addAll(playableIds(store.item(ex.user(), itemId).orElseThrow(() -> ApiException.badRequest("Unbekannter Eintrag"))));
         ListStore.Playlist p = lists.createPlaylist(ex.user().id, name, ids);
         ex.json(201, playlistView(p, ex.user(), false));
     }
@@ -558,7 +567,7 @@ public final class ExtrasApi implements MediaApi.Extension {
 
     private void addToPlaylist(Exchange ex) throws IOException {
         ListStore.Playlist p = ownPlaylist(ex);
-        MediaItem it = store.item(Json.str(ex.body(), "itemId", "")).orElseThrow(() -> ApiException.badRequest("Unbekannter Eintrag"));
+        MediaItem it = store.item(ex.user(), Json.str(ex.body(), "itemId", "")).orElseThrow(() -> ApiException.badRequest("Unbekannter Eintrag"));
         List<String> ids = playableIds(it);
         if (p.itemIds.size() + ids.size() > 5000) throw ApiException.badRequest("Die Playlist ist zu lang");
         p.itemIds.addAll(ids);
@@ -591,7 +600,7 @@ public final class ExtrasApi implements MediaApi.Extension {
 
     private List<Object> watchlistItems(User u) {
         List<Object> out = new ArrayList<>();
-        for (String id : lists.watchlist(u.id)) store.item(id).ifPresent(it -> out.add(media.view(it, u, false)));
+        for (String id : lists.watchlist(u.id)) store.item(u, id).ifPresent(it -> out.add(media.view(it, u, false)));
         return out;
     }
 
@@ -614,7 +623,7 @@ public final class ExtrasApi implements MediaApi.Extension {
 
     private void createRoom(Exchange ex) throws IOException {
         Map<String, Object> body = ex.body();
-        MediaItem it = store.item(Json.str(body, "itemId", "")).orElseThrow(() -> ApiException.badRequest("Unbekannter Eintrag"));
+        MediaItem it = store.item(ex.user(), Json.str(body, "itemId", "")).orElseThrow(() -> ApiException.badRequest("Unbekannter Eintrag"));
         if (!it.type.playable()) throw ApiException.badRequest("Nur Filme und Episoden");
         TogetherService.Room r = together.create(ex.user(), it.id, Json.num(body, "positionMs", 0));
         ex.json(201, r.toJson());
@@ -622,6 +631,8 @@ public final class ExtrasApi implements MediaApi.Extension {
 
     private void joinRoom(Exchange ex) throws IOException {
         TogetherService.Room r = room(ex);
+        // Only who may see the title can join; the invite link alone is not enough.
+        if (store.item(ex.user(), r.itemId()).isEmpty()) throw new ApiException(403, "Dieser Titel ist für dich nicht freigegeben");
         together.join(r, ex.user());
         ex.ok(r.toJson());
     }
@@ -630,7 +641,7 @@ public final class ExtrasApi implements MediaApi.Extension {
         TogetherService.Room r = room(ex);
         Map<String, Object> body = ex.body();
         String itemId = Json.str(body, "itemId", null);
-        if (itemId != null && store.item(itemId).filter(i -> i.type.playable()).isEmpty()) {
+        if (itemId != null && store.item(ex.user(), itemId).filter(i -> i.type.playable()).isEmpty()) {
             throw ApiException.badRequest("Unbekannter Eintrag");
         }
         try {
@@ -646,6 +657,7 @@ public final class ExtrasApi implements MediaApi.Extension {
     /** Server-Sent Events stream of the room; stays open until the browser closes it. */
     private void roomEvents(Exchange ex) throws Exception {
         TogetherService.Room r = room(ex);
+        if (store.item(ex.user(), r.itemId()).isEmpty()) throw new ApiException(403, "Dieser Titel ist für dich nicht freigegeben");
         var h = ex.raw.getResponseHeaders();
         h.set("Content-Type", "text/event-stream; charset=utf-8");
         h.set("Cache-Control", "no-cache");

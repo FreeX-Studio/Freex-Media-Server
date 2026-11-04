@@ -2673,6 +2673,14 @@ select, .field input, .inline input {
     font-size: 14px;
 }
 
+/* choices inside a field look like normal text, not like the field's heading */
+.field label.check {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 10px;
+}
+
 .field .check input {
     width: auto;
     height: auto;
@@ -2979,4 +2987,24 @@ select, .field input, .inline input {
 
 .about-name b {
     font-weight: 500;
+}
+
+/* ------------------------------------------------------------------ library sharing */
+
+.lib-picker {
+    display: grid;
+    gap: 2px;
+    margin: -6px 0 12px 26px;
+}
+
+.lib-picker .check {
+    margin-bottom: 6px;
+}
+
+.lib-picker .check .ico {
+    color: var(--muted);
+}
+
+.lib-picker.disabled {
+    opacity: .45;
 }

@@ -186,6 +186,7 @@ public final class DataStore implements AutoCloseable {
     }
 
     public void removeLibrary(String id) {
+        userStore.removeLibraryAccess(id);
         synchronized (writeLock) {
             libraries.remove(id);
             items.values().removeIf(i -> i.libraryId.equals(id));
@@ -197,6 +198,27 @@ public final class DataStore implements AutoCloseable {
                 LOG.log(Level.WARNING, "Could not delete index of library " + id, e);
             }
         }
+    }
+
+    // ================================================================== access
+
+    /** Whether the user may see the item (its library is shared with them). */
+    public boolean canSee(User u, MediaItem it) {
+        return u != null && it != null && u.mayAccess(it.libraryId);
+    }
+
+    public boolean canSee(User u, Library l) {
+        return u != null && l != null && u.mayAccess(l.id);
+    }
+
+    /** Libraries the user may see. */
+    public List<Library> librariesOf(User u) {
+        return libraries().stream().filter(l -> canSee(u, l)).toList();
+    }
+
+    /** The item if it exists and the user may see it; otherwise empty, as if it did not exist. */
+    public Optional<MediaItem> item(User u, String id) {
+        return item(id).filter(it -> canSee(u, it));
     }
 
     // ================================================================== items

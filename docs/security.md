@@ -17,6 +17,13 @@ FreeX Media Server is meant to be reachable from the internet. It is designed to
   sign-in of other users.
 - **Login history** with failed attempts per account.
 
+## Library sharing
+
+Admins decide per user which libraries they may see: all of them (including libraries added later, the default) or
+selected ones. The server enforces this on every request, not only in the interface: titles, artwork, streams,
+subtitles, search, home screen, collections, playlists, watchlist, watch history, Watch Together and Chromecast all
+behave as if libraries that are not shared did not exist. Admins always see everything.
+
 ## Requests
 
 - Session tokens are 256-bit random values; only their SHA-256 hash is stored. The cookie is `HttpOnly`,

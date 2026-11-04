@@ -370,6 +370,10 @@ public final class AuthApi {
         String password = validPassword(Json.str(body, "password", ""), username);
         try {
             User u = store.addUser(username, PasswordHasher.hash(password), Json.bool(body, "admin", false));
+            if (body.containsKey("libraries")) {
+                applyLibraries(u, body.get("libraries"));
+                store.updateUser(u);
+            }
             LOG.info("User '" + username + "' created by '" + ex.user().username + "'");
             ex.json(201, u.toPublic());
         } catch (IllegalArgumentException e) {
@@ -387,6 +391,11 @@ public final class AuthApi {
                 throw ApiException.badRequest("Es muss mindestens einen Administrator geben");
             }
             u.admin = admin;
+        }
+        if (body.containsKey("libraries")) {
+            applyLibraries(u, body.get("libraries"));
+            LOG.info("Libraries of '" + u.username + "' set by '" + ex.user().username + "': "
+                    + (u.allLibraries ? "all" : String.join(", ", u.libraryIds)));
         }
         String password = Json.str(body, "password", "");
         if (!password.isEmpty()) {
@@ -414,6 +423,27 @@ public final class AuthApi {
         onUserDeleted.accept(id);
         LOG.info("User '" + u.username + "' deleted by '" + ex.user().username + "'");
         ex.noContent();
+    }
+
+    /**
+     * Sets which libraries a user may see: {@code "all"} (also libraries added later) or a list of
+     * library ids. Admins always see everything, whatever is stored here.
+     */
+    private void applyLibraries(User u, Object value) {
+        if ("all".equals(value)) {
+            u.allLibraries = true;
+            u.libraryIds = java.util.Set.of();
+            return;
+        }
+        if (!(value instanceof List<?> list)) throw ApiException.badRequest("libraries: \"all\" oder eine Liste von Bibliotheken erwartet");
+        java.util.Set<String> ids = new java.util.LinkedHashSet<>();
+        for (Object o : list) {
+            String id = String.valueOf(o);
+            if (store.library(id).isEmpty()) throw ApiException.badRequest("Unbekannte Bibliothek " + id);
+            ids.add(id);
+        }
+        u.allLibraries = false;
+        u.libraryIds = java.util.Set.copyOf(ids);
     }
 
     // ================================================================== validation

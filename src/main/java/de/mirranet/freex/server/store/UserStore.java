@@ -68,12 +68,15 @@ public final class UserStore {
             user.audioLanguage = rs.getString("audio_language");
             user.subtitleMode = rs.getString("subtitle_mode");
             user.subtitleLanguage = rs.getString("subtitle_language");
+            user.allLibraries = rs.getInt("all_libraries") == 1;
             return user;
         })) {
             users.put(u.id, u);
         }
         for (User u : users.values()) {
             u.recoveryCodes = new ArrayList<>(db.query("SELECT code_hash FROM recovery_codes WHERE user_id = ?",
+                    rs -> rs.getString(1), u.id));
+            u.libraryIds = java.util.Set.copyOf(db.query("SELECT library_id FROM user_libraries WHERE user_id = ?",
                     rs -> rs.getString(1), u.id));
         }
         db.query("SELECT * FROM sessions", rs -> {
@@ -142,9 +145,11 @@ public final class UserStore {
         db.transaction(d -> {
             d.update("UPDATE users SET password_hash = ?, admin = ?, password_changed_at = ?, totp_secret = ?, "
                             + "totp_enabled = ?, totp_last_step = ?, avatar_version = ?, audio_language = ?, "
-                            + "subtitle_mode = ?, subtitle_language = ? WHERE id = ?",
+                            + "subtitle_mode = ?, subtitle_language = ?, all_libraries = ? WHERE id = ?",
                     u.passwordHash, u.admin, u.passwordChangedAt, u.totpSecret, u.totpEnabled, u.totpLastStep,
-                    u.avatarVersion, u.audioLanguage, u.subtitleMode, u.subtitleLanguage, u.id);
+                    u.avatarVersion, u.audioLanguage, u.subtitleMode, u.subtitleLanguage, u.allLibraries, u.id);
+            d.update("DELETE FROM user_libraries WHERE user_id = ?", u.id);
+            for (String lib : u.libraryIds) d.update("INSERT INTO user_libraries (user_id, library_id) VALUES (?, ?)", u.id, lib);
             d.update("DELETE FROM recovery_codes WHERE user_id = ?", u.id);
             for (String code : u.recoveryCodes) d.update("INSERT INTO recovery_codes (user_id, code_hash) VALUES (?, ?)", u.id, code);
         });
@@ -157,6 +162,18 @@ public final class UserStore {
         users.remove(id);
         sessions.values().removeIf(s -> s.userId.equals(id));
         progress.remove(id);
+    }
+
+    /** A deleted library disappears from all user assignments. */
+    public void removeLibraryAccess(String libraryId) {
+        db.update("DELETE FROM user_libraries WHERE library_id = ?", libraryId);
+        for (User u : users.values()) {
+            if (u.libraryIds.contains(libraryId)) {
+                java.util.Set<String> s = new java.util.HashSet<>(u.libraryIds);
+                s.remove(libraryId);
+                u.libraryIds = java.util.Set.copyOf(s);
+            }
+        }
     }
 
     // ================================================================== sessions
