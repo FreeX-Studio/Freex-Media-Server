@@ -152,6 +152,14 @@ without a framework or build step:
 | `cast.js` | Google Cast sender (only loaded in Chrome over HTTPS) |
 | `boot.js` | Starts the app after all parts have registered |
 
+Texts are English in the code and go through `t()`, which looks them up in the catalog of the user's display
+language (`i18n.js`, `i18n/de.js`). The server answers with messages in the same language: error answers carry the
+translated `error` and a stable `code` (the catalog key) for apps.
+
+Each user chooses which sidebar entries are pinned. Unpinned entries are stored as ids (`history`,
+`library:<id>`) in the user's preferences, so the choice follows them to every device; the *More* view at the end of
+the sidebar lists all entries with pin buttons.
+
 All markup is created with `h()`, which sets text and attributes but never parses HTML from data, so titles or file
 names cannot inject markup. The parts share the global object `window.FreeX`. FreeX Web has its own version in
 `version.json`.

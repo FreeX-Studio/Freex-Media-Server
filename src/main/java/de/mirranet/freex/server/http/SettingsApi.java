@@ -15,6 +15,8 @@ package de.mirranet.freex.server.http;
 import de.mirranet.freex.server.auth.PasswordHasher;
 import de.mirranet.freex.server.config.Configuration;
 import de.mirranet.freex.server.config.Settings;
+import de.mirranet.freex.server.i18n.MessageException;
+import de.mirranet.freex.server.i18n.Text;
 import de.mirranet.freex.server.json.Json;
 
 import java.io.IOException;
@@ -124,23 +126,23 @@ public final class SettingsApi {
     private void save(Exchange ex) throws IOException {
         Map<String, Object> body = ex.body();
         if (!PasswordHasher.verify(Json.str(body, "currentPassword", ""), ex.user().passwordHash)) {
-            throw new ApiException(403, "Das aktuelle Passwort ist falsch");
+            throw new ApiException(403, "error.wrongCurrentPassword");
         }
         if (!writable()) {
-            throw new ApiException(409, "Der Server darf " + running.file + " nicht ändern. Passe die Datei direkt an.");
+            throw new ApiException(409, "error.configReadOnly", running.file);
         }
         Map<String, String> saved = Settings.effective(fileText());
         Map<String, String> next = new LinkedHashMap<>(saved);
         Map<String, String> changes = new LinkedHashMap<>();
         for (Map.Entry<String, Object> e : Json.obj(body.get("values")).entrySet()) {
             Settings.Field f = Settings.field(e.getKey());
-            if (f == null) throw ApiException.badRequest("Unbekannte Einstellung " + e.getKey());
+            if (f == null) throw ApiException.badRequest("error.unknownSetting", e.getKey());
             if (f.type() == Settings.Type.SECRET && e.getValue() == null) continue; // unchanged
             String value;
             try {
                 value = Settings.validate(f, e.getValue());
-            } catch (IllegalArgumentException iae) {
-                throw ApiException.badRequest(iae.getMessage());
+            } catch (MessageException me) {
+                throw ApiException.of(400, me);
             }
             if (!value.equals(saved.get(f.key()))) changes.put(f.key(), value);
             next.put(f.key(), value);
@@ -167,10 +169,10 @@ public final class SettingsApi {
             try {
                 InetAddress a = InetAddress.getByName(address);
                 if (!a.isAnyLocalAddress() && !a.isLoopbackAddress() && NetworkInterface.getByInetAddress(a) == null) {
-                    throw ApiException.badRequest("Die Adresse " + address + " gehört zu keiner Netzwerkschnittstelle dieses Servers");
+                    throw ApiException.badRequest("error.addressNotLocal", address);
                 }
             } catch (IOException e) {
-                throw ApiException.badRequest("Die Adresse " + address + " ist ungültig");
+                throw ApiException.badRequest("error.addressInvalid", address);
             }
         }
         // The current port is held by this server itself, so only a different port can be tested.
@@ -179,8 +181,7 @@ public final class SettingsApi {
                 s.setReuseAddress(true);
                 s.bind(new InetSocketAddress(address, port));
             } catch (IOException e) {
-                throw ApiException.badRequest("Port " + port + " ist nicht verfügbar (" + e.getMessage() + ")"
-                        + (port < 1024 ? ". Ports unter 1024 brauchen besondere Rechte." : ""));
+                throw ApiException.badRequest(port < 1024 ? "error.portPrivileged" : "error.portUnavailable", port, e.getMessage());
             }
         }
     }
@@ -197,12 +198,10 @@ public final class SettingsApi {
             Files.writeString(probe, "ok");
             Files.delete(probe);
         } catch (IOException | SecurityException e) {
-            String why = e instanceof AccessDeniedException ? "keine Berechtigung"
+            Object why = e instanceof AccessDeniedException ? new Text("error.accessDenied")
                     : e instanceof FileSystemException fse && fse.getReason() != null ? fse.getReason()
-                    : e instanceof NoSuchFileException ? "Pfad nicht vorhanden" : e.getClass().getSimpleName();
-            throw ApiException.badRequest("Der Server kann nicht in " + dir + " schreiben (" + why + "). "
-                    + "Prüfe die Rechte für den Benutzer des Servers. Läuft er als systemd-Dienst, gib den Ordner dort frei: "
-                    + "sudo systemctl edit freex-media-server und unter [Service] ReadWritePaths=" + dir + " eintragen.");
+                    : e instanceof NoSuchFileException ? new Text("error.noSuchPath") : e.getClass().getSimpleName();
+            throw ApiException.badRequest("error.directoryNotWritable", dir, why);
         }
     }
 
@@ -212,11 +211,11 @@ public final class SettingsApi {
         String keystore = next.get("server.tlsKeystore").trim();
         if (keystore.isEmpty()) return;
         Path p = running.file.getParent().resolve(keystore).normalize();
-        if (!Files.isReadable(p)) throw ApiException.badRequest("Keystore " + p + " nicht gefunden oder nicht lesbar");
+        if (!Files.isReadable(p)) throw ApiException.badRequest("error.keystoreMissing", p);
         try {
             WebServer.sslContext(p.toString(), next.get("server.tlsKeystorePassword"));
         } catch (IOException e) {
-            throw ApiException.badRequest("Keystore lässt sich nicht öffnen: falsches Passwort oder kein PKCS#12-Format");
+            throw ApiException.badRequest("error.keystoreInvalid");
         }
     }
 

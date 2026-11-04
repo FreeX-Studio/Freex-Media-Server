@@ -17,6 +17,7 @@
  */
 window.FreeX = (() => {
     "use strict";
+    const {t, tn, tParts, num, locale} = window.FreeXI18n;
 
     const S = {
         token: null,
@@ -25,6 +26,7 @@ window.FreeX = (() => {
         libraries: [],
         pollTimer: null,
         cleanup: null, // called when leaving the current view
+        navMore: false, // sidebar shows all entries with pin buttons instead of the pinned ones
     };
 
     const store = {
@@ -104,6 +106,9 @@ window.FreeX = (() => {
         together: svg('<circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M15.5 14.6c2.6-.2 4.9 1.4 5.6 4.4"/>'),
         skip: svg('<path d="M5 5v14l9-7z"/><path d="M17 5v14"/>'),
         user: svg('<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.4 4.2-6.5 8-6.5s7 2.1 8 6.5"/>'),
+        pin: svg('<path d="M9 4h6l-1 6 4 4H6l4-4z"/><path d="M12 14v7"/>'),
+        pinned: '<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l-1 6 4 4H6l4-4z" fill="currentColor" stroke="currentColor"/><path d="M12 14v7" fill="none" stroke="currentColor"/></svg>',
+        moreVertical: '<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>',
     };
     const icon = (name, cls) => h("span", {class: "ico" + (cls ? " " + cls : ""), html: ICONS[name], "aria-hidden": "true"});
 
@@ -112,10 +117,10 @@ window.FreeX = (() => {
     function fmtDuration(ms) {
         if (!ms) return "";
         const min = Math.round(ms / 60000);
-        if (min < 60) return `${min} Min.`;
+        if (min < 60) return t("{0} min", min);
         const hrs = Math.floor(min / 60);
         const rest = min % 60;
-        return rest ? `${hrs} Std. ${rest} Min.` : `${hrs} Std.`;
+        return rest ? t("{0} hr {1} min", hrs, rest) : t("{0} hr", hrs);
     }
 
     function fmtClock(ms) {
@@ -128,29 +133,21 @@ window.FreeX = (() => {
     }
 
     function fmtDate(ms) {
-        if (!ms) return "nie";
-        return new Date(ms).toLocaleString("de-DE", {dateStyle: "medium", timeStyle: "short"});
+        if (!ms) return t("never");
+        return new Date(ms).toLocaleString(locale(), {dateStyle: "medium", timeStyle: "short"});
     }
 
     function fmtSize(bytes) {
         if (!bytes) return "";
         const gb = bytes / 1024 ** 3;
-        return gb >= 1 ? `${gb.toFixed(1).replace(".", ",")} GB` : `${Math.round(bytes / 1024 ** 2)} MB`;
+        return gb >= 1 ? `${num(gb, 1)} GB` : `${num(bytes / 1024 ** 2, 0)} MB`;
     }
 
     function fmtBitrate(bps) {
         if (!bps) return "";
-        return bps >= 1e6 ? `${(bps / 1e6).toFixed(1).replace(".", ",")} Mbit/s` : `${Math.round(bps / 1e3)} kbit/s`;
+        return bps >= 1e6 ? `${num(bps / 1e6, 1)} Mbit/s` : `${num(bps / 1e3, 0)} kbit/s`;
     }
 
-    const LANGS = {de: "Deutsch", ger: "Deutsch", deu: "Deutsch", en: "Englisch", eng: "Englisch", fr: "Französisch",
-        fre: "Französisch", fra: "Französisch", es: "Spanisch", spa: "Spanisch", it: "Italienisch", ita: "Italienisch",
-        nl: "Niederländisch", nld: "Niederländisch", dut: "Niederländisch", ja: "Japanisch", jpn: "Japanisch",
-        tr: "Türkisch", tur: "Türkisch", pl: "Polnisch", pol: "Polnisch", ru: "Russisch", rus: "Russisch",
-        sv: "Schwedisch", swe: "Schwedisch", da: "Dänisch", dan: "Dänisch", no: "Norwegisch", nor: "Norwegisch",
-        ko: "Koreanisch", kor: "Koreanisch", zh: "Chinesisch", chi: "Chinesisch", zho: "Chinesisch", pt: "Portugiesisch",
-        por: "Portugiesisch"};
-    const language = (code) => LANGS[code] || (code ? code.toUpperCase() : "");
 
     const CODECS = {ac3: "Dolby Digital", eac3: "Dolby Digital+", dts: "DTS", truehd: "Dolby TrueHD", aac: "AAC",
         mp3: "MP3", flac: "FLAC", opus: "Opus", vorbis: "Vorbis", pcm_s16le: "PCM", pcm_s24le: "PCM",
@@ -159,17 +156,14 @@ window.FreeX = (() => {
     const codecName = (c) => CODECS[c] || (c || "").toUpperCase();
 
     function channels(n) {
-        return {1: "Mono", 2: "Stereo", 6: "5.1", 8: "7.1"}[n] || (n ? `${n} Kanäle` : "");
+        return {1: "Mono", 2: "Stereo", 6: "5.1", 8: "7.1"}[n] || (n ? t("{0} channels", n) : "");
     }
 
     // ------------------------------------------------------------------ language preferences
 
-    /** Languages offered in the preferences (ISO 639-1), as the server accepts them. */
-    const PREF_LANGS = [["de", "Deutsch"], ["en", "Englisch"], ["fr", "Französisch"], ["es", "Spanisch"],
-        ["it", "Italienisch"], ["nl", "Niederländisch"], ["pt", "Portugiesisch"], ["pl", "Polnisch"], ["ru", "Russisch"],
-        ["tr", "Türkisch"], ["sv", "Schwedisch"], ["da", "Dänisch"], ["no", "Norwegisch"], ["fi", "Finnisch"],
-        ["cs", "Tschechisch"], ["hu", "Ungarisch"], ["el", "Griechisch"], ["ja", "Japanisch"], ["ko", "Koreanisch"],
-        ["zh", "Chinesisch"], ["ar", "Arabisch"], ["hi", "Hindi"]];
+    /** Audio and subtitle languages offered in the preferences (ISO 639-1), as the server accepts them. */
+    const PREF_LANGS = ["de", "en", "fr", "es", "it", "nl", "pt", "pl", "ru", "tr", "sv", "da", "no", "fi", "cs", "hu",
+        "el", "ja", "ko", "zh", "ar", "hi"];
 
     /** ISO 639-2 (B and T) codes as found in media files, mapped to ISO 639-1. */
     const ISO3 = {ger: "de", deu: "de", eng: "en", fre: "fr", fra: "fr", spa: "es", ita: "it", dut: "nl", nld: "nl",
@@ -180,6 +174,19 @@ window.FreeX = (() => {
         const c = String(code || "").toLowerCase().split(/[-_]/)[0];
         return ISO3[c] || c;
     };
+
+    /** Name of a language (ISO 639-1 or -2 code) in the display language. */
+    function language(code) {
+        if (!code) return "";
+        const c = normLang(code);
+        try {
+            const name = new Intl.DisplayNames([locale()], {type: "language"}).of(c);
+            if (name && name.toLowerCase() !== c) return name.charAt(0).toUpperCase() + name.slice(1);
+        } catch (e) {
+            // not a valid language code
+        }
+        return String(code).toUpperCase();
+    }
 
     /**
      * The tracks to start with when the user picked none: audio in the preferred language
@@ -223,15 +230,15 @@ window.FreeX = (() => {
     }
 
     function audioLabel(a) {
-        return [language(a.language) || "Unbekannt", a.title && !/^(stereo|surround|5\.1)$/i.test(a.title) ? `(${a.title})` : "",
+        return [language(a.language) || t("Unknown"), a.title && !/^(stereo|surround|5\.1)$/i.test(a.title) ? `(${a.title})` : "",
             `${codecName(a.codec)} ${channels(a.channels)}`.trim()].filter(Boolean).join(" ");
     }
 
     function subtitleLabel(s) {
-        const parts = [language(s.language) || "Unbekannt"];
-        if (s.forced) parts.push("erzwungen");
+        const parts = [language(s.language) || t("Unknown")];
+        if (s.forced) parts.push(t("forced"));
         if (s.title && !s.forced) parts.push(s.title);
-        return `${parts.join(", ")} (${codecName(s.codec)}${s.external ? ", Datei" : ""})`;
+        return `${parts.join(", ")} (${codecName(s.codec)}${s.external ? ", " + t("file") : ""})`;
     }
 
     function episodeCode(it) {
@@ -242,20 +249,20 @@ window.FreeX = (() => {
 
     /** Short device name from a user agent, for the session list. */
     function deviceName(ua) {
-        if (!ua) return "Unbekanntes Gerät";
+        if (!ua) return t("Unknown device");
         const browser = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Firefox\//.test(ua) ? "Firefox"
-            : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : /curl|wget|python|java/i.test(ua) ? "Skript" : "Browser";
+            : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : /curl|wget|python|java/i.test(ua) ? t("Script") : "Browser";
         const os = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android"
             : /Windows/.test(ua) ? "Windows" : /Mac OS X|Macintosh/.test(ua) ? "macOS" : /CrOS/.test(ua) ? "ChromeOS"
                 : /Linux/.test(ua) ? "Linux" : "";
-        return os ? `${browser} auf ${os}` : browser;
+        return os ? t("{0} on {1}", browser, os) : browser;
     }
 
     function toast(msg, isError) {
-        document.querySelectorAll(".toast").forEach((t) => t.remove());
-        const t = h("div", {class: "toast" + (isError ? " error" : ""), role: "status"}, msg);
-        document.body.append(t);
-        setTimeout(() => t.remove(), 3800);
+        document.querySelectorAll(".toast").forEach((el) => el.remove());
+        const el = h("div", {class: "toast" + (isError ? " error" : ""), role: "status"}, msg);
+        document.body.append(el);
+        setTimeout(() => el.remove(), 3800);
     }
 
     const img = (id, kind) => `/api/items/${encodeURIComponent(id)}/image/${kind}`;
@@ -269,15 +276,18 @@ window.FreeX = (() => {
 
     // ------------------------------------------------------------------ API
 
+    /** An error answer of the server: HTTP status, translated message and the message key as code. */
     class ApiError extends Error {
-        constructor(status, message) {
+        constructor(status, message, code) {
             super(message);
             this.status = status;
+            this.code = code || "";
         }
     }
 
     async function api(method, path, body) {
-        const headers = {};
+        // Signed-in users get messages in their display language; before that, in the one shown here.
+        const headers = {"Accept-Language": FreeXI18n.lang()};
         if (S.token) headers["X-FreeX-Token"] = S.token;
         if (body !== undefined) headers["Content-Type"] = "application/json";
         let res;
@@ -285,7 +295,7 @@ window.FreeX = (() => {
             res = await fetch(path, {method, headers, credentials: "same-origin",
                 body: body === undefined ? undefined : JSON.stringify(body)});
         } catch (e) {
-            throw new ApiError(0, "Der Server ist nicht erreichbar");
+            throw new ApiError(0, t("The server cannot be reached"));
         }
         if (res.status === 204) return null;
         let data = null;
@@ -299,9 +309,17 @@ window.FreeX = (() => {
                 logoutLocal();
                 navigate("/login?next=" + encodeURIComponent(location.pathname + location.search), true);
             }
-            throw new ApiError(res.status, (data && data.error) || `Fehler ${res.status}`);
+            throw new ApiError(res.status, (data && data.error) || t("Error {0}", res.status), data && data.code);
         }
         return data;
+    }
+
+    /** Switches to the user's display language; the shell is rebuilt if it was drawn in another one. */
+    function applyLanguage() {
+        const before = FreeXI18n.lang();
+        if (FreeXI18n.setLanguage((S.user.preferences || {}).uiLanguage || "") !== before) {
+            document.querySelector(".shell")?.remove();
+        }
     }
 
     function logoutLocal() {
@@ -370,8 +388,8 @@ window.FreeX = (() => {
                 S.status = await api("GET", "/api/status");
             } catch (e) {
                 document.getElementById("app").replaceChildren(h("div", {class: "auth"},
-                    h("div", {class: "auth-box"}, h("h1", null, "Server nicht erreichbar"), h("p", null, e.message),
-                        h("button", {class: "btn", onclick: () => location.reload()}, "Erneut versuchen"))));
+                    h("div", {class: "auth-box"}, h("h1", null, t("Server not reachable")), h("p", null, e.message),
+                        h("button", {class: "btn", onclick: () => location.reload()}, t("Try again")))));
                 return;
             }
             document.title = S.status.name;
@@ -399,6 +417,7 @@ window.FreeX = (() => {
                 return navigate("/login?next=" + encodeURIComponent(path + location.search), true);
             }
         }
+        applyLanguage();
         if (match && !match.r.shell) {
             document.querySelector(".shell")?.remove();
             return match.r.handler(null, match.params, query);
@@ -408,11 +427,11 @@ window.FreeX = (() => {
         main.replaceChildren(h("div", {class: "loading"}, h("span", {class: "spin"})));
         try {
             if (match) await match.r.handler(main, match.params, query);
-            else main.replaceChildren(emptyState("Seite nicht gefunden", "Diese Adresse gibt es nicht.",
-                link("/", {class: "btn"}, "Zur Startseite")));
+            else main.replaceChildren(emptyState(t("Page not found"), t("This address does not exist."),
+                link("/", {class: "btn"}, t("Go to the home screen"))));
         } catch (e) {
             if (e instanceof ApiError && e.status === 401) return;
-            main.replaceChildren(emptyState("Das hat nicht geklappt", e.message, link("/", {class: "btn"}, "Zur Startseite")));
+            main.replaceChildren(emptyState(t("That did not work"), e.message, link("/", {class: "btn"}, t("Go to the home screen"))));
         }
         if (!(history.state && history.state.keepScroll)) main.scrollTop = 0;
     }
@@ -455,12 +474,12 @@ window.FreeX = (() => {
 
     // ------------------------------------------------------------------ activity (admins)
 
-    const MODE_LABELS = {direct: "Direkte Wiedergabe", remux: "Direct Stream", audio: "Direct Stream (Ton umgewandelt)", transcode: "Umwandlung"};
+    const MODE_LABELS = {direct: "Direct play", remux: "Direct stream", audio: "Direct stream (audio converted)", transcode: "Transcoding"};
 
     /** Header button with the number of running playbacks; opens the activity panel. */
     function activityButton() {
         const badge = h("span", {class: "badge", hidden: true});
-        const btn = h("button", {class: "icon-btn activity-btn", title: "Aktivität", "aria-label": "Aktivität", "data-menu": true,
+        const btn = h("button", {class: "icon-btn activity-btn", title: t("Activity"), "aria-label": t("Activity"), "data-menu": true,
             onclick: () => document.querySelector(".activity-panel") ? closeMenus() : openActivity(btn, badge)}, icon("activity"), badge);
         const update = async () => {
             if (!btn.isConnected) return clearInterval(timer);
@@ -484,9 +503,9 @@ window.FreeX = (() => {
 
     function openActivity(anchor, badge) {
         closeMenus();
-        const body = h("div", {class: "activity-body"}, h("div", {class: "activity-empty"}, "Wird geladen …"));
-        const panel = h("div", {class: "popup activity-panel", role: "dialog", "aria-label": "Aktivität"},
-            h("div", {class: "activity-head"}, "Aktivität"), body);
+        const body = h("div", {class: "activity-body"}, h("div", {class: "activity-empty"}, t("Loading …")));
+        const panel = h("div", {class: "popup activity-panel", role: "dialog", "aria-label": t("Activity")},
+            h("div", {class: "activity-head"}, t("Activity")), body);
         document.body.append(panel);
         const r = anchor.getBoundingClientRect();
         Object.assign(panel.style, {top: r.bottom + 8 + "px", left: Math.max(8, Math.min(window.innerWidth - panel.offsetWidth - 8, r.right - panel.offsetWidth)) + "px"});
@@ -510,14 +529,14 @@ window.FreeX = (() => {
                         h("div", {class: "activity-user"}, s.user ? avatar(s.user, "small") : null,
                             h("span", null, [s.user ? s.user.username : "", s.device || deviceName(s.userAgent)].filter(Boolean).join(" · "))),
                         h("div", {class: "activity-mode" + (s.mode === "transcode" ? " transcode" : "")},
-                            s.state === "paused" ? "Pausiert · " : "", MODE_LABELS[s.mode] || s.mode || "",
+                            s.state === "paused" ? t("Paused") + " · " : "", MODE_LABELS[s.mode] ? t(MODE_LABELS[s.mode]) : s.mode || "",
                             s.quality && s.quality !== "Original" ? ` · ${s.quality}` : ""),
                         h("div", {class: "activity-progress"}, h("span", {style: {width: pct + "%"}})),
                         h("div", {class: "activity-time"}, `${fmtClock(s.offsetMs)} / ${fmtClock(s.durationMs)}`)));
             });
-            const tasks = a.tasks.map((t) => h("div", {class: "activity-task"}, h("span", {class: "spin"}), t.title));
+            const tasks = a.tasks.map((task) => h("div", {class: "activity-task"}, h("span", {class: "spin"}), task.title));
             body.replaceChildren(...rows, ...tasks);
-            if (!rows.length && !tasks.length) body.append(h("div", {class: "activity-empty"}, "Gerade läuft nichts."));
+            if (!rows.length && !tasks.length) body.append(h("div", {class: "activity-empty"}, t("Nothing is playing right now.")));
         };
         const load = async () => {
             if (!panel.isConnected) return clearInterval(timer);
@@ -547,7 +566,7 @@ window.FreeX = (() => {
     function shell(path) {
         let root = document.querySelector(".shell");
         if (!root) {
-            const search = h("input", {type: "search", placeholder: "Suchen", "aria-label": "Filme und Serien durchsuchen"});
+            const search = h("input", {type: "search", placeholder: t("Search"), "aria-label": t("Search movies and shows")});
             let timer = null;
             search.addEventListener("input", () => {
                 clearTimeout(timer);
@@ -560,24 +579,24 @@ window.FreeX = (() => {
                 if (e.key === "Enter" && search.value.trim()) navigate("/search?q=" + encodeURIComponent(search.value.trim()));
             });
 
-            const userBtn = h("button", {class: "user-button", "data-menu": true, "aria-haspopup": "menu", "aria-label": "Konto",
+            const userBtn = h("button", {class: "user-button", "data-menu": true, "aria-haspopup": "menu", "aria-label": t("Account"),
                 onclick: (e) => popup(e.currentTarget, [
                     {label: S.user.username, onclick: () => navigate("/settings/account")},
                     null,
-                    {label: "Konto und Sicherheit", onclick: () => navigate("/settings/security")},
-                    S.user.admin ? {label: "Server-Einstellungen", onclick: () => navigate("/settings/libraries")} : undefined,
+                    {label: t("Account and security"), onclick: () => navigate("/settings/security")},
+                    S.user.admin ? {label: t("Server settings"), onclick: () => navigate("/settings/libraries")} : undefined,
                     null,
-                    {label: "Abmelden", onclick: logout},
+                    {label: t("Sign out"), onclick: logout},
                 ])}, avatar(S.user));
 
             root = h("div", {class: "shell"},
                 h("header", {class: "topbar"},
-                    h("button", {class: "icon-btn menu-toggle", "aria-label": "Menü ein- oder ausklappen", title: "Menü", onclick: toggleNav}, icon("menu")),
-                    link("/", {class: "brand", "aria-label": "Startseite"}, h("img", {src: "/icon.svg", alt: ""}), h("span", null, "Free", h("b", null, "X"))),
+                    h("button", {class: "icon-btn menu-toggle", "aria-label": t("Expand or collapse the menu"), title: t("Menu"), onclick: toggleNav}, icon("menu")),
+                    link("/", {class: "brand", "aria-label": t("Home")}, h("img", {src: "/icon.svg", alt: ""}), h("span", null, "Free", h("b", null, "X"))),
                     h("div", {class: "search"}, icon("search"), search),
                     h("div", {class: "spacer"}),
                     S.user.admin ? activityButton() : null,
-                    link("/settings", {class: "icon-btn", title: "Einstellungen", "aria-label": "Einstellungen"}, icon("wrench")),
+                    link("/settings", {class: "icon-btn", title: t("Settings"), "aria-label": t("Settings")}, icon("wrench")),
                     userBtn),
                 h("nav", {class: "sidebar", "aria-label": "Navigation"}),
                 h("main", {class: "main"}));
@@ -602,22 +621,95 @@ window.FreeX = (() => {
         return root.querySelector(".main");
     }
 
+    /**
+     * All sidebar entries. The id is what the user's preferences store when the entry is unpinned;
+     * the home screen cannot be unpinned.
+     */
+    function navEntries(current) {
+        const entries = [
+            {id: "home", href: "/", icon: "home", label: t("Home"), active: current === "/", fixed: true},
+            {id: "watchlist", href: "/watchlist", icon: "bookmark", label: t("Watchlist"), active: current === "/watchlist"},
+            {id: "playlists", href: "/playlists", icon: "playlist", label: t("Playlists"), active: current.startsWith("/playlist")},
+            {id: "history", href: "/history", icon: "history", label: t("History"), active: current === "/history"},
+        ];
+        for (const l of S.libraries) {
+            entries.push({id: "library:" + l.id, href: `/library/${l.id}`, icon: l.type === "shows" ? "shows" : "movies",
+                label: l.name, active: current.startsWith(`/library/${l.id}`), library: true,
+                extra: l.scanning ? h("span", {class: "spin", title: t("Scanning")}) : null});
+        }
+        return entries;
+    }
+
+    const unpinned = () => new Set((S.user.preferences || {}).unpinned || []);
+
+    async function setPinned(id, pin) {
+        const set = unpinned();
+        if (pin) set.delete(id); else set.add(id);
+        const before = S.user.preferences.unpinned;
+        S.user.preferences.unpinned = [...set];
+        renderSidebar();
+        try {
+            S.user = await api("PUT", "/api/me/preferences", {unpinned: [...set]});
+        } catch (e) {
+            S.user.preferences.unpinned = before;
+            renderSidebar();
+            toast(e.message, true);
+        }
+    }
+
+    function showAllNav(on) {
+        S.navMore = on;
+        const root = document.querySelector(".shell");
+        // The list with pin buttons needs room: leave the icon-only modes.
+        if (on && root) {
+            if (window.matchMedia("(max-width: 860px)").matches) root.classList.add("nav-open");
+            else if (root.classList.contains("nav-collapsed")) toggleNav();
+        }
+        renderSidebar();
+        document.querySelector(".sidebar .nav-link, .sidebar button")?.focus();
+    }
+
+    /** Replaces the children of an element with a nested list of nodes, skipping empty entries. */
+    const fill = (el, nodes) => el.replaceChildren(...nodes.flat(Infinity).filter(Boolean));
+
     function renderSidebar(path) {
         const nav = document.querySelector(".sidebar");
         if (!nav) return;
-        const current = path || location.pathname;
-        const item = (href, iconName, label, extra, active) => link(href,
-            {class: "nav-link" + (active ? " active" : ""), title: label}, icon(iconName), h("span", {class: "label"}, label), extra);
-        nav.replaceChildren(...[
-            item("/", "home", "Startseite", null, current === "/"),
-            item("/watchlist", "bookmark", "Merkliste", null, current === "/watchlist"),
-            item("/playlists", "playlist", "Playlists", null, current.startsWith("/playlist")),
-            item("/history", "history", "Verlauf", null, current === "/history"),
-            S.libraries.length ? h("div", {class: "nav-group"}, S.status.name) : null,
-            S.libraries.map((l) => item(`/library/${l.id}`, l.type === "shows" ? "shows" : "movies", l.name,
-                l.scanning ? h("span", {class: "spin", title: "Wird gescannt"}) : null,
-                current.startsWith(`/library/${l.id}`))),
-        ].flat(Infinity).filter(Boolean));
+        const entries = navEntries(path || location.pathname);
+        const hidden = unpinned();
+        const navLink = (e) => link(e.href, {class: "nav-link" + (e.active ? " active" : ""), title: e.label},
+            icon(e.icon), h("span", {class: "label"}, e.label), e.extra);
+        const groupTitle = h("div", {class: "nav-group"}, S.status.name);
+
+        if (S.navMore) {
+            const row = (e) => {
+                const pinned = !hidden.has(e.id);
+                return h("div", {class: "nav-item"}, navLink(e), e.fixed ? null : h("button", {
+                    class: "nav-action pin" + (pinned ? " on" : ""), "aria-pressed": String(pinned),
+                    title: pinned ? t("Unpin") : t("Pin"), "aria-label": pinned ? t("Unpin {0}", e.label) : t("Pin {0}", e.label),
+                    html: ICONS[pinned ? "pinned" : "pin"], onclick: () => setPinned(e.id, !pinned)}));
+            };
+            fill(nav, [
+                h("button", {class: "nav-link nav-back", onclick: () => showAllNav(false)}, icon("back"),
+                    h("span", {class: "label"}, t("Pinned"))),
+                entries.filter((e) => !e.library).map(row),
+                entries.some((e) => e.library) ? groupTitle : null,
+                entries.filter((e) => e.library).map(row)]);
+            return;
+        }
+        const shown = entries.filter((e) => !hidden.has(e.id));
+        const pinnedRow = (e) => h("div", {class: "nav-item"}, navLink(e), e.fixed ? null : h("button", {
+            class: "nav-action", "data-menu": true, title: t("More"), "aria-label": t("More options for {0}", e.label),
+            "aria-haspopup": "menu", html: ICONS.moreVertical, onclick: (ev) => popup(ev.currentTarget, [
+                {label: t("Unpin"), onclick: () => setPinned(e.id, false)},
+                {label: t("Edit sidebar"), onclick: () => showAllNav(true)},
+            ])}));
+        fill(nav, [
+            shown.filter((e) => !e.library).map(pinnedRow),
+            shown.some((e) => e.library) ? groupTitle : null,
+            shown.filter((e) => e.library).map(pinnedRow),
+            h("button", {class: "nav-link nav-more", title: t("More"), onclick: () => showAllNav(true)},
+                icon("next"), h("span", {class: "label"}, t("More")))]);
     }
 
     /** Reloads the library list; while a scan is running it polls and refreshes the view when done. */
@@ -630,7 +722,7 @@ window.FreeX = (() => {
             clearTimeout(S.pollTimer);
             if (scanning) S.pollTimer = setTimeout(refreshLibraries, 2500);
             if (before && !scanning && !location.pathname.startsWith("/play/")) {
-                toast("Scan abgeschlossen");
+                toast(t("Scan finished"));
                 render();
             }
         } catch (e) {
@@ -651,10 +743,10 @@ window.FreeX = (() => {
         if (item.type === "show" || item.type === "season") {
             const left = (item.leafCount || 0) - (item.viewedLeafCount || 0);
             if (!left) return null;
-            return left === item.leafCount ? h("span", {class: "badge-new", title: "Ungesehen"})
-                : h("span", {class: "badge-count", title: `${left} ungesehen`}, left);
+            return left === item.leafCount ? h("span", {class: "badge-new", title: t("Unwatched")})
+                : h("span", {class: "badge-count", title: t("{0} unwatched", left)}, left);
         }
-        if (item.progress && !item.progress.watched && !item.progress.offsetMs) return h("span", {class: "badge-new", title: "Ungesehen"});
+        if (item.progress && !item.progress.watched && !item.progress.offsetMs) return h("span", {class: "badge-new", title: t("Unwatched")});
         return null;
     }
 
@@ -663,9 +755,9 @@ window.FreeX = (() => {
             case "movie":
                 return item.year || "";
             case "show":
-                return item.childCount === 1 ? "1 Staffel" : `${item.childCount || 0} Staffeln`;
+                return tn(item.childCount || 0, "1 season", "{0} seasons");
             case "season":
-                return `${item.leafCount || 0} Episoden`;
+                return tn(item.leafCount || 0, "1 episode", "{0} episodes");
             case "episode":
                 return `${episodeCode(item)}, ${item.title}`;
             default:
@@ -680,7 +772,7 @@ window.FreeX = (() => {
 
     async function setWatched(item, watched) {
         await api(watched ? "POST" : "DELETE", `/api/items/${item.id}/watched`);
-        toast(watched ? "Als gesehen markiert" : "Als ungesehen markiert");
+        toast(watched ? t("Marked as watched") : t("Marked as unwatched"));
         history.replaceState({keepScroll: true}, "");
         render();
     }
@@ -697,13 +789,13 @@ window.FreeX = (() => {
         const watched = isWatched(item);
         const extra = menuExtensions.flatMap((f) => f(item) || []);
         popup(anchor, [
-            item.type === "movie" || item.type === "episode" ? {label: "Abspielen", onclick: () => navigate(playHref(item))} : undefined,
-            item.type === "movie" || item.type === "episode" ? {label: "Von vorne abspielen", onclick: () => navigate(`/play/${item.id}`)} : undefined,
-            {label: watched ? "Als ungesehen markieren" : "Als gesehen markieren", onclick: () => setWatched(item, !watched)},
+            item.type === "movie" || item.type === "episode" ? {label: t("Play"), onclick: () => navigate(playHref(item))} : undefined,
+            item.type === "movie" || item.type === "episode" ? {label: t("Play from the beginning"), onclick: () => navigate(`/play/${item.id}`)} : undefined,
+            {label: watched ? t("Mark as unwatched") : t("Mark as watched"), onclick: () => setWatched(item, !watched)},
             null,
-            {label: "Details anzeigen", onclick: () => navigate(`/item/${item.id}`)},
-            item.showId ? {label: "Zur Serie", onclick: () => navigate(`/item/${item.showId}`)} : undefined,
-            item.seasonId ? {label: "Zur Staffel", onclick: () => navigate(`/item/${item.seasonId}`)} : undefined,
+            {label: t("Show details"), onclick: () => navigate(`/item/${item.id}`)},
+            item.showId ? {label: t("Go to show"), onclick: () => navigate(`/item/${item.showId}`)} : undefined,
+            item.seasonId ? {label: t("Go to season"), onclick: () => navigate(`/item/${item.seasonId}`)} : undefined,
             extra.length ? null : undefined,
             ...extra,
         ]);
@@ -717,7 +809,8 @@ window.FreeX = (() => {
             : item.firstItemId ? img(item.firstItemId, "poster") : null;
         const pic = src ? h("img", {src, alt: "", loading: "lazy"}) : h("div", {class: "placeholder"}, h("span", null, item.title));
         if (src) pic.addEventListener("error", () => pic.replaceWith(h("div", {class: "placeholder"}, h("span", null, item.title))));
-        const count = isColl ? `${item.childCount} Titel` : `${item.childCount} Einträge${item.durationMs ? ", " + fmtDuration(item.durationMs) : ""}`;
+        const count = isColl ? tn(item.childCount, "1 title", "{0} titles")
+            : tn(item.childCount, "1 entry", "{0} entries") + (item.durationMs ? ", " + fmtDuration(item.durationMs) : "");
         return link(href, {class: "card " + (isColl ? "collection" : "playlist")},
             h("div", {class: "art"}, pic, h("span", {class: "list-badge"}, icon(isColl ? "collection" : "playlist"))),
             h("div", {class: "title", title: item.title}, item.title),
@@ -732,19 +825,19 @@ window.FreeX = (() => {
         const title = item.type === "episode" && landscape ? item.showTitle || item.title : item.title;
         const playable = item.type === "movie" || item.type === "episode";
         const actions = h("div", {class: "card-actions"},
-            playable ? h("button", {class: "card-play", title: "Abspielen", "aria-label": `${title} abspielen`, html: ICONS.play,
+            playable ? h("button", {class: "card-play", title: t("Play"), "aria-label": t("Play {0}", title), html: ICONS.play,
                 onclick: (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     navigate(playHref(item));
                 }}) : null,
-            h("button", {class: "card-btn card-check", title: isWatched(item) ? "Als ungesehen markieren" : "Als gesehen markieren",
-                "aria-label": "Gesehen umschalten", html: ICONS.check, onclick: (e) => {
+            h("button", {class: "card-btn card-check", title: isWatched(item) ? t("Mark as unwatched") : t("Mark as watched"),
+                "aria-label": t("Toggle watched"), html: ICONS.check, onclick: (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     setWatched(item, !isWatched(item));
                 }}),
-            h("button", {class: "card-btn card-more", title: "Mehr", "aria-label": "Mehr", "data-menu": true, html: ICONS.more,
+            h("button", {class: "card-btn card-more", title: t("More"), "aria-label": t("More"), "data-menu": true, html: ICONS.more,
                 onclick: (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -761,8 +854,8 @@ window.FreeX = (() => {
         const row = h("div", {class: "row" + (hub.style === "landscape" ? " landscape" : "")}, hub.items.map((it) => card(it, hub.style)));
         if (hub.href) moreHref = hub.href;
         const scrollBy = (dir) => row.scrollBy({left: dir * row.clientWidth * 0.85, behavior: "smooth"});
-        const prev = h("button", {class: "row-arrow", "aria-label": "Zurück", onclick: () => scrollBy(-1)}, icon("back"));
-        const next = h("button", {class: "row-arrow", "aria-label": "Weiter", onclick: () => scrollBy(1)}, icon("next"));
+        const prev = h("button", {class: "row-arrow", "aria-label": t("Back"), onclick: () => scrollBy(-1)}, icon("back"));
+        const next = h("button", {class: "row-arrow", "aria-label": t("Next"), onclick: () => scrollBy(1)}, icon("next"));
         const update = () => {
             prev.disabled = row.scrollLeft <= 4;
             next.disabled = row.scrollLeft + row.clientWidth >= row.scrollWidth - 4;
@@ -776,7 +869,7 @@ window.FreeX = (() => {
             row);
     }
 
-    return {S, store, h, ICONS, icon, fmtDuration, fmtClock, fmtDate, fmtSize, fmtBitrate, language, codecName, channels,
+    return {S, store, t, tn, tParts, num, locale, h, ICONS, icon, fmtDuration, fmtClock, fmtDate, fmtSize, fmtBitrate, language, codecName, channels,
         audioLabel, subtitleLabel, episodeCode, deviceName, toast, img, art, api, ApiError, logoutLocal, logout, route,
         navigate, link, render, emptyState, popup, closeMenus, refreshLibraries, renderSidebar, card, hubRow, isWatched,
         setWatched, playHref, itemMenu, progressBar, unwatchedBadge, menuExtensions, PREF_LANGS, defaultTracks, avatar,

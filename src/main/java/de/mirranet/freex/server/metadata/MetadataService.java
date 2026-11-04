@@ -12,6 +12,8 @@
 
 package de.mirranet.freex.server.metadata;
 
+import de.mirranet.freex.server.i18n.Text;
+import de.mirranet.freex.server.i18n.Translatable;
 import de.mirranet.freex.server.json.Json;
 import de.mirranet.freex.server.model.Library;
 import de.mirranet.freex.server.model.MediaItem;
@@ -65,7 +67,7 @@ public final class MetadataService implements AutoCloseable {
     private final ScheduledExecutorService saver = Executors.newSingleThreadScheduledExecutor(r -> daemon(r, "metadata-saver"));
     private final Set<String> queuedLibraries = ConcurrentHashMap.newKeySet();
     private volatile boolean dirty;
-    private volatile String lastError = "";
+    private volatile Text lastError;
     private volatile Consumer<Library> afterRefresh = l -> { };
 
     /** @param tmdb null when no API key is configured: then only stored metadata is applied */
@@ -90,7 +92,8 @@ public final class MetadataService implements AutoCloseable {
         return tmdb != null;
     }
 
-    public String lastError() {
+    /** The last error while fetching metadata, or null. */
+    public Text lastError() {
         return lastError;
     }
 
@@ -151,7 +154,7 @@ public final class MetadataService implements AutoCloseable {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
                 LOG.log(Level.WARNING, "Metadata refresh of '" + library.name + "' failed", e);
-                lastError = e.getMessage();
+                lastError = Translatable.of(e);
             } finally {
                 queuedLibraries.remove(library.id);
             }
@@ -175,11 +178,11 @@ public final class MetadataService implements AutoCloseable {
                 if (it.type == MediaItem.Type.MOVIE) refreshMovie(it, md == null ? 0 : md.locked ? md.tmdbId : 0);
                 else if (it.type == MediaItem.Type.SHOW) refreshShow(it, md == null ? 0 : md.locked ? md.tmdbId : 0);
                 done++;
-                lastError = "";
+                lastError = null;
             } catch (IOException e) {
-                lastError = e.getMessage();
+                lastError = Translatable.of(e);
                 LOG.warning("Metadata for '" + it.title + "': " + e.getMessage());
-                if (e.getMessage() != null && e.getMessage().contains("401")) break; // wrong key, stop here
+                if (e instanceof TmdbException te && te.text().key().equals("error.tmdbKeyRejected")) break; // stop here
             }
         }
         if (done > 0) {
@@ -191,7 +194,7 @@ public final class MetadataService implements AutoCloseable {
 
     /** Re-fetches one item now (after "fix match" or "refresh metadata"). */
     public void refreshItem(MediaItem it) throws IOException, InterruptedException {
-        if (tmdb == null) throw new IOException("Kein TMDB-Schlüssel eingetragen (tmdb.apiKey in config.yml)");
+        if (tmdb == null) throw new TmdbException("error.tmdbNoKey");
         MediaItem top = topOf(it);
         Metadata md = byItem.get(top.id);
         int id = md != null && md.locked ? md.tmdbId : 0;
@@ -246,7 +249,7 @@ public final class MetadataService implements AutoCloseable {
 
     /** Search for "fix match". {@code type} is movie or tv. */
     public List<Map<String, Object>> search(String type, String query, int year) throws IOException, InterruptedException {
-        if (tmdb == null) throw new IOException("Kein TMDB-Schlüssel eingetragen (tmdb.apiKey in config.yml)");
+        if (tmdb == null) throw new TmdbException("error.tmdbNoKey");
         Map<String, String> p = new LinkedHashMap<>();
         p.put("query", query);
         p.put("language", tmdb.language());

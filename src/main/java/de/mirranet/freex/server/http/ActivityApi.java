@@ -12,6 +12,7 @@
 
 package de.mirranet.freex.server.http;
 
+import de.mirranet.freex.server.i18n.Text;
 import de.mirranet.freex.server.model.Library;
 import de.mirranet.freex.server.model.MediaItem;
 import de.mirranet.freex.server.model.User;
@@ -48,7 +49,7 @@ public final class ActivityApi {
         final String client;
         final long startedAt = System.currentTimeMillis();
         volatile String mode;
-        volatile String reason;
+        volatile Text reason;
         volatile String quality;
         volatile String session;
         volatile String ip;
@@ -90,7 +91,7 @@ public final class ActivityApi {
     }
 
     /** A player started (or restarted, e.g. after a seek or quality change) a playback. */
-    void started(Exchange ex, MediaItem it, String client, String device, String mode, String reason, String quality,
+    void started(Exchange ex, MediaItem it, String client, String device, String mode, Text reason, String quality,
                  String session, long offsetMs) {
         if (client == null) return;
         Playback p = playbacks.computeIfAbsent(key(ex.user().id, it.id, client), k -> new Playback(ex.user().id, it.id, client));
@@ -168,7 +169,7 @@ public final class ActivityApi {
             if (!l.scanning) continue;
             Map<String, Object> t = new LinkedHashMap<>();
             t.put("type", "scan");
-            t.put("title", l.name + " wird gescannt");
+            t.put("title", new Text("activity.scanning", l.name));
             tasks.add(t);
         }
         Map<String, Object> m = new LinkedHashMap<>();

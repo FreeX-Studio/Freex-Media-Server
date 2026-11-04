@@ -12,23 +12,39 @@
 
 package de.mirranet.freex.server.http;
 
-/** Ends a request with the given HTTP status and a message shown in the web interface. */
-public final class ApiException extends RuntimeException {
+import de.mirranet.freex.server.i18n.MessageException;
+import de.mirranet.freex.server.i18n.Text;
+import de.mirranet.freex.server.i18n.Translatable;
+
+/**
+ * Ends a request with the given HTTP status and a message for the user, translated into the
+ * user's display language when the response is written.
+ */
+public final class ApiException extends MessageException {
 
     private static final long serialVersionUID = 1L;
 
     public final int status;
 
-    public ApiException(int status, String message) {
-        super(message);
+    public ApiException(int status, String key, Object... args) {
+        this(status, new Text(key, args));
+    }
+
+    public ApiException(int status, Text text) {
+        super(text);
         this.status = status;
     }
 
-    public static ApiException notFound() {
-        return new ApiException(404, "Nicht gefunden");
+    /** Passes on the message of another exception, translated if it has a text of its own. */
+    public static ApiException of(int status, Throwable cause) {
+        return new ApiException(status, Translatable.of(cause));
     }
 
-    public static ApiException badRequest(String message) {
-        return new ApiException(400, message);
+    public static ApiException notFound() {
+        return new ApiException(404, "error.notFound");
+    }
+
+    public static ApiException badRequest(String key, Object... args) {
+        return new ApiException(400, key, args);
     }
 }

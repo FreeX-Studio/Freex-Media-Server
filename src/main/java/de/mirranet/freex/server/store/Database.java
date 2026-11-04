@@ -161,6 +161,16 @@ public final class Database implements AutoCloseable {
                         PRIMARY KEY (user_id, library_id)
                     )""",
             },
+            // 4: display language, sidebar entries the user unpinned, login events as codes instead of German text
+            {
+                    "ALTER TABLE users ADD COLUMN ui_language TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE users ADD COLUMN unpinned TEXT NOT NULL DEFAULT ''",
+                    "UPDATE login_events SET detail = 'password' WHERE detail = 'Passwort'",
+                    "UPDATE login_events SET detail = 'password+totp' WHERE detail = 'Passwort + Authenticator'",
+                    "UPDATE login_events SET detail = 'password+recovery' WHERE detail = 'Passwort + Wiederherstellungscode'",
+                    "UPDATE login_events SET detail = 'wrong-password' WHERE detail = 'Falsches Passwort'",
+                    "UPDATE login_events SET detail = 'wrong-code' WHERE detail = 'Falscher Bestätigungscode'",
+            },
     };
 
     /** Maps one result row. */

@@ -16,6 +16,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpsConfigurator;
 import com.sun.net.httpserver.HttpsServer;
+import de.mirranet.freex.server.i18n.Text;
 import de.mirranet.freex.server.model.User;
 import de.mirranet.freex.server.store.DataStore;
 
@@ -194,7 +195,7 @@ public final class WebServer implements AutoCloseable {
             boolean unsafe = !method.equals("GET") && !method.equals("HEAD");
             if (unsafe && !sameOrigin(raw)) {
                 ex = newExchange(raw, Map.of());
-                ex.error(403, "Anfrage von fremder Seite abgelehnt");
+                ex.error(403, "error.crossSite");
                 return;
             }
             if (path.startsWith("/api/")) {
@@ -214,23 +215,23 @@ public final class WebServer implements AutoCloseable {
                     return;
                 }
                 ex = newExchange(raw, Map.of());
-                ex.error(pathMatched ? 405 : 404, pathMatched ? "Methode nicht erlaubt" : "Unbekannter Endpunkt");
+                ex.error(pathMatched ? 405 : 404, pathMatched ? "error.methodNotAllowed" : "error.unknownEndpoint");
                 return;
             }
             ex = newExchange(raw, Map.of());
             serveStatic(ex, path);
         } catch (ApiException e) {
-            respondError(ex, raw, e.status, e.getMessage());
+            respondError(ex, raw, e.status, e.text());
         } catch (IOException e) {
             // Client went away mid-response.
             raw.close();
         } catch (Exception e) {
             LOG.log(Level.WARNING, "Request " + raw.getRequestMethod() + " " + raw.getRequestURI() + " failed", e);
-            respondError(ex, raw, 500, "Interner Fehler");
+            respondError(ex, raw, 500, new Text("error.internal"));
         }
     }
 
-    private static void respondError(Exchange ex, HttpExchange raw, int status, String message) {
+    private static void respondError(Exchange ex, HttpExchange raw, int status, Text message) {
         try {
             if (ex == null) {
                 ex = new Exchange(raw, Map.of());
@@ -281,18 +282,18 @@ public final class WebServer implements AutoCloseable {
             }
             case USER -> {
                 if (user.isEmpty()) {
-                    ex.error(401, "Nicht angemeldet");
+                    ex.error(401, "error.notSignedIn");
                     return false;
                 }
                 return true;
             }
             case ADMIN -> {
                 if (user.isEmpty()) {
-                    ex.error(401, "Nicht angemeldet");
+                    ex.error(401, "error.notSignedIn");
                     return false;
                 }
                 if (!user.get().admin) {
-                    ex.error(403, "Nur für Administratoren");
+                    ex.error(403, "error.adminOnly");
                     return false;
                 }
                 return true;
@@ -305,26 +306,26 @@ public final class WebServer implements AutoCloseable {
 
     private void serveStatic(Exchange ex, String path) throws IOException {
         if (!ex.method().equals("GET") && !ex.method().equals("HEAD")) {
-            ex.error(405, "Methode nicht erlaubt");
+            ex.error(405, "error.methodNotAllowed");
             return;
         }
         String file = path.equals("/") ? "index.html" : path.substring(1);
         // Only plain names from the bundled web folder, no traversal.
         if (file.contains("..") || file.contains("\\") || file.contains("//")) {
-            ex.error(404, "Nicht gefunden");
+            ex.error(404, "error.notFound");
             return;
         }
         byte[] data = resource(file);
         if (data == null) {
             // App routes like /library/abc are handled in the browser.
             if (file.contains(".")) {
-                ex.error(404, "Nicht gefunden");
+                ex.error(404, "error.notFound");
                 return;
             }
             file = "index.html";
             data = resource(file);
             if (data == null) {
-                ex.error(500, "Web-Oberfläche fehlt im Jar");
+                ex.error(500, "error.webMissing");
                 return;
             }
         }

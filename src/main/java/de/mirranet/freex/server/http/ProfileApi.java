@@ -12,6 +12,7 @@
 
 package de.mirranet.freex.server.http;
 
+import de.mirranet.freex.server.i18n.Messages;
 import de.mirranet.freex.server.json.Json;
 import de.mirranet.freex.server.model.User;
 import de.mirranet.freex.server.store.DataStore;
@@ -110,14 +111,31 @@ public final class ProfileApi {
         String audio = Json.str(body, "audioLanguage", u.audioLanguage);
         String mode = Json.str(body, "subtitleMode", u.subtitleMode);
         String subs = Json.str(body, "subtitleLanguage", u.subtitleLanguage);
-        if (!audio.isEmpty() && !LANGUAGES.contains(audio)) throw ApiException.badRequest("Unbekannte Sprache " + audio);
-        if (!subs.isEmpty() && !LANGUAGES.contains(subs)) throw ApiException.badRequest("Unbekannte Sprache " + subs);
-        if (!User.SUBTITLE_MODES.contains(mode)) throw ApiException.badRequest("Unbekannte Untertitel-Einstellung " + mode);
+        String ui = Json.str(body, "uiLanguage", u.uiLanguage);
+        List<String> unpinned = body.containsKey("unpinned") ? navEntries(body.get("unpinned")) : u.unpinned;
+        if (!ui.isEmpty() && !Messages.supported(ui)) throw ApiException.badRequest("error.unknownLanguage", ui);
+        if (!audio.isEmpty() && !LANGUAGES.contains(audio)) throw ApiException.badRequest("error.unknownLanguage", audio);
+        if (!subs.isEmpty() && !LANGUAGES.contains(subs)) throw ApiException.badRequest("error.unknownLanguage", subs);
+        if (!User.SUBTITLE_MODES.contains(mode)) throw ApiException.badRequest("error.unknownSubtitleMode", mode);
         u.audioLanguage = audio;
         u.subtitleMode = mode;
         u.subtitleLanguage = subs;
+        u.uiLanguage = ui;
+        u.unpinned = unpinned;
         store.updateUser(u);
         ex.ok(u.toPublic());
+    }
+
+    /** Sidebar entries such as {@code history} or {@code library:<id>}. */
+    private static List<String> navEntries(Object value) {
+        if (!(value instanceof List<?> list) || list.size() > 200) throw ApiException.badRequest("error.unpinnedValue");
+        List<String> out = new ArrayList<>();
+        for (Object o : list) {
+            String s = String.valueOf(o);
+            if (!s.matches("[a-z]{1,20}(:[A-Za-z0-9_-]{1,64})?")) throw ApiException.badRequest("error.unpinnedValue");
+            if (!out.contains(s)) out.add(s);
+        }
+        return List.copyOf(out);
     }
 
     // ================================================================== profile picture
@@ -157,15 +175,15 @@ public final class ProfileApi {
     static byte[] toAvatar(byte[] data) {
         try (ImageInputStream in = ImageIO.createImageInputStream(new ByteArrayInputStream(data))) {
             Iterator<ImageReader> readers = in == null ? null : ImageIO.getImageReaders(in);
-            if (readers == null || !readers.hasNext()) throw ApiException.badRequest("Bitte ein JPEG-, PNG- oder GIF-Bild hochladen");
+            if (readers == null || !readers.hasNext()) throw ApiException.badRequest("error.imageType");
             ImageReader reader = readers.next();
             try {
                 reader.setInput(in, true, true);
                 int w = reader.getWidth(0);
                 int h = reader.getHeight(0);
-                if (w < 32 || h < 32) throw ApiException.badRequest("Das Bild ist zu klein (mindestens 32 × 32 Pixel)");
+                if (w < 32 || h < 32) throw ApiException.badRequest("error.imageTooSmall", 32);
                 // Checked before decoding, so a tiny file claiming huge dimensions cannot exhaust memory.
-                if ((long) w * h > MAX_PIXELS) throw ApiException.badRequest("Das Bild hat zu viele Pixel");
+                if ((long) w * h > MAX_PIXELS) throw ApiException.badRequest("error.imageTooLarge");
                 ImageReadParam param = reader.getDefaultReadParam();
                 int step = Math.max(1, Math.min(w, h) / (AVATAR_SIZE * 2));
                 param.setSourceSubsampling(step, step, 0, 0);
@@ -191,7 +209,7 @@ public final class ProfileApi {
         } catch (ApiException e) {
             throw e;
         } catch (IOException | RuntimeException e) {
-            throw ApiException.badRequest("Das Bild lässt sich nicht lesen");
+            throw ApiException.badRequest("error.imageUnreadable");
         }
     }
 

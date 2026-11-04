@@ -88,7 +88,7 @@ public final class CastApi {
      */
     private void start(Exchange ex) throws Exception {
         MediaItem it = store.item(ex.user(), ex.param("id")).orElseThrow(ApiException::notFound);
-        if (!it.type.playable() || it.file == null) throw ApiException.badRequest("Nicht abspielbar");
+        if (!it.type.playable() || it.file == null) throw ApiException.badRequest("error.notPlayable");
         Map<String, Object> body = ex.body();
         PlaybackPlanner.Quality quality = PlaybackPlanner.quality(Json.str(body, "quality", "original"));
         int audio = (int) Json.num(body, "audio", -1);
@@ -113,7 +113,7 @@ public final class CastApi {
                 session = s.id;
                 offset = start;
             } catch (TranscodeManager.BusyException e) {
-                throw new ApiException(503, e.getMessage());
+                throw ApiException.of(503, e);
             }
             m.put("url", PREFIX + token + "/hls/index.m3u8");
             m.put("contentType", "application/x-mpegurl");

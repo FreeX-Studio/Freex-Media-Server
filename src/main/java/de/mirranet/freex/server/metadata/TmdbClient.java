@@ -99,15 +99,15 @@ public final class TmdbClient {
             int code = res.statusCode();
             if (code == 200) return Json.parseObject(res.body());
             if (code == 404) return null;
-            if (code == 401) throw new IOException("TMDB lehnt den API-Schlüssel ab (401). Bitte tmdb.apiKey in config.yml prüfen.");
+            if (code == 401) throw new TmdbException("error.tmdbKeyRejected");
             if (code == 429 || code >= 500) {
                 long wait = res.headers().firstValue("Retry-After").map(TmdbClient::seconds).orElse(2L);
                 Thread.sleep(Math.min(10, Math.max(1, wait)) * 1000L * (attempt + 1));
                 continue;
             }
-            throw new IOException("TMDB antwortet mit HTTP " + code + " für " + path);
+            throw new TmdbException("error.tmdbHttp", code, path);
         }
-        throw new IOException("TMDB ist überlastet, später erneut versuchen");
+        throw new TmdbException("error.tmdbBusy");
     }
 
     private static long seconds(String v) {

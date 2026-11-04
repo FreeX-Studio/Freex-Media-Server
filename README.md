@@ -45,6 +45,8 @@ native apps for iOS, Android and TV are planned and will use the same API.
 - **Secure by default** – two-factor sign-in, brute-force protection, per-device sessions, strict security headers
 - **Easy to run** – one self-contained jar, or a Debian package with a hardened systemd service
 - **Managed in the browser** – libraries, users and server settings, plus a live activity view for admins
+- **Your language, your sidebar** – English and German interface and server messages per user; pin and unpin
+  sidebar entries
 
 ## The FreeX family
 
@@ -56,9 +58,9 @@ native apps for iOS, Android and TV are planned and will use the same API.
 | **FreeX Android** | App for Android smartphones and tablets | planned |
 | **FreeX TV** | Smart TV and streaming device apps | later |
 
-Server and web client are versioned separately: the server uses the Maven version in `pom.xml` (e.g. `0.10.2`),
+Server and web client are versioned separately: the server uses the Maven version in `pom.xml` (e.g. `0.11.0`),
 FreeX Web the version in [`src/main/resources/web/version.json`](src/main/resources/web/version.json)
-(e.g. `1.1.0.1`). Both are shown under *Settings → Über FreeX*.
+(e.g. `1.2.0.0`). Both are shown under *Settings → Über FreeX*.
 
 ## Quick start
 

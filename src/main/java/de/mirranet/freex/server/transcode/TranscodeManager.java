@@ -12,6 +12,8 @@
 
 package de.mirranet.freex.server.transcode;
 
+import de.mirranet.freex.server.i18n.Text;
+import de.mirranet.freex.server.i18n.Translatable;
 import de.mirranet.freex.server.model.MediaFile;
 import de.mirranet.freex.server.model.MediaItem;
 import de.mirranet.freex.server.util.Ids;
@@ -77,12 +79,16 @@ public final class TranscodeManager implements AutoCloseable {
     }
 
     /** Thrown when all transcoding slots are in use. */
-    public static final class BusyException extends Exception {
+    public static final class BusyException extends Exception implements Translatable {
         private static final long serialVersionUID = 1L;
 
         BusyException() {
-            super("Der Server wandelt gerade zu viele Videos gleichzeitig um. Bitte später erneut versuchen "
-                    + "oder eine Qualität wählen, die direkt abgespielt werden kann.");
+            super("All transcoding slots are in use");
+        }
+
+        @Override
+        public Text text() {
+            return new Text("error.transcoderBusy");
         }
     }
 

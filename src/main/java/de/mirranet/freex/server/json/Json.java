@@ -17,6 +17,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Minimal JSON reader and writer, so the server needs no external library.
@@ -24,7 +25,8 @@ import java.util.Map;
  * Parsing maps JSON objects to {@link LinkedHashMap}, arrays to {@link ArrayList}, numbers to
  * {@link Long} (integers) or {@link Double}, plus {@link String}, {@link Boolean} and {@code null}.
  * Writing accepts the same types, any {@link Map}, {@link Collection}, {@link Number},
- * {@link Enum} and objects implementing {@link JsonWritable}.
+ * {@link Enum} and objects implementing {@link JsonWritable}; other objects are passed to an
+ * optional adapter, or written as their {@code toString()}.
  */
 public final class Json {
 
@@ -39,16 +41,21 @@ public final class Json {
     // ------------------------------------------------------------------ writing
 
     public static String write(Object value) {
+        return write(value, Function.identity());
+    }
+
+    /** Writes the value; {@code adapter} turns other objects (such as translatable texts) into one of the known types. */
+    public static String write(Object value, Function<Object, Object> adapter) {
         StringBuilder sb = new StringBuilder();
-        writeValue(sb, value);
+        writeValue(sb, value, adapter);
         return sb.toString();
     }
 
-    private static void writeValue(StringBuilder sb, Object value) {
+    private static void writeValue(StringBuilder sb, Object value, Function<Object, Object> adapter) {
         if (value == null) {
             sb.append("null");
         } else if (value instanceof JsonWritable w) {
-            writeValue(sb, w.toJson());
+            writeValue(sb, w.toJson(), adapter);
         } else if (value instanceof String s) {
             writeString(sb, s);
         } else if (value instanceof Boolean b) {
@@ -56,7 +63,7 @@ public final class Json {
         } else if (value instanceof Double d) {
             sb.append(d.isNaN() || d.isInfinite() ? "null" : stripZero(d));
         } else if (value instanceof Float f) {
-            writeValue(sb, f.doubleValue());
+            writeValue(sb, f.doubleValue(), adapter);
         } else if (value instanceof Number n) {
             sb.append(n);
         } else if (value instanceof Enum<?> e) {
@@ -69,7 +76,7 @@ public final class Json {
                 first = false;
                 writeString(sb, String.valueOf(e.getKey()));
                 sb.append(':');
-                writeValue(sb, e.getValue());
+                writeValue(sb, e.getValue(), adapter);
             }
             sb.append('}');
         } else if (value instanceof Collection<?> list) {
@@ -78,13 +85,15 @@ public final class Json {
             for (Object o : list) {
                 if (!first) sb.append(',');
                 first = false;
-                writeValue(sb, o);
+                writeValue(sb, o, adapter);
             }
             sb.append(']');
         } else if (value instanceof Object[] arr) {
-            writeValue(sb, List.of(arr));
+            writeValue(sb, List.of(arr), adapter);
         } else {
-            writeString(sb, value.toString());
+            Object adapted = adapter.apply(value);
+            if (adapted != value) writeValue(sb, adapted, adapter);
+            else writeString(sb, value.toString());
         }
     }
 

@@ -12,6 +12,7 @@
 
 package de.mirranet.freex.server.store;
 
+import de.mirranet.freex.server.i18n.MessageException;
 import de.mirranet.freex.server.model.Progress;
 import de.mirranet.freex.server.model.User;
 import de.mirranet.freex.server.util.Ids;
@@ -40,7 +41,7 @@ public final class UserStore {
     public record Session(String userId, long createdAt, long lastSeen, String ip, String userAgent) {
     }
 
-    /** One login attempt for the account's security overview. */
+    /** One login attempt for the account's security overview; {@code detail} is a code such as {@code password+totp}. */
     public record LoginEvent(long time, String ip, String userAgent, boolean success, String detail) {
     }
 
@@ -71,6 +72,9 @@ public final class UserStore {
             user.subtitleMode = rs.getString("subtitle_mode");
             user.subtitleLanguage = rs.getString("subtitle_language");
             user.allLibraries = rs.getInt("all_libraries") == 1;
+            user.uiLanguage = rs.getString("ui_language");
+            String unpinned = rs.getString("unpinned");
+            user.unpinned = unpinned.isEmpty() ? List.of() : List.of(unpinned.split(","));
             return user;
         })) {
             users.put(u.id, u);
@@ -127,7 +131,7 @@ public final class UserStore {
     }
 
     public synchronized User addUser(String username, String passwordHash, boolean admin) {
-        if (userByName(username).isPresent()) throw new IllegalArgumentException("Benutzername ist bereits vergeben");
+        if (userByName(username).isPresent()) throw new MessageException("error.usernameTaken");
         User u = new User(Ids.random(8), username.trim(), passwordHash, admin, System.currentTimeMillis());
         insert(u);
         users.put(u.id, u);
@@ -146,9 +150,11 @@ public final class UserStore {
         db.transaction(d -> {
             d.update("UPDATE users SET password_hash = ?, admin = ?, password_changed_at = ?, totp_secret = ?, "
                             + "totp_enabled = ?, totp_last_step = ?, avatar_version = ?, audio_language = ?, "
-                            + "subtitle_mode = ?, subtitle_language = ?, all_libraries = ? WHERE id = ?",
+                            + "subtitle_mode = ?, subtitle_language = ?, all_libraries = ?, ui_language = ?, unpinned = ? "
+                            + "WHERE id = ?",
                     u.passwordHash, u.admin, u.passwordChangedAt, u.totpSecret, u.totpEnabled, u.totpLastStep,
-                    u.avatarVersion, u.audioLanguage, u.subtitleMode, u.subtitleLanguage, u.allLibraries, u.id);
+                    u.avatarVersion, u.audioLanguage, u.subtitleMode, u.subtitleLanguage, u.allLibraries,
+                    u.uiLanguage, String.join(",", u.unpinned), u.id);
             d.update("DELETE FROM user_libraries WHERE user_id = ?", u.id);
             for (String lib : u.libraryIds) d.update("INSERT INTO user_libraries (user_id, library_id) VALUES (?, ?)", u.id, lib);
             d.update("DELETE FROM recovery_codes WHERE user_id = ?", u.id);

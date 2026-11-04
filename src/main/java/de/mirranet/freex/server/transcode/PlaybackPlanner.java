@@ -12,6 +12,7 @@
 
 package de.mirranet.freex.server.transcode;
 
+import de.mirranet.freex.server.i18n.Text;
 import de.mirranet.freex.server.json.Json;
 import de.mirranet.freex.server.model.MediaFile;
 
@@ -72,7 +73,7 @@ public final class PlaybackPlanner {
      * @param maxHeight        target height when transcoding (0 = keep)
      * @param reason           human readable explanation, shown in the player info
      */
-    public record Plan(Mode mode, int audioIndex, int burnSubtitle, long videoBitrate, int maxHeight, String reason) {
+    public record Plan(Mode mode, int audioIndex, int burnSubtitle, long videoBitrate, int maxHeight, Text reason) {
     }
 
     /** Highest frame height the software encoder produces when the user picked "Original". */
@@ -134,11 +135,11 @@ public final class PlaybackPlanner {
         boolean containerOk = caps.containers().contains(containerKind(f));
 
         if (!transcoderAvailable) {
-            return new Plan(Mode.DIRECT, audioIndex, -1, 0, 0, "Umwandlung ist ausgeschaltet oder ffmpeg fehlt");
+            return new Plan(Mode.DIRECT, audioIndex, -1, 0, 0, new Text("playback.transcoderOff"));
         }
         if (burn < 0 && bitrateOk && videoDecodable && audioDecodable && firstAudio && containerOk
                 && caps.directPlayAllowed()) {
-            return new Plan(Mode.DIRECT, audioIndex, -1, 0, 0, "Direkte Wiedergabe");
+            return new Plan(Mode.DIRECT, audioIndex, -1, 0, 0, new Text("playback.direct"));
         }
 
         // Video can be copied into HLS if the browser's MediaSource accepts it and nothing forces a re-encode.
@@ -148,21 +149,21 @@ public final class PlaybackPlanner {
             boolean audioCopyable = audio == null || (caps.mseAudio().contains(codecKind(audio.codec()))
                     && Set.of("aac", "mp3", "ac3", "eac3", "flac", "opus").contains(codecKind(audio.codec())));
             if (audioCopyable) {
-                return new Plan(Mode.REMUX, audioIndex, -1, 0, 0, "Container wird angepasst (" + containerKind(f) + " → HLS)");
+                return new Plan(Mode.REMUX, audioIndex, -1, 0, 0, new Text("playback.remux", containerKind(f)));
             }
             return new Plan(Mode.AUDIO, audioIndex, -1, 0, 0,
-                    "Ton wird umgewandelt (" + audio.codec().toUpperCase(Locale.ROOT) + " → AAC)");
+                    new Text("playback.audio", audio.codec().toUpperCase(Locale.ROOT)));
         }
 
         long sourceBitrate = f.bitrate > 0 ? f.bitrate : 8_000_000;
         long target = quality.videoBitrate() == 0 ? Math.min(sourceBitrate, 20_000_000) : quality.videoBitrate();
         target = Math.max(target, 500_000);
         int height = quality.maxHeight() == 0 ? SOFTWARE_MAX_HEIGHT : quality.maxHeight();
-        String why;
-        if (burn >= 0) why = "Untertitel werden eingebrannt";
-        else if (!videoDecodable) why = "Video wird umgewandelt (" + f.videoCodec.toUpperCase(Locale.ROOT)
-                + (f.highBitDepthOrChroma() ? " " + f.pixelFormat : "") + " → H.264)";
-        else why = "Qualität wird reduziert";
+        Text why;
+        if (burn >= 0) why = new Text("playback.burnSubtitles");
+        else if (!videoDecodable) why = new Text("playback.video", f.videoCodec.toUpperCase(Locale.ROOT)
+                + (f.highBitDepthOrChroma() ? " " + f.pixelFormat : ""));
+        else why = new Text("playback.quality");
         return new Plan(Mode.TRANSCODE, audioIndex, burn, target, height, why);
     }
 

@@ -13,6 +13,8 @@
 package de.mirranet.freex.server.http;
 
 import com.sun.net.httpserver.HttpExchange;
+import de.mirranet.freex.server.i18n.Messages;
+import de.mirranet.freex.server.i18n.Text;
 import de.mirranet.freex.server.json.Json;
 import de.mirranet.freex.server.model.User;
 
@@ -109,6 +111,19 @@ public final class Exchange {
         return ua == null ? "" : ua;
     }
 
+    /**
+     * The language for texts in the response: the display language of the signed-in user, or
+     * the best match for the browser's languages.
+     */
+    public String lang() {
+        if (user != null && Messages.supported(user.uiLanguage)) return user.uiLanguage;
+        return Messages.negotiate(header("Accept-Language"));
+    }
+
+    public String text(String key, Object... args) {
+        return Messages.get(lang(), key, args);
+    }
+
     public User user() {
         return user;
     }
@@ -126,7 +141,7 @@ public final class Exchange {
     public byte[] bytes(int max) throws IOException {
         try (InputStream in = raw.getRequestBody()) {
             byte[] data = in.readNBytes(max + 1);
-            if (data.length > max) throw new ApiException(413, "Datei zu groß");
+            if (data.length > max) throw new ApiException(413, "error.fileTooLarge");
             return data;
         }
     }
@@ -135,13 +150,13 @@ public final class Exchange {
     public Map<String, Object> body() throws IOException {
         try (InputStream in = raw.getRequestBody()) {
             byte[] data = in.readNBytes(MAX_BODY + 1);
-            if (data.length > MAX_BODY) throw new ApiException(413, "Anfrage zu groß");
+            if (data.length > MAX_BODY) throw new ApiException(413, "error.requestTooLarge");
             String s = new String(data, StandardCharsets.UTF_8).trim();
             if (s.isEmpty()) return new LinkedHashMap<>();
             try {
                 return Json.parseObject(s);
             } catch (Json.JsonException e) {
-                throw new ApiException(400, "Ungültiges JSON: " + e.getMessage());
+                throw new ApiException(400, "error.invalidJson", e.getMessage());
             }
         }
     }
@@ -150,8 +165,10 @@ public final class Exchange {
         return responded;
     }
 
+    /** Sends a JSON response; {@link Text} values in it are translated into {@link #lang()}. */
     public void json(int status, Object value) throws IOException {
-        byte[] data = Json.write(value).getBytes(StandardCharsets.UTF_8);
+        String lang = lang();
+        byte[] data = Json.write(value, v -> v instanceof Text t ? t.in(lang) : v).getBytes(StandardCharsets.UTF_8);
         send(status, "application/json; charset=utf-8", data);
     }
 
@@ -166,9 +183,15 @@ public final class Exchange {
         raw.close();
     }
 
-    public void error(int status, String message) throws IOException {
+    public void error(int status, String key, Object... args) throws IOException {
+        error(status, new Text(key, args));
+    }
+
+    /** Error answer: the translated message, plus its catalog key as a stable code for clients. */
+    public void error(int status, Text message) throws IOException {
         Map<String, Object> m = new HashMap<>();
         m.put("error", message);
+        m.put("code", message.key());
         m.put("status", status);
         json(status, m);
     }

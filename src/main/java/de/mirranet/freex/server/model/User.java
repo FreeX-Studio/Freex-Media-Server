@@ -49,6 +49,10 @@ public final class User {
     public volatile String subtitleMode = "forced";
     /** Preferred subtitle language as ISO 639-1 code; empty = same as the audio preference. */
     public volatile String subtitleLanguage = "";
+    /** Display language of the web interface and server messages; empty = the browser's language. */
+    public volatile String uiLanguage = "";
+    /** Sidebar entries the user removed from the pinned ones, such as {@code history} or {@code library:<id>}. */
+    public volatile List<String> unpinned = List.of();
 
     /** True: may see all libraries, including ones added later. Admins always may. */
     public volatile boolean allLibraries = true;
@@ -96,6 +100,8 @@ public final class User {
         p.put("audioLanguage", audioLanguage);
         p.put("subtitleMode", subtitleMode);
         p.put("subtitleLanguage", subtitleLanguage);
+        p.put("uiLanguage", uiLanguage);
+        p.put("unpinned", unpinned);
         return p;
     }
 }

@@ -73,7 +73,7 @@
         },
         /** Opens Chrome's device picker. */
         requestSession() {
-            return context ? context.requestSession() : Promise.reject(new Error("Chromecast nicht verfügbar"));
+            return context ? context.requestSession() : Promise.reject(new Error(M.t("Chromecast is not available")));
         },
         endSession() {
             if (context) context.endCurrentSession(true);

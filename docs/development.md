@@ -52,6 +52,22 @@ The FreeX logo is an X with a play symbol cut out of its centre, in the brand gr
 `icons/` (favicon, Apple touch icon, Android icons) and `manifest.webmanifest`, so FreeX can be added to the home
 screen of a phone or tablet like an app.
 
+## Translations
+
+FreeX Web and the server are available in English and German. English is the source language: texts are written in
+English in the code, and English is used wherever a translation is missing.
+
+- **FreeX Web:** wrap every visible text in `t("…")` (placeholders `{0}`, `{1}`, …), `tn(count, one, other)` for
+  plurals and `tParts(…)` when a placeholder is an element. The German texts are in
+  `src/main/resources/web/i18n/de.js`, keyed by the English text.
+- **Server:** messages that reach users (errors, home screen rows, playback reasons, activity, settings validation)
+  are keys in `src/main/resources/i18n/messages_<language>.properties`. Throw them as
+  `ApiException.badRequest("error.someKey", args…)`; texts in JSON answers are `Text` values, which the response
+  writes in the language of the user (or of the `Accept-Language` header before sign-in). Log messages stay English.
+
+To add a language, add its code to `Messages.LANGUAGES` and `LANGUAGES` in `web/i18n.js`, create
+`messages_<code>.properties` and `web/i18n/<code>.js`, and load the latter in `index.html`.
+
 ## Versioning
 
 FreeX Media Server and FreeX Web are separate products and are versioned independently:

@@ -12,6 +12,9 @@
 
 package de.mirranet.freex.server.config;
 
+import de.mirranet.freex.server.i18n.MessageException;
+import de.mirranet.freex.server.i18n.Text;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -84,7 +87,7 @@ public final class Settings {
     /** All settings in the order of the web interface. */
     public static final List<Field> FIELDS = List.of(
             text("server.name", 60, null, null),
-            text("server.bindAddress", 100, "[0-9A-Za-z.:%-]+", "Ungültige Adresse"),
+            text("server.bindAddress", 100, "[0-9A-Za-z.:%-]+", "setting.format.address"),
             number("server.port", 1, 65535),
             text("server.tlsKeystore", 500, null, null),
             of("server.tlsKeystorePassword", Type.SECRET),
@@ -96,14 +99,14 @@ public final class Settings {
             number("security.sessionDays", 1, 365),
             number("security.minPasswordLength", 8, 128),
             of("tmdb.apiKey", Type.SECRET),
-            text("tmdb.language", 10, "[a-z]{2}(-[A-Z]{2})?", "Sprache im Format de-DE oder en"),
-            text("tmdb.region", 2, "[A-Z]{2}", "Land als Kürzel mit zwei Großbuchstaben, z. B. DE"),
+            text("tmdb.language", 10, "[a-z]{2}(-[A-Z]{2})?", "setting.format.language"),
+            text("tmdb.region", 2, "[A-Z]{2}", "setting.format.region"),
             of("markers.enabled", Type.BOOL),
             of("transcoder.enabled", Type.BOOL),
             text("transcoder.directory", 500, null, null),
             number("transcoder.maxSessions", 1, 32),
             choice("transcoder.hardwareAcceleration", "none", "nvenc", "qsv", "vaapi"),
-            text("transcoder.vaapiDevice", 100, "/dev/dri/[A-Za-z0-9]+", "Pfad unter /dev/dri, z. B. /dev/dri/renderD128"),
+            text("transcoder.vaapiDevice", 100, "/dev/dri/[A-Za-z0-9]+", "setting.format.vaapiDevice"),
             choice("transcoder.preset", "ultrafast", "superfast", "veryfast", "faster", "fast", "medium"),
             number("scanner.intervalMinutes", 0, 10080),
             number("scanner.threads", 1, 32));
@@ -124,14 +127,14 @@ public final class Settings {
     /**
      * Checks one submitted value and returns it in its normalized form.
      *
-     * @throws IllegalArgumentException with a message for the user
+     * @throws MessageException with a message for the user
      */
     public static String validate(Field f, Object value) {
         switch (f.type) {
-            case READONLY -> throw new IllegalArgumentException(f.key + " kann nur in der config.yml geändert werden");
+            case READONLY -> throw new MessageException("setting.readOnly", f.key);
             case BOOL -> {
                 if (value instanceof Boolean b) return b.toString();
-                throw new IllegalArgumentException(f.key + ": Ja oder Nein erwartet");
+                throw new MessageException("setting.expectBool", f.key);
             }
             case NUMBER -> {
                 long n;
@@ -141,34 +144,34 @@ public final class Settings {
                     try {
                         n = Long.parseLong(String.valueOf(value).trim());
                     } catch (NumberFormatException e) {
-                        throw new IllegalArgumentException(f.key + ": ganze Zahl erwartet");
+                        throw new MessageException("setting.expectInteger", f.key);
                     }
                 }
                 if (n < f.min || n > f.max) {
-                    throw new IllegalArgumentException(f.key + ": erlaubt sind " + f.min + " bis " + f.max);
+                    throw new MessageException("setting.range", f.key, f.min, f.max);
                 }
                 return Long.toString(n);
             }
             case CHOICE -> {
                 String s = String.valueOf(value);
-                if (!f.choices.contains(s)) throw new IllegalArgumentException(f.key + ": erlaubt sind " + String.join(", ", f.choices));
+                if (!f.choices.contains(s)) throw new MessageException("setting.choices", f.key, String.join(", ", f.choices));
                 return s;
             }
             default -> {
-                if (!(value instanceof String s)) throw new IllegalArgumentException(f.key + ": Text erwartet");
+                if (!(value instanceof String s)) throw new MessageException("setting.expectText", f.key);
                 if (f.type == Type.TEXT) s = s.trim();
                 for (int i = 0; i < s.length(); i++) {
-                    if (Character.isISOControl(s.charAt(i))) throw new IllegalArgumentException(f.key + ": Steuerzeichen sind nicht erlaubt");
+                    if (Character.isISOControl(s.charAt(i))) throw new MessageException("setting.controlCharacters", f.key);
                 }
                 if (f.maxLength > 0 && s.length() > f.maxLength) {
-                    throw new IllegalArgumentException(f.key + ": höchstens " + f.maxLength + " Zeichen");
+                    throw new MessageException("setting.maxLength", f.key, f.maxLength);
                 }
                 if (f.pattern != null && !s.isEmpty() && !f.pattern.matcher(s).matches()) {
-                    throw new IllegalArgumentException(f.key + ": " + f.patternMessage);
+                    throw new MessageException("setting.format", f.key, new Text(f.patternMessage));
                 }
-                if (f.key.equals("server.name") && s.isEmpty()) throw new IllegalArgumentException("Der Servername darf nicht leer sein");
-                if (f.key.equals("server.bindAddress") && s.isEmpty()) throw new IllegalArgumentException("Die Adresse darf nicht leer sein");
-                if (f.key.equals("transcoder.directory") && s.isEmpty()) throw new IllegalArgumentException("Der Umwandlungsordner darf nicht leer sein");
+                if (f.key.equals("server.name") && s.isEmpty()) throw new MessageException("setting.emptyServerName");
+                if (f.key.equals("server.bindAddress") && s.isEmpty()) throw new MessageException("setting.emptyAddress");
+                if (f.key.equals("transcoder.directory") && s.isEmpty()) throw new MessageException("setting.emptyTranscodeDirectory");
                 return s;
             }
         }

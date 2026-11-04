@@ -22,7 +22,7 @@
 (() => {
     "use strict";
     const M = window.FreeX;
-    const {S, h, icon, api} = M;
+    const {S, t, h, icon, api} = M;
 
     // ------------------------------------------------------------------ browser capabilities
 
@@ -160,13 +160,13 @@
         const seekWrap = h("div", {class: "seek-wrap"}, produced, seek);
         const timeNow = h("span", {class: "time"}, "0:00");
         const timeTotal = h("span", {class: "time muted"}, M.fmtClock(durationMs));
-        const playBtn = h("button", {class: "ctl big", "aria-label": "Abspielen"}, icon("play"));
-        const muteBtn = h("button", {class: "ctl", "aria-label": "Ton aus"}, icon(video.muted ? "mute" : "volume"));
-        const vol = h("input", {type: "range", class: "volume", min: 0, max: 1, step: 0.05, value: video.muted ? 0 : video.volume, "aria-label": "Lautstärke"});
-        const settingsBtn = h("button", {class: "ctl", "aria-label": "Wiedergabe-Einstellungen", "data-menu": true}, icon("gear"));
-        const castBtn = h("button", {class: "ctl cast-btn", "aria-label": "Auf Chromecast abspielen", title: "Auf Chromecast abspielen", hidden: true}, icon("cast"));
+        const playBtn = h("button", {class: "ctl big", "aria-label": t("Play")}, icon("play"));
+        const muteBtn = h("button", {class: "ctl", "aria-label": t("Mute")}, icon(video.muted ? "mute" : "volume"));
+        const vol = h("input", {type: "range", class: "volume", min: 0, max: 1, step: 0.05, value: video.muted ? 0 : video.volume, "aria-label": t("Volume")});
+        const settingsBtn = h("button", {class: "ctl", "aria-label": t("Playback settings"), "data-menu": true}, icon("gear"));
+        const castBtn = h("button", {class: "ctl cast-btn", "aria-label": t("Play on Chromecast"), title: t("Play on Chromecast"), hidden: true}, icon("cast"));
         const castInfo = h("div", {class: "cast-info", hidden: true});
-        const fsBtn = h("button", {class: "ctl", "aria-label": "Vollbild"}, icon("fullscreen"));
+        const fsBtn = h("button", {class: "ctl", "aria-label": t("Full screen")}, icon("fullscreen"));
         const controls = h("div", {class: "controls"},
             seekWrap,
             h("div", {class: "ctl-row"},
@@ -174,15 +174,15 @@
                     h("div", {class: "now-art"}, M.art(item.id, item.type === "episode" ? "thumb" : "poster", item.title)),
                     h("div", {class: "now-text"}, h("div", {class: "now-title"}, heading), h("div", {class: "now-sub"}, sub))),
                 h("div", {class: "ctl-center"},
-                    h("button", {class: "ctl", "aria-label": "10 Sekunden zurück", onclick: () => seekTo(position() - 10000, true)}, icon("replay10")),
+                    h("button", {class: "ctl", "aria-label": t("Back 10 seconds"), onclick: () => seekTo(position() - 10000, true)}, icon("replay10")),
                     playBtn,
-                    h("button", {class: "ctl", "aria-label": "30 Sekunden vor", onclick: () => seekTo(position() + 30000, true)}, icon("forward30"))),
+                    h("button", {class: "ctl", "aria-label": t("Forward 30 seconds"), onclick: () => seekTo(position() + 30000, true)}, icon("forward30"))),
                 h("div", {class: "ctl-right"}, timeNow, h("span", {class: "time muted"}, "/"), timeTotal, muteBtn, vol, castBtn, settingsBtn, fsBtn)));
         const members = h("div", {class: "room-members"});
         const top = h("div", {class: "player-top"},
-            h("button", {class: "ctl", onclick: back, "aria-label": "Zurück", title: "Zurück"}, icon("back")),
-            roomCode ? h("div", {class: "room"}, icon("together"), h("span", null, "Gemeinsam ansehen"), members,
-                h("button", {class: "btn small", onclick: () => M.inviteDialog(roomCode)}, "Einladen")) : null);
+            h("button", {class: "ctl", onclick: back, "aria-label": t("Back"), title: t("Back")}, icon("back")),
+            roomCode ? h("div", {class: "room"}, icon("together"), h("span", null, t("Watch Together")), members,
+                h("button", {class: "btn small", onclick: () => M.inviteDialog(roomCode)}, t("Invite"))) : null);
         const skipBtn = h("button", {class: "skip-btn", hidden: true});
         const player = h("div", {class: "player"}, video, castInfo, subs, spinner, notice, top, skipBtn, controls);
         document.getElementById("app").replaceChildren(player);
@@ -231,7 +231,7 @@
             if (kind !== skipKind) {
                 skipKind = kind;
                 skipBtn.hidden = !kind;
-                skipBtn.replaceChildren(icon("skip"), {intro: "Intro überspringen", credits: "Abspann überspringen", next: "Nächste Episode"}[kind] || "");
+                skipBtn.replaceChildren(icon("skip"), {intro: t("Skip intro"), credits: t("Skip credits"), next: t("Next episode")}[kind] || "");
             }
         }
 
@@ -317,8 +317,8 @@
                         return;
                     }
                     const status = data.response && data.response.code;
-                    fail(status === 503 ? "Der Server ist ausgelastet." : "Die Umwandlung ist fehlgeschlagen. " +
-                        (S.user.admin ? "Details stehen im Server-Log." : ""));
+                    fail(status === 503 ? t("The server is busy.") : t("The conversion failed.") +
+                        (S.user.admin ? " " + t("Details are in the server log.") : ""));
                 });
                 hls.loadSource(plan.url);
                 hls.attachMedia(video);
@@ -340,7 +340,7 @@
                 if (!res.ok) throw new Error();
                 if (state.subtitle === id) state.cues = parseVtt(await res.text());
             } catch (e) {
-                M.toast("Untertitel konnten nicht geladen werden", true);
+                M.toast(t("Subtitles could not be loaded"), true);
             }
         }
 
@@ -370,13 +370,13 @@
             const fmt = [media.container, media.videoCodec, media.audioCodec].filter(Boolean).map((s) => s.toUpperCase()).join(", ");
             notice.hidden = false;
             notice.replaceChildren(h("div", null,
-                h("h2", null, "Wiedergabe nicht möglich"),
+                h("h2", null, t("Cannot play")),
                 h("p", {class: "muted"}, message),
-                h("p", {class: "muted small"}, `Datei: ${fmt || "unbekanntes Format"}`),
+                h("p", {class: "muted small"}, t("File: {0}", fmt || t("unknown format"))),
                 h("div", {class: "actions center"},
-                    h("button", {class: "btn primary", onclick: () => start(position())}, "Erneut versuchen"),
-                    h("a", {class: "btn", href: `/api/items/${item.id}/stream?download=1`}, icon("download"), "Herunterladen"),
-                    h("button", {class: "btn", onclick: back}, "Zurück"))));
+                    h("button", {class: "btn primary", onclick: () => start(position())}, t("Try again")),
+                    h("a", {class: "btn", href: `/api/items/${item.id}/stream?download=1`}, icon("download"), t("Download")),
+                    h("button", {class: "btn", onclick: back}, t("Back")))));
         }
 
         // ---- video events
@@ -409,10 +409,10 @@
             if (state.directPlay) {
                 // The browser could not decode the file after all: let the server convert it.
                 state.directPlay = false;
-                M.toast("Datei wird für deinen Browser umgewandelt");
+                M.toast(t("The file is converted for your browser"));
                 start(position());
             } else {
-                fail("Dein Browser kann diese Datei nicht abspielen.");
+                fail(t("Your browser cannot play this file."));
             }
         });
         video.addEventListener("ended", () => {
@@ -479,12 +479,14 @@
                     }}, h("span", {class: "pm-check", html: String(value) === String(current) ? M.ICONS.check : ""}), label)));
             const qualities = (plan.qualities || [{id: "original", label: "Original"}]).map((q) => [q.id, q.label]);
             const audio = media.audio.map((a) => [a.index, M.audioLabel(a)]);
-            const subsList = [["", "Keine"]].concat(media.subtitles.map((s) => [s.id, M.subtitleLabel(s)]));
-            const modeText = {direct: "Direkte Wiedergabe", remux: "Direct Stream", audio: "Direct Stream", transcode: "Umwandlung",
-                cast: casting && casting.plan ? `Chromecast · ${{direct: "Direkte Wiedergabe", remux: "Direct Stream", audio: "Direct Stream", transcode: "Umwandlung"}[casting.plan.mode] || ""}` : "Chromecast"}[plan.mode] || "";
-            const menu = h("div", {class: "player-menu popup-like", role: "dialog", "aria-label": "Wiedergabe-Einstellungen"},
+            const subsList = [["", t("None")]].concat(media.subtitles.map((s) => [s.id, M.subtitleLabel(s)]));
+            const modes = {direct: t("Direct play"), remux: t("Direct stream"), audio: t("Direct stream"), transcode: t("Transcoding")};
+            const modeText = plan.mode === "cast"
+                ? "Chromecast" + (casting && casting.plan && modes[casting.plan.mode] ? " · " + modes[casting.plan.mode] : "")
+                : modes[plan.mode] || "";
+            const menu = h("div", {class: "player-menu popup-like", role: "dialog", "aria-label": t("Playback settings")},
                 h("div", {class: "pm-info"}, h("strong", null, modeText), plan.reason && plan.mode !== "direct" ? h("span", null, plan.reason) : null),
-                section("Qualität", qualities, state.quality, (v) => {
+                section(t("Quality"), qualities, state.quality, (v) => {
                     state.quality = v;
                     M.store.set("freex.quality", v);
                     if (v === "original") state.directPlay = true;
@@ -494,7 +496,7 @@
                     state.audio = Number(v);
                     restart();
                 }) : null,
-                section("Untertitel", subsList, state.subtitle || "", (v) => {
+                section(t("Subtitles"), subsList, state.subtitle || "", (v) => {
                     const old = state.subtitle;
                     state.subtitle = v || null;
                     const s = media.subtitles.find((x) => x.id === v);
@@ -560,7 +562,7 @@
         function updateCastButton() {
             castBtn.hidden = !(M.cast && (M.cast.devicesAvailable || M.cast.session)) || !!roomCode;
             castBtn.classList.toggle("on", !!casting);
-            castBtn.title = casting ? `Verbunden mit ${M.cast.deviceName}, klicken zum Trennen` : "Auf Chromecast abspielen";
+            castBtn.title = casting ? t("Connected to {0}, click to disconnect", M.cast.deviceName) : t("Play on Chromecast");
         }
 
         castBtn.addEventListener("click", () => {
@@ -610,12 +612,12 @@
                 casting.loading = true;
                 spinner.hidden = false;
                 castInfo.hidden = false;
-                castInfo.replaceChildren(icon("cast"), h("span", null, `Wird auf ${M.cast.deviceName || "dem Chromecast"} abgespielt`));
+                castInfo.replaceChildren(icon("cast"), h("span", null, t("Playing on {0}", M.cast.deviceName || "Chromecast")));
                 updateCastButton();
                 try {
                     await M.cast.load(item, plan, state.subtitle);
                 } catch (e) {
-                    M.toast("Chromecast: " + (e && (e.description || e.code) || "Laden fehlgeschlagen"), true);
+                    M.toast("Chromecast: " + (e && (e.description || e.code) || t("Loading failed")), true);
                 } finally {
                     casting.loading = false;
                     spinner.hidden = true;
@@ -665,7 +667,7 @@
             casting = null;
             castInfo.hidden = true;
             updateCastButton();
-            M.toast("Chromecast getrennt, Wiedergabe läuft hier weiter");
+            M.toast(t("Chromecast disconnected, playback continues here"));
             start(at);
         }
 
@@ -709,14 +711,14 @@
             const box = h("div", {class: "up-next"},
                 h("div", {class: "art"}, M.art(next.id, "thumb", next.title)),
                 h("div", null,
-                    h("div", {class: "muted small"}, "Als Nächstes in ", counter, " s"),
+                    h("div", {class: "muted small"}, M.tParts("Up next in {0} s", counter)),
                     h("div", {class: "title"}, next.type === "episode" ? `${M.episodeCode(next)}, ${next.title}` : next.title),
                     h("div", {class: "row-btns"},
-                        h("button", {class: "btn primary small", onclick: go}, icon("play"), "Jetzt abspielen"),
+                        h("button", {class: "btn primary small", onclick: go}, icon("play"), t("Play now")),
                         h("button", {class: "btn small", onclick: () => {
                                 clearInterval(nextTimer);
                                 box.remove();
-                            }}, "Abbrechen"))));
+                            }}, t("Cancel")))));
             player.querySelector(".up-next")?.remove();
             player.append(box);
             nextTimer = setInterval(() => {
@@ -796,7 +798,7 @@
         function renderMembers(st) {
             members.replaceChildren(...st.members.map((m) => {
                 const a = M.avatar(m, "small" + (m.online ? "" : " offline"));
-                a.title = m.name + (m.online ? "" : " (nicht verbunden)");
+                a.title = m.name + (m.online ? "" : ` (${t("not connected")})`);
                 return a;
             }));
         }
@@ -822,7 +824,7 @@
                 if (lastRoom.st.playing && video.paused) video.play().catch(() => null);
             });
             events.onerror = () => {
-                if (events.readyState === EventSource.CLOSED) M.toast("Verbindung zum Raum verloren", true);
+                if (events.readyState === EventSource.CLOSED) M.toast(t("Connection to the room lost"), true);
             };
             // Correct drift from buffering every now and then.
             syncTimer = setInterval(async () => {

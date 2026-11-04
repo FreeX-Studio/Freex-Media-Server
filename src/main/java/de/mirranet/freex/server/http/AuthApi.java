@@ -15,6 +15,8 @@ package de.mirranet.freex.server.http;
 import de.mirranet.freex.server.auth.LoginGuard;
 import de.mirranet.freex.server.auth.PasswordHasher;
 import de.mirranet.freex.server.auth.Totp;
+import de.mirranet.freex.server.i18n.MessageException;
+import de.mirranet.freex.server.i18n.Text;
 import de.mirranet.freex.server.json.Json;
 import de.mirranet.freex.server.model.User;
 import de.mirranet.freex.server.store.DataStore;
@@ -54,7 +56,10 @@ public final class AuthApi {
     private static final long CHALLENGE_TTL_MS = TimeUnit.MINUTES.toMillis(5);
     private static final int CHALLENGE_ATTEMPTS = 5;
     private static final int RECOVERY_CODES = 10;
-    private static final String WRONG_LOGIN = "Benutzername oder Passwort falsch";
+    private static final String WRONG_LOGIN = "error.wrongLogin";
+    /** Codes stored with login events, shown translated in the security overview. */
+    private static final Set<String> LOGIN_DETAILS = Set.of("password", "password+totp", "password+recovery",
+            "wrong-password", "wrong-code");
     private static final SecureRandom RANDOM = new SecureRandom();
 
     /** Password check passed, waiting for the second factor. */
@@ -112,7 +117,7 @@ public final class AuthApi {
     private void setup(Exchange ex) throws IOException {
         Map<String, Object> body = ex.body();
         synchronized (store) {
-            if (store.hasUsers()) throw new ApiException(409, "Der Server ist bereits eingerichtet");
+            if (store.hasUsers()) throw new ApiException(409, "error.alreadySetUp");
             String username = validUsername(Json.str(body, "username", ""));
             String password = validPassword(Json.str(body, "password", ""), username);
             User u = store.addUser(username, PasswordHasher.hash(password), true);
@@ -133,7 +138,7 @@ public final class AuthApi {
         boolean ok = PasswordHasher.verify(password, user.map(u -> u.passwordHash).orElse(dummyHash)) && user.isPresent();
         if (!ok) {
             guard.failure(ip, username);
-            user.ifPresent(u -> store.addLoginEvent(u.id, event(ex, false, "Falsches Passwort")));
+            user.ifPresent(u -> store.addLoginEvent(u.id, event(ex, false, "wrong-password")));
             LOG.warning("Failed login for '" + username + "' from " + ip);
             throw new ApiException(401, WRONG_LOGIN);
         }
@@ -146,7 +151,7 @@ public final class AuthApi {
             return;
         }
         guard.success(ip, username);
-        startSession(ex, u, "Passwort");
+        startSession(ex, u, "password");
     }
 
     private void verifySecondFactor(Exchange ex) throws IOException {
@@ -156,7 +161,7 @@ public final class AuthApi {
         Challenge c = challenges.get(key);
         if (c == null || c.expires < System.currentTimeMillis()) {
             challenges.remove(key);
-            throw new ApiException(401, "Die Anmeldung ist abgelaufen. Bitte erneut mit dem Passwort anmelden.");
+            throw new ApiException(401, "error.challengeExpired");
         }
         User u = store.user(c.userId).orElseThrow(() -> new ApiException(401, WRONG_LOGIN));
         String ip = ex.remoteAddress();
@@ -167,22 +172,22 @@ public final class AuthApi {
             long step = Totp.verify(u.totpSecret, code, u.totpLastStep);
             if (step >= 0) {
                 u.totpLastStep = step;
-                method = "Passwort + Authenticator";
+                method = "password+totp";
             } else if (useRecoveryCode(u, code)) {
-                method = "Passwort + Wiederherstellungscode";
+                method = "password+recovery";
             }
             if (method != null) store.updateUser(u);
         }
         if (method == null) {
             guard.failure(ip, u.username);
-            store.addLoginEvent(u.id, event(ex, false, "Falscher Bestätigungscode"));
+            store.addLoginEvent(u.id, event(ex, false, "wrong-code"));
             LOG.warning("Failed second factor for '" + u.username + "' from " + ip);
             if (c.attempts + 1 >= CHALLENGE_ATTEMPTS) {
                 challenges.remove(key);
-                throw new ApiException(401, "Zu viele falsche Codes. Bitte erneut mit dem Passwort anmelden.");
+                throw new ApiException(401, "error.tooManyCodes");
             }
             challenges.put(key, new Challenge(c.userId, c.expires, c.attempts + 1));
-            throw new ApiException(401, "Der Code stimmt nicht");
+            throw new ApiException(401, "error.wrongCode");
         }
         challenges.remove(key);
         guard.success(ip, u.username);
@@ -193,13 +198,13 @@ public final class AuthApi {
         long wait = guard.retryAfterSeconds(ip, account);
         if (wait > 0) {
             ex.raw.getResponseHeaders().set("Retry-After", Long.toString(wait));
-            throw new ApiException(429, "Zu viele Fehlversuche. Bitte in " + formatWait(wait) + " erneut versuchen.");
+            throw new ApiException(429, "error.tooManyAttempts", formatWait(wait));
         }
     }
 
-    private static String formatWait(long seconds) {
-        if (seconds < 90) return seconds + " Sekunden";
-        return ((seconds + 59) / 60) + " Minuten";
+    private static Text formatWait(long seconds) {
+        if (seconds < 90) return new Text("time.seconds", seconds);
+        return new Text("time.minutes", (seconds + 59) / 60);
     }
 
     private boolean useRecoveryCode(User u, String code) {
@@ -243,7 +248,7 @@ public final class AuthApi {
         throttle(ex, ex.remoteAddress(), u.username);
         if (!PasswordHasher.verify(Json.str(body, "currentPassword", ""), u.passwordHash)) {
             guard.failure(ex.remoteAddress(), u.username);
-            throw new ApiException(403, "Das aktuelle Passwort ist falsch");
+            throw new ApiException(403, "error.wrongCurrentPassword");
         }
     }
 
@@ -289,7 +294,7 @@ public final class AuthApi {
             m.put("ip", e.ip());
             m.put("userAgent", e.userAgent());
             m.put("success", e.success());
-            m.put("detail", e.detail());
+            m.put("detail", LOGIN_DETAILS.contains(e.detail()) ? new Text("login." + e.detail()) : e.detail());
             out.add(m);
         }
         ex.ok(out);
@@ -301,7 +306,7 @@ public final class AuthApi {
         Map<String, Object> body = ex.body();
         requirePassword(ex, body);
         User u = ex.user();
-        if (u.totpEnabled) throw ApiException.badRequest("Die Zwei-Faktor-Anmeldung ist bereits aktiv");
+        if (u.totpEnabled) throw ApiException.badRequest("error.twoFactorActive");
         u.totpSecret = Totp.newSecret();
         u.totpLastStep = 0;
         store.updateUser(u);
@@ -314,10 +319,10 @@ public final class AuthApi {
     private void twoFactorEnable(Exchange ex) throws IOException {
         Map<String, Object> body = ex.body();
         User u = ex.user();
-        if (u.totpEnabled) throw ApiException.badRequest("Die Zwei-Faktor-Anmeldung ist bereits aktiv");
-        if (u.totpSecret == null) throw ApiException.badRequest("Bitte die Einrichtung neu starten");
+        if (u.totpEnabled) throw ApiException.badRequest("error.twoFactorActive");
+        if (u.totpSecret == null) throw ApiException.badRequest("error.twoFactorRestart");
         long step = Totp.verify(u.totpSecret, Json.str(body, "code", ""), 0);
-        if (step < 0) throw ApiException.badRequest("Der Code stimmt nicht. Uhrzeit von Handy und Server prüfen.");
+        if (step < 0) throw ApiException.badRequest("error.wrongCodeCheckClock");
         List<String> codes = new ArrayList<>();
         u.recoveryCodes = generateRecoveryCodes(codes);
         u.totpLastStep = step;
@@ -344,7 +349,7 @@ public final class AuthApi {
         Map<String, Object> body = ex.body();
         requirePassword(ex, body);
         User u = ex.user();
-        if (!u.totpEnabled) throw ApiException.badRequest("Die Zwei-Faktor-Anmeldung ist nicht aktiv");
+        if (!u.totpEnabled) throw ApiException.badRequest("error.twoFactorInactive");
         List<String> codes = new ArrayList<>();
         u.recoveryCodes = generateRecoveryCodes(codes);
         store.updateUser(u);
@@ -379,8 +384,8 @@ public final class AuthApi {
             }
             LOG.info("User '" + username + "' created by '" + ex.user().username + "'");
             ex.json(201, u.toPublic());
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(409, e.getMessage());
+        } catch (MessageException e) {
+            throw ApiException.of(409, e);
         }
     }
 
@@ -391,7 +396,7 @@ public final class AuthApi {
         if (body.containsKey("admin")) {
             boolean admin = Json.bool(body, "admin", u.admin);
             if (!admin && u.admin && store.users().stream().filter(x -> x.admin).count() <= 1) {
-                throw ApiException.badRequest("Es muss mindestens einen Administrator geben");
+                throw ApiException.badRequest("error.lastAdmin");
             }
             u.admin = admin;
         }
@@ -420,7 +425,7 @@ public final class AuthApi {
 
     private void deleteUser(Exchange ex) throws IOException {
         String id = ex.param("id");
-        if (id.equals(ex.user().id)) throw ApiException.badRequest("Du kannst dich nicht selbst löschen");
+        if (id.equals(ex.user().id)) throw ApiException.badRequest("error.deleteSelf");
         User u = store.user(id).orElseThrow(ApiException::notFound);
         store.removeUser(id);
         onUserDeleted.accept(id);
@@ -438,11 +443,11 @@ public final class AuthApi {
             u.libraryIds = Set.of();
             return;
         }
-        if (!(value instanceof List<?> list)) throw ApiException.badRequest("libraries: \"all\" oder eine Liste von Bibliotheken erwartet");
+        if (!(value instanceof List<?> list)) throw ApiException.badRequest("error.librariesValue");
         Set<String> ids = new LinkedHashSet<>();
         for (Object o : list) {
             String id = String.valueOf(o);
-            if (store.library(id).isEmpty()) throw ApiException.badRequest("Unbekannte Bibliothek " + id);
+            if (store.library(id).isEmpty()) throw ApiException.badRequest("error.unknownLibrary", id);
             ids.add(id);
         }
         u.allLibraries = false;
@@ -454,18 +459,18 @@ public final class AuthApi {
     static String validUsername(String s) {
         String u = s.trim();
         if (!u.matches("[\\p{L}\\p{N}._ -]{2,32}")) {
-            throw ApiException.badRequest("Benutzername: 2–32 Zeichen, Buchstaben, Ziffern, Punkt, Strich, Leerzeichen");
+            throw ApiException.badRequest("error.usernameRules");
         }
         return u;
     }
 
     String validPassword(String s, String username) {
         if (s.length() < minPasswordLength) {
-            throw ApiException.badRequest("Das Passwort muss mindestens " + minPasswordLength + " Zeichen lang sein");
+            throw ApiException.badRequest("error.passwordTooShort", minPasswordLength);
         }
-        if (s.length() > 256) throw ApiException.badRequest("Das Passwort ist zu lang");
-        if (s.equalsIgnoreCase(username)) throw ApiException.badRequest("Das Passwort darf nicht der Benutzername sein");
-        if (s.chars().distinct().count() < 4) throw ApiException.badRequest("Das Passwort ist zu einfach");
+        if (s.length() > 256) throw ApiException.badRequest("error.passwordTooLong");
+        if (s.equalsIgnoreCase(username)) throw ApiException.badRequest("error.passwordIsUsername");
+        if (s.chars().distinct().count() < 4) throw ApiException.badRequest("error.passwordTooSimple");
         return s;
     }
 }

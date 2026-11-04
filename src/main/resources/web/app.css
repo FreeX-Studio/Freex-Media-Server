@@ -315,6 +315,89 @@ h1, h2, h3 {
     color: var(--glass);
 }
 
+/* Sidebar entries carry a button on the right: ⋮ (shown on hover) or, in the "More" view, a pin. */
+.nav-item {
+    position: relative;
+}
+
+.nav-item .nav-link {
+    padding-right: 40px;
+}
+
+.nav-action {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: var(--radius-s, 6px);
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    opacity: 0;
+}
+
+.nav-action svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+.nav-action.pin svg {
+    fill: none;
+    stroke: currentColor;
+}
+
+.nav-action.pin.on svg path:first-child {
+    fill: currentColor;
+}
+
+.nav-item:hover .nav-action,
+.nav-action:focus-visible,
+.nav-action[aria-expanded="true"],
+.nav-action.pin {
+    opacity: 1;
+}
+
+.nav-action:hover,
+.nav-action:focus-visible {
+    color: var(--text);
+    background: var(--surface-2, rgba(255, 255, 255, .08));
+}
+
+.nav-action.pin.on {
+    color: var(--glass);
+}
+
+@media (hover: none) {
+    .nav-action {
+        opacity: .7;
+    }
+}
+
+/* "More" at the end of the pinned entries and "Pinned" (back) at the top of the full list */
+button.nav-link {
+    width: 100%;
+    border: 0;
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.nav-back {
+    color: var(--text);
+    margin-bottom: 6px;
+}
+
+.nav-more {
+    margin-top: 10px;
+}
+
 .main {
     overflow-y: auto;
     overflow-x: hidden;
@@ -2001,7 +2084,8 @@ select, .field input, .inline input {
     }
 
     .shell.nav-collapsed .nav-link .label,
-    .shell.nav-collapsed .nav-link .spin {
+    .shell.nav-collapsed .nav-link .spin,
+    .shell.nav-collapsed .nav-action {
         display: none;
     }
 
@@ -2075,7 +2159,8 @@ select, .field input, .inline input {
     }
 
     .shell:not(.nav-open) .nav-link .label,
-    .shell:not(.nav-open) .nav-link .spin {
+    .shell:not(.nav-open) .nav-link .spin,
+    .shell:not(.nav-open) .nav-action {
         display: none;
     }
 

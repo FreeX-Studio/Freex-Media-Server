@@ -12,6 +12,7 @@
 
 package de.mirranet.freex.server.http;
 
+import de.mirranet.freex.server.i18n.Text;
 import de.mirranet.freex.server.json.Json;
 import de.mirranet.freex.server.model.Library;
 import de.mirranet.freex.server.model.MediaItem;
@@ -181,12 +182,12 @@ public final class MediaApi {
     private void createLibrary(Exchange ex) throws IOException {
         Map<String, Object> body = ex.body();
         String name = Json.str(body, "name", "").trim();
-        if (name.isEmpty() || name.length() > 64) throw ApiException.badRequest("Bitte einen Namen angeben (max. 64 Zeichen)");
+        if (name.isEmpty() || name.length() > 64) throw ApiException.badRequest("error.nameRequired", 64);
         Library.Type type;
         try {
             type = Library.Type.parse(Json.str(body, "type", ""));
         } catch (IllegalArgumentException e) {
-            throw ApiException.badRequest("Typ muss 'movies' oder 'shows' sein");
+            throw ApiException.badRequest("error.libraryType");
         }
         Library l = store.addLibrary(name, type, validPaths(body.get("paths")));
         scanner.scan(l);
@@ -198,7 +199,7 @@ public final class MediaApi {
         Map<String, Object> body = ex.body();
         if (body.containsKey("name")) {
             String name = Json.str(body, "name", "").trim();
-            if (name.isEmpty() || name.length() > 64) throw ApiException.badRequest("Ungültiger Name");
+            if (name.isEmpty() || name.length() > 64) throw ApiException.badRequest("error.invalidName");
             l.name = name;
         }
         boolean rescan = false;
@@ -217,10 +218,10 @@ public final class MediaApi {
             String s = String.valueOf(o).trim();
             if (s.isEmpty()) continue;
             Path p = Path.of(s).toAbsolutePath().normalize();
-            if (!Files.isDirectory(p)) throw ApiException.badRequest("Ordner nicht gefunden: " + s);
+            if (!Files.isDirectory(p)) throw ApiException.badRequest("error.folderNotFound", s);
             if (!paths.contains(p.toString())) paths.add(p.toString());
         }
-        if (paths.isEmpty()) throw ApiException.badRequest("Bitte mindestens einen Ordner angeben");
+        if (paths.isEmpty()) throw ApiException.badRequest("error.folderRequired");
         return paths;
     }
 
@@ -263,7 +264,7 @@ public final class MediaApi {
                         .limit(2000)
                         .forEach(d -> dirs.add(Map.of("name", d.getFileName().toString(), "path", d.toString())));
             } catch (IOException e) {
-                throw new ApiException(403, "Ordner kann nicht gelesen werden");
+                throw new ApiException(403, "error.folderUnreadable");
             }
             out.put("path", p.toString());
             out.put("parent", p.getParent() == null ? "" : p.getParent().toString());
@@ -416,7 +417,8 @@ public final class MediaApi {
         return decorate(it, u, full);
     }
 
-    static Map<String, Object> hubOf(String key, String title, String libraryId, String style, List<Object> items) {
+    /** A row of the home screen; {@code title} is a {@link Text} or, for names from the library, a String. */
+    static Map<String, Object> hubOf(String key, Object title, String libraryId, String style, List<Object> items) {
         return hub(key, title, libraryId, style, items);
     }
 
@@ -488,7 +490,7 @@ public final class MediaApi {
             if (m.get("showId") != null) showsInProgress.add((String) m.get("showId"));
             cont.add(m);
         }
-        if (!cont.isEmpty()) hubs.add(hub("continue", "Weiterschauen", null, "landscape", cont));
+        if (!cont.isEmpty()) hubs.add(hub("continue", new Text("hub.continue"), null, "landscape", cont));
 
         // Up next: shows with watch history, next episode, ordered by last activity.
         Map<String, Long> showActivity = new HashMap<>();
@@ -510,7 +512,7 @@ public final class MediaApi {
             MediaItem next = nextEpisode(show, u);
             if (next != null) deck.add(decorate(next, u, false));
         }
-        if (!deck.isEmpty()) hubs.add(hub("ondeck", "Als Nächstes", null, "landscape", deck));
+        if (!deck.isEmpty()) hubs.add(hub("ondeck", new Text("hub.upNext"), null, "landscape", deck));
         for (Extension e : extensions) hubs.addAll(e.homeHubs(u));
 
         // Recently added per library.
@@ -523,7 +525,7 @@ public final class MediaApi {
                 recent.add(decorate(it, u, false));
             }
             if (!recent.isEmpty()) {
-                hubs.add(hub("recent-" + l.id, "Kürzlich hinzugefügt in " + l.name, l.id, "poster", recent));
+                hubs.add(hub("recent-" + l.id, new Text("hub.recentlyAddedIn", l.name), l.id, "poster", recent));
             }
         }
         ex.ok(hubs);
@@ -549,7 +551,7 @@ public final class MediaApi {
             if (cont.size() >= HUB_SIZE) break;
             cont.add(decorate(store.item(e.getKey()).orElseThrow(), u, false));
         }
-        if (!cont.isEmpty()) hubs.add(hub("continue", "Weiterschauen", l.id, "landscape", cont));
+        if (!cont.isEmpty()) hubs.add(hub("continue", new Text("hub.continue"), l.id, "landscape", cont));
 
         if (l.type == Library.Type.SHOWS) {
             List<Object> deck = new ArrayList<>();
@@ -561,16 +563,16 @@ public final class MediaApi {
                 MediaItem next = nextEpisode(show, u);
                 if (next != null) deck.add(decorate(next, u, false));
             }
-            if (!deck.isEmpty()) hubs.add(hub("ondeck", "Als Nächstes", l.id, "landscape", deck));
+            if (!deck.isEmpty()) hubs.add(hub("ondeck", new Text("hub.upNext"), l.id, "landscape", deck));
         }
 
-        addSortedHub(hubs, l, u, top, "recent", "Kürzlich hinzugefügt", "added",
+        addSortedHub(hubs, l, u, top, "recent", new Text("hub.recentlyAdded"), "added",
                 Comparator.comparingLong((MediaItem i) -> i.addedAt).reversed(), i -> true);
-        addSortedHub(hubs, l, u, top, "released", "Kürzlich erschienen", "year",
+        addSortedHub(hubs, l, u, top, "released", new Text("hub.recentlyReleased"), "year",
                 Comparator.comparingInt((MediaItem i) -> i.year).reversed().thenComparing(i -> i.sortTitle), i -> i.year > 0);
-        addSortedHub(hubs, l, u, top, "unwatched", l.type == Library.Type.SHOWS ? "Noch nicht angefangen" : "Noch nicht gesehen",
+        addSortedHub(hubs, l, u, top, "unwatched", new Text(l.type == Library.Type.SHOWS ? "hub.notStarted" : "hub.unwatched"),
                 null, Comparator.comparingLong((MediaItem i) -> i.addedAt).reversed(), i -> !anyWatched(i, u));
-        addSortedHub(hubs, l, u, top, "rated", "Am besten bewertet", "rating",
+        addSortedHub(hubs, l, u, top, "rated", new Text("hub.topRated"), "rating",
                 Comparator.comparingDouble((MediaItem i) -> i.rating).reversed(), i -> i.rating > 0);
 
         for (Extension e : extensions) hubs.addAll(e.libraryHubs(l, u));
@@ -590,7 +592,7 @@ public final class MediaApi {
     }
 
     private void addSortedHub(List<Map<String, Object>> hubs, Library l, User u, List<MediaItem> source, String key,
-                              String title, String sort, Comparator<MediaItem> order,
+                              Object title, String sort, Comparator<MediaItem> order,
                               Predicate<MediaItem> filter) {
         List<MediaItem> list = new ArrayList<>(source.stream().filter(filter).toList());
         if (list.size() < 2) return;
@@ -615,7 +617,7 @@ public final class MediaApi {
         return c[1] > 0;
     }
 
-    private static Map<String, Object> hub(String key, String title, String libraryId, String style, List<Object> items) {
+    private static Map<String, Object> hub(String key, Object title, String libraryId, String style, List<Object> items) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("key", key);
         m.put("title", title);
@@ -740,14 +742,14 @@ public final class MediaApi {
 
     private MediaItem playable(Exchange ex) {
         MediaItem it = store.item(ex.user(), ex.param("id")).orElseThrow(ApiException::notFound);
-        if (!it.type.playable() || it.file == null) throw ApiException.badRequest("Nicht abspielbar");
+        if (!it.type.playable() || it.file == null) throw ApiException.badRequest("error.notPlayable");
         return it;
     }
 
     private void stream(Exchange ex) throws IOException {
         MediaItem it = playable(ex);
         Path p = Path.of(it.file.path);
-        if (!Files.isRegularFile(p)) throw new ApiException(404, "Datei nicht mehr vorhanden – Bibliothek neu scannen");
+        if (!Files.isRegularFile(p)) throw new ApiException(404, "error.fileGone");
         if ("1".equals(ex.query("download"))) {
             String name = it.file.fileName().replaceAll("[\"\\\\\\r\\n]", "_");
             ex.raw.getResponseHeaders().set("Content-Disposition", "attachment; filename=\"" + name + "\"");
@@ -821,7 +823,7 @@ public final class MediaApi {
                             plan.reason(), quality.label(), s.id, start);
                 }
             } catch (TranscodeManager.BusyException e) {
-                throw new ApiException(503, e.getMessage());
+                throw ApiException.of(503, e);
             }
         }
         ex.ok(m);
@@ -845,8 +847,8 @@ public final class MediaApi {
         Path p = transcoder.awaitFile(s, name, name.endsWith(".m4s") ? 60_000 : 30_000);
         if (p == null) {
             String log = transcoder.log(s);
-            throw new ApiException(name.equals("index.m3u8") ? 500 : 404,
-                    "Umwandlung fehlgeschlagen" + (log.isBlank() ? "" : ": " + log.lines().reduce((x, y) -> y).orElse("")));
+            String last = log.isBlank() ? "" : log.lines().reduce((x, y) -> y).orElse("");
+            throw new ApiException(name.equals("index.m3u8") ? 500 : 404, last.isEmpty() ? "error.transcodeFailed" : "error.transcodeFailedWith", last);
         }
         if (name.endsWith(".m3u8")) {
             ex.raw.getResponseHeaders().set("Cache-Control", "no-cache");

@@ -20,6 +20,16 @@ curl -s -X POST https://media.example.org/api/login \
 curl -s https://media.example.org/api/hubs -H 'X-FreeX-Token: …'
 ```
 
+## Language and errors
+
+Messages are returned in the display language of the signed-in user, or before sign-in in the language of the
+`Accept-Language` header (English and German, otherwise English). Errors look like this; `code` stays the same in
+every language, so apps can react to it:
+
+```json
+{"status": 401, "code": "error.wrongLogin", "error": "Wrong username or password"}
+```
+
 ## Endpoints
 
 ### Server and account
@@ -30,7 +40,7 @@ curl -s https://media.example.org/api/hubs -H 'X-FreeX-Token: …'
 | `POST` | `/api/login` | `{username, password}` → `{token, user}` or `{twoFactorRequired, challenge}` |
 | `POST` | `/api/login/verify` | `{challenge, code}` → `{token, user}` |
 | `GET` | `/api/me` | The signed-in user with preferences |
-| `PUT` | `/api/me/preferences` | `{audioLanguage, subtitleMode: off\|forced\|foreign\|always, subtitleLanguage}` (ISO 639-1) |
+| `PUT` | `/api/me/preferences` | `{audioLanguage, subtitleMode: off\|forced\|foreign\|always, subtitleLanguage, uiLanguage: ""\|en\|de, unpinned: ["history", "library:<id>", …]}`; send only the fields to change |
 | `PUT` / `DELETE` | `/api/me/avatar` | Upload the profile picture as raw request body (JPEG/PNG/GIF, max. 10 MB) / remove it |
 | `GET` | `/api/users/{id}/avatar?v=` | Profile picture |
 
