@@ -583,6 +583,13 @@ window.FreeX = (() => {
                 h("main", {class: "main"}));
             // Collapsed sidebar (icons only) is remembered per browser; on phones the menu slides in instead.
             if (store.get("freex.navCollapsed") === "1") root.classList.add("nav-collapsed");
+            // Open overlay menu (small screens): a tap next to it only closes it.
+            root.querySelector(".main").addEventListener("click", (e) => {
+                if (!root.classList.contains("nav-open")) return;
+                e.preventDefault();
+                e.stopPropagation();
+                root.classList.remove("nav-open");
+            }, true);
             root.querySelector(".sidebar").addEventListener("click", (e) => {
                 if (e.target.closest("a")) root.classList.remove("nav-open");
             });
