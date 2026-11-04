@@ -646,8 +646,8 @@ public final class ExtrasApi implements MediaApi.Extension {
             throw ApiException.badRequest("error.unknownItem");
         }
         try {
-            long version = together.update(r, ex.user(), Json.str(body, "action", ""), Json.num(body, "positionMs", 0), itemId);
-            ex.ok(Map.of("version", version));
+            together.update(r, ex.user(), Json.str(body, "action", ""), Json.num(body, "positionMs", 0), itemId);
+            ex.ok(together.state(r));
         } catch (IllegalStateException e) {
             throw new ApiException(403, "error.notInRoom");
         } catch (IllegalArgumentException e) {

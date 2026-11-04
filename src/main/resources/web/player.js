@@ -118,7 +118,6 @@
         // Identifies this playback in the server's activity list (one per opened player).
         const clientId = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2)).replace(/-/g, "").slice(0, 32);
         const playlistId = query.get("pl");
-        let remoteApplying = false;
 
         // What plays after this one: the next playlist entry, otherwise the next episode.
         let nextItem = item.next || null;
@@ -179,12 +178,14 @@
                     h("button", {class: "ctl", "aria-label": t("Forward 30 seconds"), onclick: () => seekTo(position() + 30000, true)}, icon("forward30"))),
                 h("div", {class: "ctl-right"}, timeNow, h("span", {class: "time muted"}, "/"), timeTotal, muteBtn, vol, castBtn, settingsBtn, fsBtn)));
         const members = h("div", {class: "room-members"});
+        const waitInfo = h("div", {class: "room-wait", hidden: true, role: "status"});
         const top = h("div", {class: "player-top"},
-            h("button", {class: "ctl", onclick: back, "aria-label": t("Back"), title: t("Back")}, icon("back")),
+            h("div", {class: "top-text"}, h("div", {class: "title"}, heading), sub ? h("div", {class: "sub"}, sub) : null),
             roomCode ? h("div", {class: "room"}, icon("together"), h("span", null, t("Watch Together")), members,
-                h("button", {class: "btn small", onclick: () => M.inviteDialog(roomCode)}, t("Invite"))) : null);
+                h("button", {class: "btn small", onclick: () => M.inviteDialog(roomCode)}, t("Invite"))) : null,
+            h("button", {class: "ctl close-btn", onclick: back, "aria-label": t("Close player"), title: t("Close player")}, icon("close")));
         const skipBtn = h("button", {class: "skip-btn", hidden: true});
-        const player = h("div", {class: "player"}, video, castInfo, subs, spinner, notice, top, skipBtn, controls);
+        const player = h("div", {class: "player"}, video, castInfo, subs, spinner, notice, waitInfo, top, skipBtn, controls);
         document.getElementById("app").replaceChildren(player);
         document.title = `${heading} – ${S.status.name}`;
 
@@ -267,9 +268,29 @@
         };
 
         // ---- starting a stream
+        /**
+         * Starts playback at a position: asks the server for a plan and loads the stream. Calls while
+         * a start is running are not lost; the newest one runs when the current one is done.
+         */
         async function start(atMs) {
-            if (state.starting) return;
+            if (state.starting) {
+                state.queuedStart = atMs;
+                return;
+            }
             state.starting = true;
+            try {
+                await load(atMs);
+            } finally {
+                state.starting = false;
+            }
+            if (state.queuedStart != null) {
+                const next = state.queuedStart;
+                state.queuedStart = null;
+                start(next);
+            }
+        }
+
+        async function load(atMs) {
             spinner.hidden = false;
             notice.hidden = true;
             const oldSession = state.plan && state.plan.session;
@@ -285,10 +306,11 @@
                     client: clientId, device: M.deviceName ? M.deviceName(navigator.userAgent) : "",
                 });
             } catch (e) {
-                state.starting = false;
                 return fail(e.message);
             }
+            if (state.queuedStart != null) return; // overtaken by a newer start
             if (oldSession && oldSession !== plan.session) stopSession(oldSession);
+            watchdog.reset();
             state.plan = plan;
             state.audio = plan.audio;
             state.offsetMs = plan.mode === "direct" ? 0 : plan.offsetMs;
@@ -308,15 +330,29 @@
                     },
                 });
                 state.hls = hls;
-                let recovered = false;
+                let mediaRecoveries = 0;
+                let networkRetries = 0;
+                hls.on(window.Hls.Events.FRAG_LOADED, () => networkRetries = 0);
                 hls.on(window.Hls.Events.ERROR, (ev, data) => {
+                    if (state.hls !== hls) return;
+                    const status = data.response && data.response.code;
+                    // The server only answers 404 once the conversion is gone (it waits for segments
+                    // that are still being written), so retrying the same session is pointless.
+                    if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR && (status === 404 || status === 410)) {
+                        if (watchdog.restart()) return;
+                        return fail(t("The conversion failed.") + (S.user.admin ? " " + t("Details are in the server log.") : ""));
+                    }
                     if (!data.fatal) return;
-                    if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR && !recovered) {
-                        recovered = true;
+                    if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR && mediaRecoveries < 2) {
+                        if (mediaRecoveries++ === 1) hls.swapAudioCodec();
                         hls.recoverMediaError();
                         return;
                     }
-                    const status = data.response && data.response.code;
+                    if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR && status !== 503 && networkRetries < 4) {
+                        networkRetries++;
+                        setTimeout(() => state.hls === hls && hls.startLoad(), 1000 * networkRetries);
+                        return;
+                    }
                     fail(status === 503 ? t("The server is busy.") : t("The conversion failed.") +
                         (S.user.admin ? " " + t("Details are in the server log.") : ""));
                 });
@@ -326,9 +362,63 @@
                 video.src = plan.url; // Safari plays HLS natively
             }
             loadSubtitle();
-            video.play().catch(() => null);
-            state.starting = false;
+            // In a room the room decides when to play (see Watch Together below).
+            if (!roomCode) tryPlay();
         }
+
+        /** Plays; if the browser blocks playback without a click, offers a button to start it. */
+        function tryPlay() {
+            const p = video.play();
+            if (!p) return;
+            p.catch((e) => {
+                if (e && e.name === "NotAllowedError") {
+                    spinner.hidden = true;
+                    notice.hidden = false;
+                    notice.replaceChildren(h("button", {class: "btn primary big-play", onclick: () => {
+                            notice.hidden = true;
+                            video.play().catch(() => null);
+                        }}, icon("play"), t("Start playback")));
+                }
+            });
+        }
+
+        /**
+         * Notices playback that is stuck (no progress although it should play) and restarts the
+         * stream at the current position. Gives up after a few restarts without progress.
+         */
+        const watchdog = (() => {
+            let lastPos = -1;
+            let stuckSince = 0;
+            let restarts = 0;
+            return {
+                reset() {
+                    lastPos = -1;
+                    stuckSince = 0;
+                },
+                /** @return false when it already tried too often */
+                restart() {
+                    if (restarts >= 3) return false;
+                    restarts++;
+                    this.reset();
+                    start(position());
+                    return true;
+                },
+                check() {
+                    if (casting || !state.plan || state.starting || video.paused || !notice.hidden) return this.reset();
+                    const pos = position();
+                    if (Math.abs(pos - lastPos) > 200) {
+                        lastPos = pos;
+                        stuckSince = 0;
+                        if (video.readyState >= 3) restarts = 0;
+                        return;
+                    }
+                    if (!stuckSince) stuckSince = Date.now();
+                    else if (Date.now() - stuckSince > 20000 && !this.restart()) {
+                        fail(t("Playback stopped and could not be resumed."));
+                    }
+                },
+            };
+        })();
 
         async function loadSubtitle() {
             state.cues = [];
@@ -433,8 +523,22 @@
             if (roomCode) sendRoom(play ? "play" : "pause", position());
         };
         playBtn.addEventListener("click", togglePlay);
-        video.addEventListener("click", togglePlay);
-        video.addEventListener("dblclick", () => toggleFullscreen());
+        // A tap on a touch screen first shows the controls; a double click only toggles full screen.
+        let tapWoke = false;
+        let clickTimer = null;
+        video.addEventListener("touchstart", () => tapWoke = player.classList.contains("idle"), {passive: true});
+        video.addEventListener("click", () => {
+            if (tapWoke) {
+                tapWoke = false;
+                return;
+            }
+            clearTimeout(clickTimer);
+            clickTimer = setTimeout(togglePlay, 220);
+        });
+        video.addEventListener("dblclick", () => {
+            clearTimeout(clickTimer);
+            toggleFullscreen();
+        });
         muteBtn.addEventListener("click", () => {
             if (casting) return casting.controller.muteOrUnmute();
             video.muted = !video.muted;
@@ -572,7 +676,7 @@
 
         const offCast = M.cast ? M.cast.onChange(() => {
             updateCastButton();
-            if (M.cast.session && !casting && state.plan) castStart(position());
+            if (M.cast.session && !casting && state.plan && !roomCode) castStart(position());
             else if (!M.cast.session && casting) castStop();
         }) : () => null;
 
@@ -694,6 +798,7 @@
         }
 
         const interval = setInterval(() => report(false), 10000);
+        const watchTimer = setInterval(() => watchdog.check(), 1000);
         const onHide = () => {
             report(true, true);
             // Tab closed or reloaded: free the transcoding slot right away instead of after the timeout.
@@ -732,67 +837,130 @@
         }
 
         // ---- Watch Together
+        //
+        // The server keeps the room's state: item, whether it plays, and the position at a server
+        // time. Each player follows it: small differences are evened out by playing slightly faster
+        // or slower, larger ones by seeking. While a player loads it reports "buffering" and the
+        // room waits for it, so nobody falls behind.
         let events = null;
         let syncTimer = null;
-        let lastRoom = null;
-
-        // Only called from the player's own controls, never while applying a change from the room,
-        // so every call is a real user action and must reach the others.
-        let roomVersion = -1;   // newest room state we know
+        let pollTimer = null;
+        let room = null;        // newest room state
+        let roomVersion = -1;   // its version
         let pendingSends = 0;   // own changes not yet confirmed by the server
+        let clockOffset = null; // server time minus local time
+        let loadingSince = 0;
+        let reportedLoading = false;
+        let lastHardSync = 0;
+        let hardSyncPause = 3000; // grows while seeking does not help, e.g. a stream that starts a bit off
 
+        const roomPost = (body) => fetch(`/api/together/${roomCode}/state`, {method: "POST", credentials: "same-origin",
+            headers: {"Content-Type": "application/json", ...(S.token ? {"X-FreeX-Token": S.token} : {})},
+            body: JSON.stringify(body)}).then((r) => r.ok ? r.json() : null);
+
+        /** Sends a change made with this player's controls (play, pause, seek, next title). */
         function sendRoom(action, positionMs, itemId) {
             if (!roomCode) return;
             pendingSends++;
-            // Our own change is the room's state from now on; the echo from the server confirms it.
-            if (lastRoom) {
-                const st = {...lastRoom.st, positionMs: Math.round(positionMs)};
+            // Our change is the room's state from now on; the server's answer confirms it.
+            if (room) {
+                const st = {...room, positionMs: Math.round(positionMs), serverTime: serverNow()};
                 if (action === "play") st.playing = true;
                 if (action === "pause") st.playing = false;
-                lastRoom = {st, at: Date.now()};
+                st.running = st.playing && !(st.waiting || []).length;
+                room = st;
             }
-            fetch(`/api/together/${roomCode}/state`, {method: "POST", credentials: "same-origin",
-                headers: {"Content-Type": "application/json", ...(S.token ? {"X-FreeX-Token": S.token} : {})},
-                body: JSON.stringify({action, positionMs: Math.round(positionMs), itemId})})
-                .then((r) => r.ok ? r.json() : null)
-                .then((d) => {
-                    if (d && d.version > roomVersion) roomVersion = d.version;
-                })
-                .catch(() => null)
-                .finally(() => pendingSends--);
+            roomPost({action, positionMs: Math.round(positionMs), itemId})
+                .then((st) => {
+                    pendingSends--;
+                    if (st) applyRoom(st);
+                }, () => pendingSends--);
         }
 
-        /** Older than what we know, or overtaken by our own change still on its way: ignore. */
-        function stale(st) {
-            return pendingSends > 0 || (typeof st.version === "number" && st.version < roomVersion);
+        const serverNow = () => Date.now() + (clockOffset || 0);
+
+        /**
+         * Learns the clock difference to the server. A message can only arrive late, never early,
+         * so the largest difference seen is the most accurate; it decays slowly to follow drift.
+         */
+        function learnClock(st) {
+            if (typeof st.serverTime !== "number") return;
+            const sample = st.serverTime - Date.now();
+            clockOffset = clockOffset == null ? sample : Math.max(sample, clockOffset - 20);
         }
 
-        /** Where the room is right now, from the last state and the time since. */
+        /** Where the room is right now. */
         function roomPosition() {
-            if (!lastRoom) return null;
-            return lastRoom.st.positionMs + (lastRoom.st.playing ? Date.now() - lastRoom.at : 0);
+            if (!room) return null;
+            return room.positionMs + (room.running ? Math.max(0, serverNow() - room.serverTime) : 0);
         }
 
         function applyRoom(st) {
-            if (stale(st)) return;
-            if (typeof st.version === "number") roomVersion = Math.max(roomVersion, st.version);
+            learnClock(st);
+            renderMembers(st);
+            // While an own change is on its way, the server's answer to it brings the newest state.
+            if (pendingSends > 0) return;
+            if (typeof st.version === "number") {
+                if (st.version < roomVersion) return; // older than what we have
+                roomVersion = st.version;
+            }
             if (st.itemId && st.itemId !== item.id) {
                 M.navigate(nextHref({id: st.itemId}), true);
                 return;
             }
-            lastRoom = {st, at: Date.now()};
-            remoteApplying = true;
-            const target = st.positionMs;
+            room = st;
+            renderWaiting(st);
+            sync();
+        }
+
+        /** Brings this player in line with the room; runs on every room change and twice a second. */
+        function sync() {
+            if (!room) return;
+            const target = roomPosition();
             if (!state.plan) {
-                start(target).then(() => {
-                    if (!st.playing) video.pause();
-                });
-            } else if (Math.abs(position() - target) > 2500) {
-                seekTo(target);
+                if (!state.starting) start(target);
+                return reportLoading(true);
             }
-            if (st.playing && video.paused) video.play().catch(() => null);
-            if (!st.playing && !video.paused) video.pause();
-            setTimeout(() => remoteApplying = false, 600);
+            const loading = state.starting || video.seeking || video.readyState < 3 || !notice.hidden;
+            reportLoading(loading);
+            if (state.starting || video.seeking) return;
+
+            const diff = position() - target;
+            const limit = room.running ? 2500 : 400;
+            if (Math.abs(diff) > limit) {
+                if (Date.now() - lastHardSync > hardSyncPause) {
+                    if (Date.now() - lastHardSync < hardSyncPause + 5000) hardSyncPause = Math.min(30000, hardSyncPause * 2);
+                    lastHardSync = Date.now();
+                    video.playbackRate = 1;
+                    seekTo(target);
+                    return;
+                }
+            } else if (Date.now() - lastHardSync > 10000) {
+                hardSyncPause = 3000;
+            }
+            if (room.running) {
+                if (video.paused && notice.hidden) video.play().catch(() => tryPlay());
+                // Ahead: a little slower, behind: a little faster, by up to 8 %.
+                const ad = Math.abs(diff);
+                video.playbackRate = ad < 200 ? 1 : 1 - Math.sign(diff) * Math.min(0.08, 0.02 + ad / 25000);
+            } else {
+                video.playbackRate = 1;
+                if (!video.paused) video.pause();
+            }
+        }
+
+        /** Tells the room when this player starts or stops loading (after a short delay, to skip hiccups). */
+        function reportLoading(loading) {
+            if (!loading) {
+                loadingSince = 0;
+            } else if (!loadingSince) {
+                loadingSince = Date.now();
+                return;
+            }
+            const report = loading && Date.now() - loadingSince > 600;
+            if (report === reportedLoading || (loading && !report)) return;
+            reportedLoading = report;
+            roomPost({action: report ? "buffering" : "ready"}).then((st) => st && applyRoom(st), () => null);
         }
 
         function renderMembers(st) {
@@ -803,49 +971,28 @@
             }));
         }
 
+        function renderWaiting(st) {
+            const others = (st.waiting || []).filter((w) => w.id !== S.user.id).map((w) => w.name);
+            waitInfo.hidden = !others.length || !st.playing;
+            if (others.length) waitInfo.replaceChildren(h("span", {class: "spin"}), t("Waiting for {0} …", others.join(", ")));
+        }
+
         if (roomCode) {
             video.autoplay = false;
             events = new EventSource(`/api/together/${roomCode}/events`);
-            events.addEventListener("state", (e) => {
+            events.addEventListener("state", (e) => applyRoom(JSON.parse(e.data)));
+            events.addEventListener("members", (e) => {
                 const st = JSON.parse(e.data);
                 renderMembers(st);
-                applyRoom(st);
-            });
-            events.addEventListener("members", (e) => renderMembers(JSON.parse(e.data)));
-            // A change that arrived while the video was still loading is applied once it can play.
-            video.addEventListener("canplay", () => {
-                const target = roomPosition();
-                if (target == null || !state.plan) return;
-                if (Math.abs(position() - target) > 2500) {
-                    remoteApplying = true;
-                    seekTo(target);
-                    setTimeout(() => remoteApplying = false, 600);
-                }
-                if (lastRoom.st.playing && video.paused) video.play().catch(() => null);
+                learnClock(st);
             });
             events.onerror = () => {
                 if (events.readyState === EventSource.CLOSED) M.toast(t("Connection to the room lost"), true);
             };
-            // Correct drift from buffering every now and then.
-            syncTimer = setInterval(async () => {
-                try {
-                    const st = await api("GET", `/api/together/${roomCode}`);
-                    if (stale(st)) return;
-                    lastRoom = {st, at: Date.now()};
-                    if (st.playing !== !video.paused) {
-                        remoteApplying = true;
-                        if (st.playing) video.play().catch(() => null); else video.pause();
-                        setTimeout(() => remoteApplying = false, 600);
-                    }
-                    if (st.playing && !video.paused && Math.abs(position() - st.positionMs) > 3000) {
-                        remoteApplying = true;
-                        seekTo(st.positionMs);
-                        setTimeout(() => remoteApplying = false, 600);
-                    }
-                } catch (e) {
-                    // room gone; the event stream reports it
-                }
-            }, 8000);
+            for (const ev of ["canplay", "playing", "seeked", "waiting"]) video.addEventListener(ev, () => sync());
+            syncTimer = setInterval(sync, 500);
+            // In case an event got lost (e.g. the connection dropped for a moment).
+            pollTimer = setInterval(() => api("GET", `/api/together/${roomCode}`).then(applyRoom, () => null), 10000);
         }
 
         S.cleanup = () => {
@@ -857,10 +1004,14 @@
             }
             if (events) events.close();
             clearInterval(syncTimer);
+            clearInterval(pollTimer);
+            if (roomCode && reportedLoading) roomPost({action: "ready"}).catch(() => null);
             report(true, true);
             cancelAnimationFrame(raf);
             clearInterval(interval);
+            clearInterval(watchTimer);
             clearInterval(nextTimer);
+            clearTimeout(clickTimer);
             clearTimeout(idleTimer);
             document.removeEventListener("keydown", onKey);
             document.removeEventListener("click", closePlayerMenu);

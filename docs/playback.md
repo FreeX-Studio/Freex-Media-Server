@@ -24,7 +24,9 @@ way:
 Converted streams are HLS with fragmented MP4 segments (hls.js in Chrome, Firefox and Edge, native in Safari and on
 iOS). Seeking within the converted part is instant; seeking further ahead restarts the conversion there. ffmpeg is
 paused when it is far ahead of the player and stopped shortly after the player is gone. If direct play fails in a
-browser after all, the player switches to conversion automatically.
+browser after all, the player switches to conversion automatically. Network errors are retried, a conversion the
+server has ended (for example after a long pause) is started again at the same position, and playback that stops
+making progress is restarted by itself.
 
 Quality can be chosen from *Original* down to 1 Mbit/s. Admins see all running playbacks, direct or converted, in the
 activity menu in the header.
@@ -65,6 +67,11 @@ countdown; for the last episode *Skip credits*.
 server) watches in sync: everybody can play, pause, seek or start the next episode, and all others follow. Each
 viewer streams separately and can pick their own quality, audio and subtitles.
 
+While a viewer's player is still loading, after joining, after a jump or when the conversion falls behind, the room
+pauses for everyone and shows whom it is waiting for; playback then continues for all at the same moment. Small
+differences between the players are evened out by playing a few percent faster or slower, so nobody notices a jump.
+A player that does not get ready within 20 seconds no longer holds up the others.
+
 ## Chromecast
 
 In Chrome, the player shows a cast button as soon as a Chromecast or a TV with Google Cast is in the network. The
@@ -91,4 +98,4 @@ next episode is cast automatically.
 | `→` / `L` | 30 seconds forward |
 | `F` | Fullscreen |
 | `M` | Mute |
-| `Esc` | Back |
+| `Esc` | Close the player (the × at the top right does the same) |

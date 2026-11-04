@@ -39,6 +39,10 @@ import java.util.logging.Logger;
  * <p>
  * Members receive changes as Server-Sent Events. The state's position is extrapolated from the
  * time of the last change, so late joiners land at the right spot.
+ * <p>
+ * A member whose player is loading (starting, seeking, buffering) reports it, and the room holds
+ * its position until everyone is ready again, so nobody falls behind. A report that is not
+ * cleared expires after {@link #WAIT_LIMIT_MS}, so one stuck player cannot stop the room.
  */
 public final class TogetherService implements AutoCloseable {
 
@@ -47,6 +51,7 @@ public final class TogetherService implements AutoCloseable {
     private static final long EMPTY_ROOM_TTL_MS = TimeUnit.MINUTES.toMillis(10);
     private static final long IDLE_ROOM_TTL_MS = TimeUnit.HOURS.toMillis(8);
     private static final SecureRandom RANDOM = new SecureRandom();
+    static final long WAIT_LIMIT_MS = TimeUnit.SECONDS.toMillis(20);
 
     public static final class Room {
         public final String code;
@@ -62,6 +67,8 @@ public final class TogetherService implements AutoCloseable {
         volatile long version;
         /** userId → display name, for everyone who joined. */
         final Map<String, String> members = new ConcurrentHashMap<>();
+        /** Members whose player is loading: userId → since when. Guarded by the room's lock. */
+        final Map<String, Long> waiting = new LinkedHashMap<>();
         final List<Subscriber> subscribers = new CopyOnWriteArrayList<>();
 
         /** The title currently played in the room. */
@@ -75,21 +82,38 @@ public final class TogetherService implements AutoCloseable {
             this.itemId = itemId;
         }
 
-        /** Current position, counting the time since the last change while playing. */
-        long currentPosition() {
-            return playing ? positionMs + (System.currentTimeMillis() - changedAt) : positionMs;
+        /** Whether the position advances: playing, and nobody is loading. */
+        synchronized boolean running() {
+            return playing && waiting.isEmpty();
         }
 
-        Map<String, Object> toJson(ToLongFunction<String> avatars) {
+        /** Position at {@code now}, counting the time since the last change while running. */
+        synchronized long positionAt(long now) {
+            return running() ? positionMs + Math.max(0, now - changedAt) : positionMs;
+        }
+
+        /** Fixes the position at now; called before anything that starts or stops the clock. */
+        private void freeze(long now) {
+            positionMs = positionAt(now);
+            changedAt = now;
+        }
+
+        synchronized Map<String, Object> toJson(ToLongFunction<String> avatars) {
+            long now = System.currentTimeMillis();
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("code", code);
             m.put("hostId", hostId);
             m.put("itemId", itemId);
+            // playing is what the members chose; running says whether the position moves right now
             m.put("playing", playing);
-            m.put("positionMs", currentPosition());
+            m.put("running", running());
+            m.put("positionMs", positionAt(now));
             m.put("changedBy", changedBy);
             m.put("version", version);
-            m.put("serverTime", System.currentTimeMillis());
+            m.put("serverTime", now);
+            List<Object> loading = new ArrayList<>();
+            for (String id : waiting.keySet()) loading.add(Map.of("id", id, "name", members.getOrDefault(id, "")));
+            m.put("waiting", loading);
             List<Object> online = new ArrayList<>();
             Set<String> connected = new HashSet<>();
             for (Subscriber s : subscribers) connected.add(s.userId);
@@ -130,6 +154,7 @@ public final class TogetherService implements AutoCloseable {
     public TogetherService(ToLongFunction<String> avatars) {
         this.avatars = avatars;
         cleaner.scheduleWithFixedDelay(this::cleanup, 1, 1, TimeUnit.MINUTES);
+        cleaner.scheduleWithFixedDelay(this::expireWaiting, 2, 2, TimeUnit.SECONDS);
     }
 
     /** The state of a room as sent to its members. */
@@ -163,12 +188,17 @@ public final class TogetherService implements AutoCloseable {
     }
 
     /**
-     * Applies a change from a member. {@code action} is play, pause, seek or item (switch to
-     * another item, e.g. the next episode).
+     * Applies a change from a member. {@code action} is play, pause, seek, item (switch to another
+     * item, e.g. the next episode), or buffering / ready, which a player reports while it loads.
+     *
+     * @return the room's new version
      */
-    /** @return the room's new version */
     public long update(Room r, User u, String action, long positionMs, String itemId) {
         if (!r.members.containsKey(u.id)) throw new IllegalStateException("not a member");
+        if (action.equals("buffering") || action.equals("ready")) {
+            if (setWaiting(r, u.id, action.equals("buffering"))) broadcast(r, "state");
+            return r.version;
+        }
         synchronized (r) {
             switch (action) {
                 case "play" -> r.playing = true;
@@ -180,6 +210,7 @@ public final class TogetherService implements AutoCloseable {
                     if (itemId == null || itemId.isBlank()) throw new IllegalArgumentException("itemId missing");
                     r.itemId = itemId;
                     r.playing = true;
+                    r.waiting.clear(); // everyone loads the new title and reports again
                 }
                 default -> throw new IllegalArgumentException("unknown action " + action);
             }
@@ -191,6 +222,34 @@ public final class TogetherService implements AutoCloseable {
         }
         broadcast(r, "state");
         return r.version;
+    }
+
+    /** @return whether the room's state changed */
+    private boolean setWaiting(Room r, String userId, boolean on) {
+        synchronized (r) {
+            if (on == r.waiting.containsKey(userId)) return false;
+            long now = System.currentTimeMillis();
+            r.freeze(now);
+            if (on) r.waiting.put(userId, now); else r.waiting.remove(userId);
+            r.lastActivity = now;
+            r.version++;
+            return true;
+        }
+    }
+
+    private void expireWaiting() {
+        long now = System.currentTimeMillis();
+        for (Room r : rooms.values()) {
+            List<String> expired = new ArrayList<>();
+            synchronized (r) {
+                r.waiting.forEach((id, since) -> {
+                    if (now - since > WAIT_LIMIT_MS) expired.add(id);
+                });
+            }
+            boolean changed = false;
+            for (String id : expired) changed |= setWaiting(r, id, false);
+            if (changed) broadcast(r, "state");
+        }
     }
 
     public Subscriber subscribe(Room r, User u) {
@@ -205,10 +264,13 @@ public final class TogetherService implements AutoCloseable {
     public void unsubscribe(Room r, Subscriber s) {
         r.subscribers.remove(s);
         r.lastActivity = System.currentTimeMillis();
-        broadcast(r, "members");
+        // Whoever left no longer holds up the others.
+        boolean stillThere = r.subscribers.stream().anyMatch(x -> x.userId.equals(s.userId));
+        broadcast(r, !stillThere && setWaiting(r, s.userId, false) ? "state" : "members");
     }
 
     public void leave(Room r, User u) {
+        setWaiting(r, u.id, false);
         r.members.remove(u.id);
         r.subscribers.removeIf(s -> s.userId.equals(u.id));
         broadcast(r, "members");
