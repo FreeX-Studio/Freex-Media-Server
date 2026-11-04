@@ -1,0 +1,66 @@
+#!/bin/sh
+# Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3, see /usr/share/doc/freex-media-server/copyright.
+# Post-install script of freex-media-server: service user, data directory, systemd service.
+set -e
+
+USER_NAME=freex
+DATA_DIR=/var/lib/freex-media-server
+CACHE_DIR=/var/cache/freex-media-server
+CONFIG_DIR=/etc/freex-media-server
+CONFIG=$CONFIG_DIR/config.yml
+
+if [ "$1" = "configure" ]; then
+    if ! getent passwd "$USER_NAME" >/dev/null; then
+        adduser --system --group --home "$DATA_DIR" --no-create-home \
+            --gecos "FreeX" "$USER_NAME" >/dev/null
+    fi
+    # GPU access for hardware transcoding (VAAPI / Quick Sync), if the groups exist.
+    for g in video render; do
+        if getent group "$g" >/dev/null; then
+            adduser "$USER_NAME" "$g" >/dev/null 2>&1 || true
+        fi
+    done
+
+    # systemd also creates these (StateDirectory/CacheDirectory); created here so they
+    # exist for manual starts and on systems without systemd.
+    for d in "$DATA_DIR" "$CACHE_DIR"; do
+        mkdir -p "$d"
+        chown "$USER_NAME:$USER_NAME" "$d"
+        chmod 750 "$d"
+    done
+
+    # Up to 0.4.1 the caches were kept in the data directory. They are recreated on demand,
+    # so the old copies are simply removed.
+    if [ -n "$2" ] && dpkg --compare-versions "$2" lt 0.4.2; then
+        rm -rf "$DATA_DIR/thumbs" "$DATA_DIR/subtitles" "$DATA_DIR/transcode"
+        rm -f "$DATA_DIR"/sqlite-*libsqlitejdbc.so* "$DATA_DIR"/sqlite-*.lck
+    fi
+
+    # The configuration is written on the first install only and then belongs to the server,
+    # which changes it from its settings page. It can hold the TMDB key and the keystore
+    # password, so only the service user can read it.
+    mkdir -p "$CONFIG_DIR"
+    if [ ! -f "$CONFIG" ]; then
+        cp /usr/share/freex-media-server/config.yml.default "$CONFIG"
+    fi
+    chown "$USER_NAME:$USER_NAME" "$CONFIG_DIR" "$CONFIG"
+    chmod 750 "$CONFIG_DIR"
+    chmod 640 "$CONFIG"
+
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload >/dev/null || true
+        systemctl enable freex-media-server.service >/dev/null 2>&1 || true
+        if [ -z "$2" ]; then
+            systemctl start freex-media-server.service || true
+        else
+            systemctl try-restart freex-media-server.service || true
+        fi
+    fi
+
+    if [ -z "$2" ]; then
+        echo "FreeX Media Server is running on port 32500. Open http://<this-server>:32500/ to create the admin account."
+        echo "Media folders must be readable by the user '$USER_NAME'."
+    fi
+fi
+
+exit 0

@@ -1,0 +1,72 @@
+# FreeX configuration (installed by the Debian package, kept on updates).
+# Most settings can also be changed by an admin in the web interface (Settings > Server),
+# which writes them back into this file. After editing it by hand:
+#   sudo systemctl restart freex-media-server
+# Libraries and users are managed in the web interface, not here.
+
+server:
+  # Name shown in the web interface
+  name: "FreeX"
+  # Address and port the HTTP server listens on
+  bindAddress: "0.0.0.0"
+  port: 32500
+  # Optional HTTPS: path to a PKCS#12 keystore (.p12/.pfx) with certificate and key.
+  # Leave empty for plain HTTP (e.g. behind a reverse proxy that does TLS).
+  tlsKeystore: ""
+  tlsKeystorePassword: ""
+  # Set to true only when the server runs behind your own reverse proxy: then the
+  # X-Forwarded-For / X-Forwarded-Proto headers are trusted for client IP and HTTPS detection.
+  trustProxy: false
+
+data:
+  # Where the database (users, watch state, lists), library index and metadata are stored
+  directory: "/var/lib/freex-media-server"
+  # Where files the server can recreate at any time are stored: thumbnails,
+  # extracted subtitles and transcoding segments. Safe to delete while the server is stopped.
+  cacheDirectory: "/var/cache/freex-media-server"
+
+ffmpeg:
+  # Paths to the ffprobe/ffmpeg binaries. Used for media info and thumbnails;
+  # the server still works without them, just with less information.
+  ffprobe: "ffprobe"
+  ffmpeg: "ffmpeg"
+
+security:
+  # A login stays valid this many days without use
+  sessionDays: 30
+  # Minimum password length for new passwords
+  minPasswordLength: 10
+
+tmdb:
+  # API key or read access token from https://www.themoviedb.org/settings/api (free).
+  # Leave empty to use only local .nfo files and artwork.
+  apiKey: ""
+  # Language of titles and descriptions, and country for age ratings
+  language: "de-DE"
+  region: "DE"
+
+markers:
+  # Detect intros and end credits of TV episodes ("Skip intro")
+  enabled: true
+
+transcoder:
+  # Convert files the browser can't play (codec, container, bitrate) with ffmpeg
+  enabled: true
+  # Where temporary segments are written: relative to the cache directory or an absolute
+  # path, e.g. on a fast SSD. The server only ever deletes its own session folders there.
+  # Outside /var/cache/freex-media-server the systemd service needs a drop-in:
+  #   sudo systemctl edit freex-media-server  ->  [Service] ReadWritePaths=/path/to/transcode
+  directory: "transcode"
+  # Simultaneous conversions; more requests get a "busy" message
+  maxSessions: 3
+  # Hardware encoding: none, nvenc (NVIDIA), qsv (Intel Quick Sync) or vaapi (Intel/AMD on Linux)
+  hardwareAcceleration: "none"
+  vaapiDevice: "/dev/dri/renderD128"
+  # x264 speed/quality trade-off for software encoding (ultrafast … medium)
+  preset: "veryfast"
+
+scanner:
+  # Automatic rescan of all libraries, in minutes (0 = only manual scans)
+  intervalMinutes: 30
+  # Number of files probed in parallel
+  threads: 4

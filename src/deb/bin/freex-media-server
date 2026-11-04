@@ -1,0 +1,37 @@
+#!/bin/sh
+# Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3, see /usr/share/doc/freex-media-server/copyright.
+# Starts FreeX with a Java 21+ runtime.
+# Usage: freex-media-server [config.yml]   (default: /etc/freex-media-server/config.yml)
+
+JAR=/usr/share/freex-media-server/freex-media-server.jar
+CONFIG="${1:-/etc/freex-media-server/config.yml}"
+
+# Prefer JAVA_HOME, then an installed Java 21/25, then whatever "java" is on the PATH.
+JAVA=""
+if [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+    JAVA="$JAVA_HOME/bin/java"
+else
+    for d in /usr/lib/jvm/java-25-* /usr/lib/jvm/java-21-* /usr/lib/jvm/temurin-25* /usr/lib/jvm/temurin-21*; do
+        if [ -x "$d/bin/java" ]; then
+            JAVA="$d/bin/java"
+            break
+        fi
+    done
+    [ -z "$JAVA" ] && JAVA="$(command -v java)"
+fi
+if [ -z "$JAVA" ]; then
+    echo "freex-media-server: no Java runtime found, install openjdk-21-jre-headless" >&2
+    exit 1
+fi
+
+MAJOR=$("$JAVA" -XshowSettings:properties -version 2>&1 | sed -n 's/.*java.specification.version = \([0-9]*\).*/\1/p' | head -n 1)
+if [ -n "$MAJOR" ] && [ "$MAJOR" -lt 21 ]; then
+    echo "freex-media-server: Java 21 or newer is required, found Java $MAJOR at $JAVA" >&2
+    exit 1
+fi
+
+# File names with umlauts need a UTF-8 locale.
+export LANG="${LANG:-C.UTF-8}"
+case "$LANG" in *UTF-8*|*utf8*) ;; *) export LANG=C.UTF-8 ;; esac
+
+exec "$JAVA" $JAVA_OPTS -jar "$JAR" "$CONFIG"
