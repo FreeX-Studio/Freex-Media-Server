@@ -11,7 +11,7 @@
  */
 
 /*
- * FreeX web interface: Chromecast support (Google Cast sender).
+ * FreeX Web: Chromecast support (Google Cast sender), used by the player.
  *
  * The SDK is loaded from Google only in Chrome on a secure page (HTTPS or localhost); Chrome
  * offers the Cast API nowhere else. The receiver is Google's Default Media Receiver, which

@@ -23,7 +23,10 @@ import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -194,9 +197,9 @@ public final class SettingsApi {
             Files.writeString(probe, "ok");
             Files.delete(probe);
         } catch (IOException | SecurityException e) {
-            String why = e instanceof java.nio.file.AccessDeniedException ? "keine Berechtigung"
-                    : e instanceof java.nio.file.FileSystemException fse && fse.getReason() != null ? fse.getReason()
-                    : e instanceof java.nio.file.NoSuchFileException ? "Pfad nicht vorhanden" : e.getClass().getSimpleName();
+            String why = e instanceof AccessDeniedException ? "keine Berechtigung"
+                    : e instanceof FileSystemException fse && fse.getReason() != null ? fse.getReason()
+                    : e instanceof NoSuchFileException ? "Pfad nicht vorhanden" : e.getClass().getSimpleName();
             throw ApiException.badRequest("Der Server kann nicht in " + dir + " schreiben (" + why + "). "
                     + "Prüfe die Rechte für den Benutzer des Servers. Läuft er als systemd-Dienst, gib den Ordner dort frei: "
                     + "sudo systemctl edit freex-media-server und unter [Service] ReadWritePaths=" + dir + " eintragen.");

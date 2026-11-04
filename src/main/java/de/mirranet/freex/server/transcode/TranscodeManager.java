@@ -46,7 +46,6 @@ public final class TranscodeManager implements AutoCloseable {
 
     private static final Logger LOG = Logger.getLogger(TranscodeManager.class.getName());
 
-    /** Segment length in seconds. */
     static final int SEGMENT_SECONDS = 4;
     private static final long IDLE_TIMEOUT_MS = 60_000;
     /** Pause ffmpeg when it is this many segments ahead of the player, continue at the lower mark. */

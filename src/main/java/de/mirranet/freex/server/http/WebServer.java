@@ -19,6 +19,7 @@ import com.sun.net.httpserver.HttpsServer;
 import de.mirranet.freex.server.model.User;
 import de.mirranet.freex.server.store.DataStore;
 
+import java.net.URI;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
@@ -140,7 +141,7 @@ public final class WebServer implements AutoCloseable {
                 ? raw.getRequestHeaders().getFirst("X-Forwarded-Host") : raw.getRequestHeaders().getFirst("Host");
         if (host == null) return false;
         try {
-            java.net.URI o = java.net.URI.create(origin);
+            URI o = URI.create(origin);
             String oh = o.getHost() + (o.getPort() > 0 ? ":" + o.getPort() : "");
             return oh.equalsIgnoreCase(host.trim()) || o.getHost().equalsIgnoreCase(host.trim());
         } catch (IllegalArgumentException e) {

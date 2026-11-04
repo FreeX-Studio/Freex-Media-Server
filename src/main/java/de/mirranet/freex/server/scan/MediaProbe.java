@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -91,8 +92,8 @@ public final class MediaProbe {
         f.durationMs = Math.round(parseDouble(Json.str(format, "duration", "0")) * 1000);
         f.bitrate = Json.num(format, "bit_rate", 0);
         f.formatName = Json.str(format, "format_name", "");
-        f.audioStreams = new java.util.ArrayList<>();
-        f.subtitleStreams = new java.util.ArrayList<>();
+        f.audioStreams = new ArrayList<>();
+        f.subtitleStreams = new ArrayList<>();
         List<Object> streams = Json.list(json.get("streams"));
         boolean haveVideo = false;
         for (Object o : streams) {

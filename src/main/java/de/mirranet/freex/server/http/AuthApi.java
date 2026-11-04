@@ -25,12 +25,15 @@ import java.io.IOException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 import static de.mirranet.freex.server.http.WebServer.Access.ADMIN;
@@ -67,10 +70,10 @@ public final class AuthApi {
     /** Compared against when the account does not exist, so the response time is the same. */
     private final String dummyHash = PasswordHasher.hash(Ids.token());
 
-    private final java.util.function.Consumer<String> onUserDeleted;
+    private final Consumer<String> onUserDeleted;
 
     public AuthApi(String serverName, DataStore store, int minPasswordLength, int sessionDays,
-                   java.util.function.Consumer<String> onUserDeleted) {
+                   Consumer<String> onUserDeleted) {
         this.onUserDeleted = onUserDeleted;
         this.serverName = serverName;
         this.store = store;
@@ -432,18 +435,18 @@ public final class AuthApi {
     private void applyLibraries(User u, Object value) {
         if ("all".equals(value)) {
             u.allLibraries = true;
-            u.libraryIds = java.util.Set.of();
+            u.libraryIds = Set.of();
             return;
         }
         if (!(value instanceof List<?> list)) throw ApiException.badRequest("libraries: \"all\" oder eine Liste von Bibliotheken erwartet");
-        java.util.Set<String> ids = new java.util.LinkedHashSet<>();
+        Set<String> ids = new LinkedHashSet<>();
         for (Object o : list) {
             String id = String.valueOf(o);
             if (store.library(id).isEmpty()) throw ApiException.badRequest("Unbekannte Bibliothek " + id);
             ids.add(id);
         }
         u.allLibraries = false;
-        u.libraryIds = java.util.Set.copyOf(ids);
+        u.libraryIds = Set.copyOf(ids);
     }
 
     // ================================================================== validation

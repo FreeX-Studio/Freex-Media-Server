@@ -54,7 +54,6 @@ public final class MarkerService implements AutoCloseable {
     private static final int MAX_BIT_ERRORS = 10;
     private static final int MAX_GAP = 24;
 
-    /** A segment in milliseconds. */
     public record Segment(long startMs, long endMs) {
         Map<String, Object> toJson() {
             return Map.of("startMs", startMs, "endMs", endMs);

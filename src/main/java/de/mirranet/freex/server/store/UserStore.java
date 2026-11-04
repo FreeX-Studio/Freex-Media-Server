@@ -18,10 +18,12 @@ import de.mirranet.freex.server.util.Ids;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -76,7 +78,7 @@ public final class UserStore {
         for (User u : users.values()) {
             u.recoveryCodes = new ArrayList<>(db.query("SELECT code_hash FROM recovery_codes WHERE user_id = ?",
                     rs -> rs.getString(1), u.id));
-            u.libraryIds = java.util.Set.copyOf(db.query("SELECT library_id FROM user_libraries WHERE user_id = ?",
+            u.libraryIds = Set.copyOf(db.query("SELECT library_id FROM user_libraries WHERE user_id = ?",
                     rs -> rs.getString(1), u.id));
         }
         db.query("SELECT * FROM sessions", rs -> {
@@ -89,7 +91,6 @@ public final class UserStore {
                     new Progress(rs.getLong("offset_ms"), rs.getInt("watched") == 1, rs.getInt("view_count"), rs.getLong("updated_at")));
             return null;
         });
-        // Expired sessions are cleaned up at start.
         long cutoff = System.currentTimeMillis() - sessionTtlMs;
         db.update("DELETE FROM sessions WHERE last_seen < ?", cutoff);
         sessions.values().removeIf(s -> s.lastSeen < cutoff);
@@ -169,9 +170,9 @@ public final class UserStore {
         db.update("DELETE FROM user_libraries WHERE library_id = ?", libraryId);
         for (User u : users.values()) {
             if (u.libraryIds.contains(libraryId)) {
-                java.util.Set<String> s = new java.util.HashSet<>(u.libraryIds);
+                Set<String> s = new HashSet<>(u.libraryIds);
                 s.remove(libraryId);
-                u.libraryIds = java.util.Set.copyOf(s);
+                u.libraryIds = Set.copyOf(s);
             }
         }
     }
@@ -326,27 +327,5 @@ public final class UserStore {
 
     public int clearHistory(String userId) {
         return db.update("DELETE FROM watch_history WHERE user_id = ?", userId);
-    }
-
-    // ================================================================== import of the former JSON files
-
-    /** Used once by {@link JsonImport}: inserts a user with all fields as they were stored. */
-    void importUser(User u) {
-        insert(u);
-        for (String code : u.recoveryCodes) db.update("INSERT OR IGNORE INTO recovery_codes (user_id, code_hash) VALUES (?, ?)", u.id, code);
-        users.put(u.id, u);
-    }
-
-    void importSession(String tokenHash, Session s) {
-        if (!users.containsKey(s.userId)) return;
-        db.update("INSERT OR IGNORE INTO sessions (token_hash, user_id, created_at, last_seen, ip, user_agent) VALUES (?, ?, ?, ?, ?, ?)",
-                tokenHash, s.userId, s.createdAt, s.lastSeen, s.ip == null ? "" : s.ip, s.userAgent == null ? "" : s.userAgent);
-        sessions.put(tokenHash, s);
-    }
-
-    void importLoginEvent(String userId, LoginEvent e) {
-        if (!users.containsKey(userId)) return;
-        db.update("INSERT INTO login_events (user_id, time, ip, user_agent, success, detail) VALUES (?, ?, ?, ?, ?, ?)",
-                userId, e.time, e.ip, e.userAgent, e.success, e.detail);
     }
 }

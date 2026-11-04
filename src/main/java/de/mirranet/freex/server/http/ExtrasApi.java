@@ -626,7 +626,7 @@ public final class ExtrasApi implements MediaApi.Extension {
         MediaItem it = store.item(ex.user(), Json.str(body, "itemId", "")).orElseThrow(() -> ApiException.badRequest("Unbekannter Eintrag"));
         if (!it.type.playable()) throw ApiException.badRequest("Nur Filme und Episoden");
         TogetherService.Room r = together.create(ex.user(), it.id, Json.num(body, "positionMs", 0));
-        ex.json(201, r.toJson());
+        ex.json(201, together.state(r));
     }
 
     private void joinRoom(Exchange ex) throws IOException {
@@ -634,7 +634,7 @@ public final class ExtrasApi implements MediaApi.Extension {
         // Only who may see the title can join; the invite link alone is not enough.
         if (store.item(ex.user(), r.itemId()).isEmpty()) throw new ApiException(403, "Dieser Titel ist für dich nicht freigegeben");
         together.join(r, ex.user());
-        ex.ok(r.toJson());
+        ex.ok(together.state(r));
     }
 
     private void roomState(Exchange ex) throws IOException {

@@ -14,7 +14,6 @@ package de.mirranet.freex.server.http;
 
 import de.mirranet.freex.server.json.Json;
 import de.mirranet.freex.server.model.Library;
-import de.mirranet.freex.server.model.MediaFile;
 import de.mirranet.freex.server.model.MediaItem;
 import de.mirranet.freex.server.model.Progress;
 import de.mirranet.freex.server.model.User;
@@ -28,6 +27,7 @@ import de.mirranet.freex.server.transcode.TranscodeManager;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,8 +40,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
+import java.util.TreeSet;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import static de.mirranet.freex.server.http.WebServer.Access.ADMIN;
@@ -73,7 +74,7 @@ public final class MediaApi {
     }
 
     private static Map<String, Object> readWebClientVersion() {
-        try (java.io.InputStream in = MediaApi.class.getResourceAsStream("/web/version.json")) {
+        try (InputStream in = MediaApi.class.getResourceAsStream("/web/version.json")) {
             if (in != null) {
                 Map<String, Object> m = Json.parseObject(new String(in.readAllBytes(), StandardCharsets.UTF_8));
                 return Map.of("name", Json.str(m, "name", "FreeX Web"), "version", Json.str(m, "version", "dev"));
@@ -291,7 +292,7 @@ public final class MediaApi {
         };
         items.sort(desc ? cmp.reversed() : cmp);
 
-        Set<String> genres = new java.util.TreeSet<>();
+        Set<String> genres = new TreeSet<>();
         List<Object> out = new ArrayList<>();
         for (MediaItem it : items) {
             for (String g : it.genres.split(",")) if (!g.isBlank()) genres.add(g.trim());
@@ -394,7 +395,7 @@ public final class MediaApi {
         }
     }
 
-    private final List<Extension> extensions = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final List<Extension> extensions = new CopyOnWriteArrayList<>();
 
     /** Running playbacks for the activity menu; set during wiring. */
     private volatile ActivityApi activity;
@@ -407,7 +408,10 @@ public final class MediaApi {
         extensions.add(e);
     }
 
-    /** Item view for other API classes. */
+    /**
+     * The JSON view of an item as this user sees it: watch state, show and season of episodes,
+     * data of the extensions; {@code full} adds the description for shows, seasons and episodes.
+     */
     public Map<String, Object> view(MediaItem it, User u, boolean full) {
         return decorate(it, u, full);
     }
@@ -587,7 +591,7 @@ public final class MediaApi {
 
     private void addSortedHub(List<Map<String, Object>> hubs, Library l, User u, List<MediaItem> source, String key,
                               String title, String sort, Comparator<MediaItem> order,
-                              java.util.function.Predicate<MediaItem> filter) {
+                              Predicate<MediaItem> filter) {
         List<MediaItem> list = new ArrayList<>(source.stream().filter(filter).toList());
         if (list.size() < 2) return;
         list.sort(order);
@@ -813,7 +817,7 @@ public final class MediaApi {
                 m.put("offsetMs", start);
                 m.put("startMs", start);
                 if (activity != null) {
-                    activity.started(ex, it, client, device, plan.mode().name().toLowerCase(java.util.Locale.ROOT),
+                    activity.started(ex, it, client, device, plan.mode().name().toLowerCase(Locale.ROOT),
                             plan.reason(), quality.label(), s.id, start);
                 }
             } catch (TranscodeManager.BusyException e) {
@@ -846,10 +850,10 @@ public final class MediaApi {
         }
         if (name.endsWith(".m3u8")) {
             ex.raw.getResponseHeaders().set("Cache-Control", "no-cache");
-            ex.send(200, "application/vnd.apple.mpegurl", java.nio.file.Files.readAllBytes(p));
+            ex.send(200, "application/vnd.apple.mpegurl", Files.readAllBytes(p));
         } else {
             ex.raw.getResponseHeaders().set("Cache-Control", "private, max-age=3600");
-            ex.send(200, name.endsWith(".mp4") ? "video/mp4" : "video/iso.segment", java.nio.file.Files.readAllBytes(p));
+            ex.send(200, name.endsWith(".mp4") ? "video/mp4" : "video/iso.segment", Files.readAllBytes(p));
         }
     }
 

@@ -17,9 +17,11 @@ import de.mirranet.freex.server.model.User;
 
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -27,6 +29,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.ToLongFunction;
 import java.util.logging.Logger;
 
 /**
@@ -77,7 +80,7 @@ public final class TogetherService implements AutoCloseable {
             return playing ? positionMs + (System.currentTimeMillis() - changedAt) : positionMs;
         }
 
-        public Map<String, Object> toJson() {
+        Map<String, Object> toJson(ToLongFunction<String> avatars) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("code", code);
             m.put("hostId", hostId);
@@ -88,11 +91,11 @@ public final class TogetherService implements AutoCloseable {
             m.put("version", version);
             m.put("serverTime", System.currentTimeMillis());
             List<Object> online = new ArrayList<>();
-            java.util.Set<String> connected = new java.util.HashSet<>();
+            Set<String> connected = new HashSet<>();
             for (Subscriber s : subscribers) connected.add(s.userId);
             for (Map.Entry<String, String> e : members.entrySet()) {
                 online.add(Map.of("id", e.getKey(), "name", e.getValue(), "online", connected.contains(e.getKey()),
-                        "avatar", avatarLookup.applyAsLong(e.getKey())));
+                        "avatar", avatars.applyAsLong(e.getKey())));
             }
             m.put("members", online);
             return m;
@@ -122,14 +125,16 @@ public final class TogetherService implements AutoCloseable {
     });
 
     /** Profile picture version of a user (0 = none), shown next to the members. */
-    private static volatile java.util.function.ToLongFunction<String> avatarLookup = id -> 0;
+    private final ToLongFunction<String> avatars;
 
-    public void setAvatarLookup(java.util.function.ToLongFunction<String> lookup) {
-        avatarLookup = lookup;
+    public TogetherService(ToLongFunction<String> avatars) {
+        this.avatars = avatars;
+        cleaner.scheduleWithFixedDelay(this::cleanup, 1, 1, TimeUnit.MINUTES);
     }
 
-    public TogetherService() {
-        cleaner.scheduleWithFixedDelay(this::cleanup, 1, 1, TimeUnit.MINUTES);
+    /** The state of a room as sent to its members. */
+    public Map<String, Object> state(Room r) {
+        return r.toJson(avatars);
     }
 
     public Room create(User host, String itemId, long positionMs) {
@@ -220,8 +225,8 @@ public final class TogetherService implements AutoCloseable {
         }
     }
 
-    private static String event(String type, Room r) {
-        return "event: " + type + "\ndata: " + Json.write(r.toJson()) + "\n\n";
+    private String event(String type, Room r) {
+        return "event: " + type + "\ndata: " + Json.write(state(r)) + "\n\n";
     }
 
     private void cleanup() {

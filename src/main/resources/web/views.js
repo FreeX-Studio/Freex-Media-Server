@@ -10,7 +10,7 @@
  * or contact: niklas.linz@mirranet.de
  */
 
-/* FreeX web interface, part 2: home, libraries, details and search. */
+/* FreeX Web, part 2: home screen, libraries, detail pages and search. */
 (() => {
     "use strict";
     const M = window.FreeX;

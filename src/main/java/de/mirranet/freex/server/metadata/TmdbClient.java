@@ -15,6 +15,7 @@ package de.mirranet.freex.server.metadata;
 import de.mirranet.freex.server.json.Json;
 
 import java.io.IOException;
+import java.net.ProxySelector;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -61,7 +62,7 @@ public final class TmdbClient {
         this.language = language;
         // Honour -Dhttps.proxyHost etc., for servers that reach the internet only through a proxy.
         this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
-                .proxy(java.net.ProxySelector.getDefault())
+                .proxy(ProxySelector.getDefault())
                 .followRedirects(HttpClient.Redirect.NORMAL).build();
     }
 

@@ -38,6 +38,8 @@ src/deb/                  Debian package: control files, launcher, systemd servi
 docs/                     documentation, screenshots and brand assets
 ```
 
+How the parts work together (requests, data, scanning, playback) is described in [Architecture](architecture.md).
+
 The server depends only on the JDK and the SQLite JDBC driver. The web client uses no framework; the bundled
 libraries are hls.js and a QR code generator.
 

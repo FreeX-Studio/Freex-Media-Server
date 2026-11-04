@@ -88,7 +88,7 @@ public final class ProfileApi {
         });
     }
 
-    /** Called when an account is deleted. */
+    /** Deletes the profile picture of an account that is being deleted. */
     public void removeUser(String userId) {
         try {
             Files.deleteIfExists(avatarFile(userId));

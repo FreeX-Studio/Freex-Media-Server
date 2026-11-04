@@ -12,17 +12,17 @@
 
 package de.mirranet.freex.server.model;
 
-import de.mirranet.freex.server.json.Json;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A server account. The password is only stored as a PBKDF2 hash, recovery codes as SHA-256
- * hashes. The TOTP secret has to be stored in a usable form; the data files are therefore
- * written readable for the server user only.
+ * hashes. The TOTP secret has to be stored in a usable form, which is why the database is
+ * readable for the server user only.
  */
 public final class User {
 
@@ -53,7 +53,7 @@ public final class User {
     /** True: may see all libraries, including ones added later. Admins always may. */
     public volatile boolean allLibraries = true;
     /** The libraries this user may see when {@link #allLibraries} is false. */
-    public volatile java.util.Set<String> libraryIds = java.util.Set.of();
+    public volatile Set<String> libraryIds = Set.of();
 
     /** Whether this user may see the library with the given id. */
     public boolean mayAccess(String libraryId) {
@@ -73,22 +73,6 @@ public final class User {
         this.admin = admin;
         this.createdAt = createdAt;
         this.passwordChangedAt = createdAt;
-    }
-
-    /** Full record for persistence, including secrets. */
-    public Map<String, Object> toStorage() {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", id);
-        m.put("username", username);
-        m.put("passwordHash", passwordHash);
-        m.put("admin", admin);
-        m.put("createdAt", createdAt);
-        m.put("passwordChangedAt", passwordChangedAt);
-        m.put("totpSecret", totpSecret);
-        m.put("totpEnabled", totpEnabled);
-        m.put("totpLastStep", totpLastStep);
-        m.put("recoveryCodes", recoveryCodes);
-        return m;
     }
 
     /** Public view for the API, without any secret. */
@@ -113,18 +97,5 @@ public final class User {
         p.put("subtitleMode", subtitleMode);
         p.put("subtitleLanguage", subtitleLanguage);
         return p;
-    }
-
-    public static User fromStorage(Map<String, Object> m) {
-        User u = new User(Json.str(m, "id", ""), Json.str(m, "username", ""), Json.str(m, "passwordHash", ""),
-                Json.bool(m, "admin", false), Json.num(m, "createdAt", 0));
-        u.passwordChangedAt = Json.num(m, "passwordChangedAt", u.createdAt);
-        u.totpSecret = Json.str(m, "totpSecret", null);
-        u.totpEnabled = Json.bool(m, "totpEnabled", false) && u.totpSecret != null;
-        u.totpLastStep = Json.num(m, "totpLastStep", 0);
-        List<String> codes = new ArrayList<>();
-        for (Object o : Json.list(m.get("recoveryCodes"))) codes.add(String.valueOf(o));
-        u.recoveryCodes = codes;
-        return u;
     }
 }

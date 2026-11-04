@@ -11,7 +11,7 @@
  */
 
 /*
- * FreeX web interface, part 1: state, helpers, API access, routing, the app shell and the
+ * FreeX Web, part 1: state, helpers, API access, routing, the app shell and the
  * poster cards. All markup is built with h(), so data from the server is never parsed as HTML.
  * The parts share the global object `FreeX`.
  */

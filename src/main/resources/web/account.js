@@ -10,7 +10,7 @@
  * or contact: niklas.linz@mirranet.de
  */
 
-/* FreeX web interface, part 4: sign-in, settings, account security, users. */
+/* FreeX Web, part 4: sign-in and setup, settings, account security, users, server settings. */
 (() => {
     "use strict";
     const M = window.FreeX;
@@ -654,8 +654,6 @@
         document.body.append(dialog);
         pass.focus();
     }
-
-    // ------------------------------------------------------------------ server
 
     // ------------------------------------------------------------------ about
 

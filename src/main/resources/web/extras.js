@@ -11,7 +11,7 @@
  */
 
 /*
- * FreeX web interface, part 5: watchlist, playlists, collections, people, fix match,
+ * FreeX Web, part 5: watchlist, playlists, watch history, collections, people, fix match,
  * trailers and Watch Together.
  */
 (() => {

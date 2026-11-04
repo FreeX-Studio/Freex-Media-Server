@@ -25,14 +25,15 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -66,7 +67,7 @@ public final class DataStore implements AutoCloseable {
     private volatile Map<String, List<String>> childIndex = Map.of();
 
     private final Object writeLock = new Object();
-    private final java.util.Set<String> dirty = ConcurrentHashMap.newKeySet();
+    private final Set<String> dirty = ConcurrentHashMap.newKeySet();
     private final ScheduledExecutorService saver = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "datastore-saver");
         t.setDaemon(true);
@@ -78,7 +79,7 @@ public final class DataStore implements AutoCloseable {
         this.userStore = userStore;
         Files.createDirectories(dir.resolve("items"));
         try {
-            Files.setPosixFilePermissions(dir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+            Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
         } catch (UnsupportedOperationException | IOException ignored) {
             // Windows or a file system without POSIX permissions
         }
@@ -397,7 +398,7 @@ public final class DataStore implements AutoCloseable {
     /** Data files contain password hashes and 2FA secrets: readable for the server user only (POSIX). */
     private static void restrictPermissions(Path p) {
         try {
-            Files.setPosixFilePermissions(p, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+            Files.setPosixFilePermissions(p, PosixFilePermissions.fromString("rw-------"));
         } catch (UnsupportedOperationException | IOException ignored) {
             // Windows or a file system without POSIX permissions
         }

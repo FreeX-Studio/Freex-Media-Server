@@ -11,7 +11,7 @@
  */
 
 /*
- * FreeX web interface, part 3: the player.
+ * FreeX Web, part 3: the player.
  *
  * The server decides per file whether it is played directly or converted to HLS (see
  * PlaybackPlanner). A converted stream starts at the requested position, so the player keeps an

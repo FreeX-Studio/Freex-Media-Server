@@ -10,7 +10,7 @@
  * or contact: niklas.linz@mirranet.de
  */
 
-/* Starts the app once all parts have registered their views. */
+/* FreeX Web: starts the app once all parts have registered their views (loaded last). */
 (() => {
     "use strict";
     const M = window.FreeX;

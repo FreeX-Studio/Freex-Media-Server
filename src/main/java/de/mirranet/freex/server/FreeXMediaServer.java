@@ -21,7 +21,6 @@ import de.mirranet.freex.server.markers.MarkerService;
 import de.mirranet.freex.server.metadata.MetadataService;
 import de.mirranet.freex.server.metadata.TmdbClient;
 import de.mirranet.freex.server.store.Database;
-import de.mirranet.freex.server.store.JsonImport;
 import de.mirranet.freex.server.store.ListStore;
 import de.mirranet.freex.server.store.UserStore;
 import de.mirranet.freex.server.together.TogetherService;
@@ -36,6 +35,8 @@ import de.mirranet.freex.server.store.DataStore;
 import de.mirranet.freex.server.transcode.SubtitleService;
 import de.mirranet.freex.server.transcode.TranscodeManager;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -184,12 +185,10 @@ public final class FreeXMediaServer {
             add(metadata::close);
             ListStore lists = new ListStore(db);
             add(lists::close);
-            JsonImport.run(config.dataDirectory, db, users, lists);
             MarkerService markers = config.markersEnabled && thumbs.available()
                     ? new MarkerService(store, config.ffmpeg, config.dataDirectory) : null;
             if (markers != null) add(markers::close);
-            TogetherService together = new TogetherService();
-            together.setAvatarLookup(id -> store.user(id).map(u -> u.avatarVersion).orElse(0L));
+            TogetherService together = new TogetherService(id -> store.user(id).map(u -> u.avatarVersion).orElse(0L));
             add(together::close);
             scanner.onScanned(lib -> {
                 metadata.applyAll(lib);
@@ -254,8 +253,8 @@ public final class FreeXMediaServer {
                 String msg = String.format("%1$tF %1$tT [%2$s] %3$s: %4$s%n", r.getMillis(), r.getLevel(), cls,
                         formatMessage(r));
                 if (r.getThrown() != null) {
-                    java.io.StringWriter sw = new java.io.StringWriter();
-                    r.getThrown().printStackTrace(new java.io.PrintWriter(sw));
+                    StringWriter sw = new StringWriter();
+                    r.getThrown().printStackTrace(new PrintWriter(sw));
                     msg += sw;
                 }
                 return msg;

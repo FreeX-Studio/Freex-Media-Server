@@ -225,32 +225,6 @@ public final class ListStore implements AutoCloseable {
         watchlists.remove(userId);
     }
 
-    // ------------------------------------------------------------------ import of the former JSON files
-
-    void importCollection(String id, String libraryId, String name, String summary, List<String> items, long createdAt) {
-        Collection c = new Collection(id, libraryId, name, summary, items, createdAt);
-        db.update("INSERT OR IGNORE INTO collections (id, library_id, name, summary, created_at) VALUES (?, ?, ?, ?, ?)",
-                id, libraryId, name, summary, createdAt);
-        collections.put(id, c);
-        changedCollection(c);
-    }
-
-    void importPlaylist(String id, String userId, String name, List<String> items, long createdAt, long updatedAt) {
-        Playlist p = new Playlist(id, userId, name, items, createdAt, updatedAt);
-        db.update("INSERT OR IGNORE INTO playlists (id, user_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-                id, userId, name, createdAt, updatedAt);
-        playlists.put(id, p);
-        changedPlaylist(p);
-    }
-
-    void importWatchlist(String userId, List<String> newestFirst) {
-        long t = System.currentTimeMillis();
-        for (String itemId : newestFirst) {
-            db.update("INSERT OR IGNORE INTO watchlist (user_id, item_id, added_at) VALUES (?, ?, ?)", userId, itemId, t--);
-        }
-        watchlists.put(userId, new CopyOnWriteArrayList<>(newestFirst));
-    }
-
     @Override
     public void close() {
         // Everything is written immediately; nothing to flush.

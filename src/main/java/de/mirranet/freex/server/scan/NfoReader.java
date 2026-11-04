@@ -15,6 +15,7 @@ package de.mirranet.freex.server.scan;
 import de.mirranet.freex.server.model.MediaItem;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -45,7 +46,7 @@ final class NfoReader {
         try {
             if (Files.size(nfo) > MAX_SIZE) return;
             xml = Files.readString(nfo, StandardCharsets.UTF_8);
-        } catch (IOException | java.io.UncheckedIOException e) {
+        } catch (IOException | UncheckedIOException e) {
             try {
                 xml = Files.readString(nfo, StandardCharsets.ISO_8859_1);
             } catch (IOException ex) {

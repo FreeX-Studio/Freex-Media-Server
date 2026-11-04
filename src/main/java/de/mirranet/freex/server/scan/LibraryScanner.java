@@ -31,11 +31,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -71,7 +75,7 @@ public final class LibraryScanner implements AutoCloseable {
     private final int threads;
     private final ScheduledExecutorService scheduler;
     private final ExecutorService scanExecutor;
-    private final List<java.util.function.Consumer<Library>> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final List<Consumer<Library>> listeners = new CopyOnWriteArrayList<>();
 
     public LibraryScanner(DataStore store, MediaProbe probe, int threads, int intervalMinutes) {
         this.store = store;
@@ -91,7 +95,7 @@ public final class LibraryScanner implements AutoCloseable {
     }
 
     /** Called after every finished scan of a library (metadata, intro detection, ...). */
-    public void onScanned(java.util.function.Consumer<Library> listener) {
+    public void onScanned(Consumer<Library> listener) {
         listeners.add(listener);
     }
 
@@ -413,7 +417,7 @@ public final class LibraryScanner implements AutoCloseable {
             for (Future<?> f : futures) {
                 try {
                     f.get();
-                } catch (java.util.concurrent.ExecutionException e) {
+                } catch (ExecutionException e) {
                     LOG.log(Level.FINE, "Probe failed", e.getCause());
                 }
             }
@@ -436,7 +440,7 @@ public final class LibraryScanner implements AutoCloseable {
 
     /** Directory listing of one folder, used to find artwork, NFOs and subtitles next to a video. */
     private static final class Sidecars {
-        private static final Map<Path, Sidecars> CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+        private static final Map<Path, Sidecars> CACHE = new ConcurrentHashMap<>();
 
         final Map<String, Path> byLowerName = new HashMap<>();
         int videoCount;

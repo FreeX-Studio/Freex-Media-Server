@@ -56,9 +56,9 @@ native apps for iOS, Android and TV are planned and will use the same API.
 | **FreeX Android** | App for Android smartphones and tablets | planned |
 | **FreeX TV** | Smart TV and streaming device apps | later |
 
-Server and web client are versioned separately: the server uses the Maven version in `pom.xml` (e.g. `0.9.0`),
+Server and web client are versioned separately: the server uses the Maven version in `pom.xml` (e.g. `0.10.2`),
 FreeX Web the version in [`src/main/resources/web/version.json`](src/main/resources/web/version.json)
-(e.g. `1.0.0.0`). Both are shown under *Settings → Über FreeX*.
+(e.g. `1.1.0.1`). Both are shown under *Settings → Über FreeX*.
 
 ## Quick start
 
@@ -98,6 +98,7 @@ See [Installation](docs/installation.md) for details, paths, updates and running
 | [Organizing your media](docs/media-library.md) | Folder and file naming, local artwork, `.nfo` files, TMDB |
 | [Playback](docs/playback.md) | Direct play and conversion, hardware acceleration, subtitles, skip intro, Watch Together, Chromecast |
 | [Security](docs/security.md) | Sign-in, two-factor authentication, sessions and how the server is hardened |
+| [Architecture](docs/architecture.md) | How the server works inside: requests, data, scanning, playback, FreeX Web |
 | [API](docs/api.md) | The JSON API used by FreeX Web and the upcoming apps |
 | [Development](docs/development.md) | Project structure, building, versioning and contributing |
 

@@ -17,6 +17,8 @@ import de.mirranet.freex.server.model.MediaItem;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -102,12 +104,12 @@ public final class ThumbnailService {
         Process p = null;
         try {
             p = new ProcessBuilder(ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
-                    "-ss", String.format(java.util.Locale.ROOT, "%.3f", seekMs / 1000.0),
+                    "-ss", String.format(Locale.ROOT, "%.3f", seekMs / 1000.0),
                     "-i", item.file.path, "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "4", tmp.toString())
                     .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
             boolean done = p.waitFor(60, TimeUnit.SECONDS);
             if (done && p.exitValue() == 0 && Files.exists(tmp) && Files.size(tmp) > 0) {
-                Files.move(tmp, out, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                Files.move(tmp, out, StandardCopyOption.REPLACE_EXISTING);
                 return true;
             }
             failed.put(item.id, System.currentTimeMillis());
