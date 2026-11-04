@@ -111,13 +111,21 @@ After a scan, the listeners run: `MetadataService` matches new titles on TMDB, `
 2. `PlaybackPlanner` decides: **direct play** (the file as it is), **direct stream** (video copied into HLS, audio
    converted if needed) or **transcode** (video converted to H.264). Bitmap subtitles are burned into the picture.
 3. For direct play the client loads `/api/items/{id}/stream`, which supports range requests. Otherwise
-   `TranscodeManager` starts ffmpeg, which writes HLS segments of four seconds into the conversion folder; the
-   client plays `/api/transcode/{session}/index.m3u8`.
-4. A conversion starts at the requested position, so the client keeps that offset and shows absolute times. Seeking
-   inside the converted part is instant; further ahead the client asks for a new playback at that position.
-5. ffmpeg is paused when it is far ahead of the player and stopped one minute after the player stops asking for
-   segments. At most `transcoder.maxSessions` conversions run at once.
-6. The client reports the position every few seconds (`PUT /api/items/{id}/progress`). This saves the resume
+   `TranscodeManager` creates a session with a `TranscodeWorker`, and the client plays
+   `/api/transcode/{session}/index.m3u8`.
+4. That playlist covers the whole title from the start (`Segments`): segments of four seconds when the video is
+   converted, from keyframe to keyframe (at least four seconds) when it is copied; the keyframes are read with
+   ffprobe through the file's index. The player seeks like in any other video and asks for whatever segment it
+   needs.
+5. The worker runs ffmpeg from the segment asked for. ffmpeg writes one fragment per keyframe with the timestamps
+   of the source (`-copyts`, no MP4 edit lists, a fixed offset of one second), so fragments of different runs fit
+   together exactly; a segment is sent as its fragments one after the other. When the player asks for a segment
+   far ahead of or behind the running ffmpeg, the worker restarts it there; everything converted before is kept
+   and served again when the player comes back.
+6. ffmpeg runs with lower CPU and I/O priority (`nice`, `ionice`), is paused when it is two minutes ahead of the
+   player and stopped one minute after the player stops asking for segments. At most `transcoder.maxSessions`
+   conversions run at once.
+7. The client reports the position every few seconds (`PUT /api/items/{id}/progress`). This saves the resume
    position, marks the title as watched at 90 % and adds it to the watch history, and keeps the playback visible in
    the admins' activity view.
 
@@ -131,7 +139,8 @@ unlocks only that title for a limited time, because the Chromecast cannot sign i
 | Periodic rescans | `LibraryScanner` (every `scanner.intervalMinutes`) |
 | TMDB matching and refresh | `MetadataService` (one worker, rate-friendly) |
 | Intro and credits detection | `MarkerService` (one worker, once per season and file version) |
-| Stopping idle conversions | `TranscodeManager` (reaper every 10 seconds) |
+| Converting, one per playback | `TranscodeWorker` (an ffmpeg process at a time, restarted where the player asks) |
+| Pausing and stopping conversions | `TranscodeManager` (reaper every 5 seconds) |
 | Writing the library index | `DataStore` (a few seconds after a change) |
 | Cleaning up Watch Together rooms | `TogetherService` (every minute) |
 

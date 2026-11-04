@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -89,44 +90,71 @@ public final class MediaProbe {
     }
 
     /**
-     * Time of the last video keyframe at or before {@code ms}, relative to the start of the file
-     * (as ffmpeg's {@code -ss} counts), or -1 if it cannot be determined. Only the packets from
-     * the keyframe before {@code ms - 30 s} on are read, so this stays fast in long files.
-     * A conversion that copies the video must start at a keyframe; starting there exactly keeps
-     * picture and sound together.
+     * Times of the video keyframes of a file in ms from its start (as ffmpeg's {@code -ss} counts),
+     * sorted; empty if they cannot be read. Conversions that copy the video can only cut there.
+     * <p>
+     * Instead of reading the whole file, ffprobe seeks to every other second and reports the
+     * keyframe it lands on, which uses the file's index and is fast even for large files on a
+     * network share. Keyframes closer together than that may be missed, which is fine: segments
+     * only need some keyframes as their borders. Files without an index are read completely.
      */
-    public long keyframeBefore(Path video, int streamIndex, long ms) {
-        if (!available || ms <= 0) return -1;
+    public List<Long> keyframes(Path video, int streamIndex, long durationMs) {
+        if (!available || durationMs <= 0) return List.of();
+        double start = startTime(video);
+        StringBuilder intervals = new StringBuilder();
+        for (long t = 0; t < durationMs; t += 2000) {
+            if (!intervals.isEmpty()) intervals.append(',');
+            intervals.append(String.format(Locale.ROOT, "%.3f%%+#1", start + t / 1000.0));
+        }
+        List<Long> keys = keyframePackets(video, streamIndex, intervals.toString(), start);
+        // Without an index every seek lands at the start: then the file has to be read once.
+        if (keys.size() < Math.max(2, durationMs / 120_000)) keys = keyframePackets(video, streamIndex, null, start);
+        return keys;
+    }
+
+    private List<Long> keyframePackets(Path video, int streamIndex, String intervals, double startTime) {
+        List<String> cmd = new ArrayList<>(List.of(ffprobe, "-v", "error", "-select_streams",
+                streamIndex >= 0 ? Integer.toString(streamIndex) : "v:0", "-show_entries", "packet=pts_time,flags", "-of", "csv=p=0"));
+        if (intervals != null) cmd.addAll(List.of("-read_intervals", intervals));
+        cmd.add(video.toAbsolutePath().toString());
         Process p = null;
         try {
-            double startTime = 0;
-            List<Double> keys = new ArrayList<>();
-            // read_intervals takes timestamps of the file, so the file's start time is needed first.
+            p = new ProcessBuilder(cmd).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+            String out = readLimited(p.getInputStream(), 256 * 1024 * 1024);
+            if (!p.waitFor(120, TimeUnit.SECONDS)) return List.of();
+            TreeSet<Long> keys = new TreeSet<>();
+            for (String line : out.split("\\R")) {
+                String[] parts = line.split(",");
+                if (parts.length >= 2 && parts[1].startsWith("K") && !parts[0].equals("N/A")) {
+                    keys.add(Math.max(0, Math.round((parseDouble(parts[0]) - startTime) * 1000)));
+                }
+            }
+            return new ArrayList<>(keys);
+        } catch (IOException | RuntimeException e) {
+            LOG.fine("ffprobe keyframes failed on " + video + ": " + e.getMessage());
+            return List.of();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return List.of();
+        } finally {
+            if (p != null && p.isAlive()) p.destroyForcibly();
+        }
+    }
+
+    /** Start time of the file's timestamps in seconds (often 0, not for MPEG-TS recordings). */
+    private double startTime(Path video) {
+        Process p = null;
+        try {
             p = new ProcessBuilder(ffprobe, "-v", "error", "-show_entries", "format=start_time", "-of", "csv=p=0",
                     video.toAbsolutePath().toString()).redirectError(ProcessBuilder.Redirect.DISCARD).start();
             String st = readLimited(p.getInputStream(), 4096).trim();
-            if (!p.waitFor(10, TimeUnit.SECONDS)) return -1;
-            if (!st.isEmpty() && !st.equals("N/A")) startTime = parseDouble(st);
-            double target = startTime + ms / 1000.0;
-            String interval = String.format(Locale.ROOT, "%.3f%%%.3f", Math.max(startTime, target - 30), target + 0.001);
-            p = new ProcessBuilder(ffprobe, "-v", "error", "-select_streams", streamIndex >= 0 ? Integer.toString(streamIndex) : "v:0",
-                    "-show_entries", "packet=pts_time,flags", "-read_intervals", interval, "-of", "csv=p=0",
-                    video.toAbsolutePath().toString()).redirectError(ProcessBuilder.Redirect.DISCARD).start();
-            String out = readLimited(p.getInputStream(), 4 * 1024 * 1024);
-            if (!p.waitFor(10, TimeUnit.SECONDS)) return -1;
-            for (String line : out.split("\\R")) {
-                String[] parts = line.split(",");
-                if (parts.length >= 2 && parts[1].startsWith("K") && !parts[0].equals("N/A")) keys.add(parseDouble(parts[0]));
-            }
-            double best = -1;
-            for (double k : keys) if (k <= target + 0.0005 && k > best) best = k;
-            return best < 0 ? -1 : Math.max(0, Math.round((best - startTime) * 1000));
+            if (!p.waitFor(10, TimeUnit.SECONDS) || st.isEmpty() || st.equals("N/A")) return 0;
+            return parseDouble(st);
         } catch (IOException | RuntimeException e) {
-            LOG.fine("ffprobe keyframe lookup failed on " + video + ": " + e.getMessage());
-            return -1;
+            return 0;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return -1;
+            return 0;
         } finally {
             if (p != null && p.isAlive()) p.destroyForcibly();
         }

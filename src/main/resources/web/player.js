@@ -108,7 +108,6 @@
             subtitle: query.get("s") != null ? (query.get("s") === "none" ? null : query.get("s")) : preferred.sub,
             directPlay: true,
             plan: null,
-            offsetMs: 0,
             hls: null,
             cues: [],
             pendingSeek: 0,
@@ -192,14 +191,18 @@
         // ---- time handling
         // While casting, the Chromecast's position counts (see the Chromecast section below).
         let casting = null;
-        const position = () => casting && casting.plan ? casting.plan.offsetMs + casting.remote.currentTime * 1000
-            : state.plan && state.plan.mode !== "direct" ? state.offsetMs + video.currentTime * 1000 : video.currentTime * 1000;
+        // Every stream covers the whole title, direct play and conversions alike.
+        const position = () => (casting && casting.plan ? casting.remote.currentTime : video.currentTime) * 1000;
         const isDirect = () => state.plan && state.plan.mode === "direct";
 
-        function producedEndMs() {
-            if (isDirect() || casting) return durationMs;
-            const r = video.seekable;
-            return r && r.length ? state.offsetMs + r.end(r.length - 1) * 1000 : state.offsetMs;
+        /** The buffered stretch around the current position, shown in the seek bar: [start, end] in ms. */
+        function bufferedMs() {
+            const b = video.buffered;
+            const now = video.currentTime;
+            for (let i = 0; b && i < b.length; i++) {
+                if (b.start(i) <= now + 0.5 && b.end(i) >= now) return [b.start(i) * 1000, b.end(i) * 1000];
+            }
+            return [position(), position()];
         }
 
         let dragging = false;
@@ -209,8 +212,9 @@
             if (!dragging) seek.value = Math.round(pos / 1000);
             timeNow.textContent = M.fmtClock(dragging ? seek.value * 1000 : pos);
             if (durationMs) {
-                const a = isDirect() ? 0 : state.offsetMs / durationMs * 100;
-                const b = Math.min(100, producedEndMs() / durationMs * 100);
+                const [from, to] = casting ? [0, 0] : bufferedMs();
+                const a = Math.max(0, from / durationMs * 100);
+                const b = Math.min(100, to / durationMs * 100);
                 Object.assign(produced.style, {left: a + "%", width: Math.max(0, b - a) + "%"});
                 seek.style.setProperty("--pct", (pos / durationMs * 100) + "%");
             }
@@ -313,20 +317,18 @@
             watchdog.reset();
             state.plan = plan;
             state.audio = plan.audio;
-            // A converted stream begins at offsetMs; when the video is copied that is the keyframe
-            // before the requested position, so the player seeks the rest of the way.
-            state.offsetMs = plan.mode === "direct" ? 0 : plan.offsetMs;
-            const leadMs = Math.max(0, plan.startMs - state.offsetMs);
-            state.pendingSeek = leadMs;
+            state.pendingSeek = plan.startMs;
             if (plan.mode === "direct") {
                 video.src = plan.url;
             } else if (window.Hls && window.Hls.isSupported()) {
                 state.pendingSeek = 0; // hls.js starts there itself
                 const hls = new window.Hls({
-                    startPosition: leadMs / 1000,
-                    maxBufferLength: 30,
-                    backBufferLength: 60,
-                    liveDurationInfinity: false,
+                    startPosition: plan.startMs / 1000,
+                    // A minute ahead, two back: seeking within that needs no new conversion.
+                    maxBufferLength: 60,
+                    maxMaxBufferLength: 120,
+                    backBufferLength: 120,
+                    // After a far jump the server first restarts the conversion there.
                     fragLoadingTimeOut: 70000,
                     manifestLoadingTimeOut: 35000,
                     xhrSetup: (xhr) => {
@@ -448,15 +450,8 @@
             if (!state.plan) return;
             if (byUser && roomCode) sendRoom("seek", target);
             if (casting) return castSeek(target);
-            if (isDirect()) {
-                video.currentTime = target / 1000;
-                return;
-            }
-            const rel = (target - state.offsetMs) / 1000;
-            const r = video.seekable;
-            const end = r && r.length ? r.end(r.length - 1) : 0;
-            if (rel >= 0 && rel <= end - 2) video.currentTime = rel;
-            else start(target);
+            // The server converts whatever part of the title the player asks for.
+            video.currentTime = target / 1000;
         }
 
         function fail(message) {
@@ -736,23 +731,15 @@
         }
 
         function castSeek(target) {
-            const {remote, controller, plan} = casting;
-            const rel = (target - plan.offsetMs) / 1000;
-            // Within what the Chromecast has (direct stream, or the converted part): seek there;
-            // further ahead the server converts from the new position.
-            if (!plan.hls || (rel >= 0 && rel <= (remote.duration || 0) - 2)) {
-                remote.currentTime = Math.max(0, rel);
-                controller.seek();
-            } else {
-                castStart(target);
-            }
+            casting.remote.currentTime = target / 1000;
+            casting.controller.seek();
         }
 
         function onRemoteChange(e) {
             if (!casting) return;
             const r = casting.remote;
             // Kept, because after a disconnect the remote player no longer knows the position.
-            if (e.field === "currentTime" && !casting.loading) casting.lastPos = casting.plan.offsetMs + r.currentTime * 1000;
+            if (e.field === "currentTime" && !casting.loading) casting.lastPos = r.currentTime * 1000;
             if (e.field === "isPaused" || e.field === "playerState") {
                 playBtn.replaceChildren(icon(r.isPaused ? "play" : "pause"));
                 report(true);

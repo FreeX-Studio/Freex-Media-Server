@@ -29,6 +29,7 @@ import de.mirranet.freex.server.transcode.TranscodeManager;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -825,7 +826,6 @@ public final class MediaApi {
         m.put("qualities", PlaybackPlanner.QUALITIES.stream().map(q -> Map.of("id", q.id(), "label", q.label())).toList());
         if (plan.mode() == PlaybackPlanner.Mode.DIRECT) {
             m.put("url", "/api/items/" + it.id + "/stream");
-            m.put("offsetMs", 0);
             m.put("startMs", start);
             if (activity != null) activity.started(ex, it, client, device, "direct", plan.reason(), quality.label(), null, start);
         } else {
@@ -833,7 +833,6 @@ public final class MediaApi {
                 TranscodeManager.Session s = transcoder.start(ex.user().id, it, plan, start);
                 m.put("session", s.id);
                 m.put("url", "/api/transcode/" + s.id + "/index.m3u8");
-                m.put("offsetMs", s.offsetMs); // where the stream begins; the player seeks on to startMs
                 m.put("startMs", start);
                 if (activity != null) {
                     activity.started(ex, it, client, device, plan.mode().name().toLowerCase(Locale.ROOT),
@@ -857,22 +856,45 @@ public final class MediaApi {
         sendTranscodeFile(ex, ownSession(ex), ex.param("file"));
     }
 
-    /** Sends the playlist or a segment of a conversion, waiting until ffmpeg has written it. */
+    /**
+     * Sends the playlist, the init segment or a segment of a conversion. The worker converts the
+     * segment if needed, so this can take a few seconds, longer after a far jump.
+     */
     void sendTranscodeFile(Exchange ex, TranscodeManager.Session s, String name) throws Exception {
-        if (!name.matches("index\\.m3u8|init\\.mp4|seg\\d{1,8}\\.m4s")) throw ApiException.notFound();
-        // Segments far ahead of ffmpeg can take a while; the playlist needs the first segment.
-        Path p = transcoder.awaitFile(s, name, name.endsWith(".m4s") ? 60_000 : 30_000);
-        if (p == null) {
+        if (name.equals("index.m3u8")) {
+            ex.raw.getResponseHeaders().set("Cache-Control", "no-cache");
+            ex.send(200, "application/vnd.apple.mpegurl", transcoder.playlist(s).getBytes(StandardCharsets.UTF_8));
+            return;
+        }
+        List<Path> parts;
+        if (name.equals("init.mp4")) {
+            Path p = transcoder.init(s, 30_000);
+            parts = p == null ? null : List.of(p);
+        } else if (name.matches("s\\d{1,6}\\.m4s")) {
+            parts = transcoder.segment(s, Integer.parseInt(name.substring(1, name.length() - 4)), 60_000);
+        } else {
+            throw ApiException.notFound();
+        }
+        if (parts == null) {
             String log = transcoder.log(s);
             String last = log.isBlank() ? "" : log.lines().reduce((x, y) -> y).orElse("");
-            throw new ApiException(name.equals("index.m3u8") ? 500 : 404, last.isEmpty() ? "error.transcodeFailed" : "error.transcodeFailedWith", last);
+            throw new ApiException(name.equals("init.mp4") ? 500 : 404, last.isEmpty() ? "error.transcodeFailed" : "error.transcodeFailedWith", last);
         }
-        if (name.endsWith(".m3u8")) {
-            ex.raw.getResponseHeaders().set("Cache-Control", "no-cache");
-            ex.send(200, "application/vnd.apple.mpegurl", Files.readAllBytes(p));
-        } else {
-            ex.raw.getResponseHeaders().set("Cache-Control", "private, max-age=3600");
-            ex.send(200, name.endsWith(".mp4") ? "video/mp4" : "video/iso.segment", Files.readAllBytes(p));
+        // A segment is several fragments of ffmpeg, sent one after the other.
+        long length = 0;
+        for (Path p : parts) length += Files.size(p);
+        var h = ex.raw.getResponseHeaders();
+        h.set("Content-Type", name.endsWith(".mp4") ? "video/mp4" : "video/iso.segment");
+        h.set("Cache-Control", "private, max-age=3600");
+        ex.markResponded();
+        if (ex.method().equals("HEAD")) {
+            ex.raw.sendResponseHeaders(200, -1);
+            ex.raw.close();
+            return;
+        }
+        ex.raw.sendResponseHeaders(200, length);
+        try (OutputStream out = ex.raw.getResponseBody()) {
+            for (Path p : parts) Files.copy(p, out);
         }
     }
 

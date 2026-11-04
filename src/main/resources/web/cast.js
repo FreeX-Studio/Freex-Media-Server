@@ -115,9 +115,7 @@
             });
             const req = new chrome.cast.media.LoadRequest(info);
             req.autoplay = true;
-            // A conversion begins at offsetMs (for a copied video the keyframe before startMs), a direct
-            // stream at the start of the file; the receiver seeks on to the requested position.
-            req.currentTime = (plan.hls ? Math.max(0, plan.startMs - plan.offsetMs) : plan.startMs) / 1000;
+            req.currentTime = plan.startMs / 1000;
             const track = plan.subtitles.findIndex((s) => s.id === subtitleId);
             req.activeTrackIds = track >= 0 ? [track + 1] : [];
             return session.loadMedia(req);

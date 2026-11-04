@@ -22,11 +22,12 @@ way:
 | Transcode | Video codec not supported (e.g. HEVC in Firefox), a lower quality is chosen, or bitmap subtitles are burned in | converts video to H.264 and audio to AAC stereo |
 
 Converted streams are HLS with fragmented MP4 segments (hls.js in Chrome, Firefox and Edge, native in Safari and on
-iOS). Seeking within the converted part is instant; seeking further ahead restarts the conversion there. When the
-video is copied (direct stream), a conversion starts exactly at the keyframe before the position and the player
-seeks the rest of the way, so picture and sound begin together; segments carry their real timestamps (no MP4 edit
-lists), and converted sound follows the timestamps of the source, so it stays in sync over the whole film. ffmpeg is
-paused when it is far ahead of the player and stopped shortly after the player is gone. If direct play fails in a
+iOS). The playlist covers the whole title from the start, so the player seeks as in any video and keeps what it
+has buffered (a minute ahead, two minutes back). A background worker per playback converts whatever part the player
+asks for: after a far jump it restarts ffmpeg there within about a second, and parts converted before are served
+again without converting them twice. Segments carry the real timestamps of the source, and converted sound follows
+them, so picture and sound stay in sync over the whole film and across every jump. ffmpeg runs with low CPU and disk
+priority, is paused when it is far ahead of the player and stopped shortly after the player is gone. If direct play fails in a
 browser after all, the player switches to conversion automatically. Network errors are retried, a conversion the
 server has ended (for example after a long pause) is started again at the same position, and playback that stops
 making progress is restarted by itself.

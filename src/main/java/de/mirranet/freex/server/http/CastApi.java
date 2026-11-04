@@ -32,8 +32,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static de.mirranet.freex.server.http.WebServer.Access.PUBLIC;
 import static de.mirranet.freex.server.http.WebServer.Access.USER;
@@ -59,10 +57,9 @@ public final class CastApi {
             Set.of("mp4"), Set.of("h264"), Set.of("aac", "mp3"), Set.of("h264"), Set.of("aac", "mp3"), true);
 
     private static final long EXTRA_VALIDITY_MS = TimeUnit.HOURS.toMillis(6);
-    private static final Pattern VTT_TIME = Pattern.compile("(?:(\\d+):)?(\\d{2}):(\\d{2})\\.(\\d{3})");
 
     /** Access of one Chromecast to one item. */
-    private record Grant(String userId, String itemId, String session, long offsetMs, long expires) {
+    private record Grant(String userId, String itemId, String session, long expires) {
     }
 
     private final Map<String, Grant> grants = new ConcurrentHashMap<>();
@@ -101,7 +98,6 @@ public final class CastApi {
         expire();
         String token = Ids.token();
         String session = null;
-        long offset = 0;
         Map<String, Object> m = new LinkedHashMap<>();
         if (plan.mode() == PlaybackPlanner.Mode.DIRECT) {
             m.put("url", PREFIX + token + "/stream");
@@ -111,7 +107,6 @@ public final class CastApi {
             try {
                 TranscodeManager.Session s = transcoder.start(ex.user().id, it, plan, start);
                 session = s.id;
-                offset = s.offsetMs;
             } catch (TranscodeManager.BusyException e) {
                 throw ApiException.of(503, e);
             }
@@ -120,12 +115,11 @@ public final class CastApi {
             m.put("hls", true);
         }
         long validity = (it.file.durationMs > 0 ? it.file.durationMs : TimeUnit.HOURS.toMillis(4)) + EXTRA_VALIDITY_MS;
-        grants.put(token, new Grant(ex.user().id, it.id, session, offset, System.currentTimeMillis() + validity));
+        grants.put(token, new Grant(ex.user().id, it.id, session, System.currentTimeMillis() + validity));
 
         m.put("mode", plan.mode().name().toLowerCase(Locale.ROOT));
         m.put("reason", plan.reason());
         m.put("audio", plan.audioIndex());
-        m.put("offsetMs", offset);
         m.put("startMs", start);
         m.put("durationMs", it.file.durationMs);
         m.put("image", PREFIX + token + "/image/" + (it.type == MediaItem.Type.EPISODE ? "thumb" : "poster"));
@@ -198,8 +192,6 @@ public final class CastApi {
         Grant g = grant(ex);
         String text = media.subtitleText(item(g), ex.param("sid").replace(".vtt", ""));
         if (text == null) throw ApiException.notFound();
-        // A conversion starts at the offset, so the cues have to move with it.
-        if (g.offsetMs > 0) text = shift(text, -g.offsetMs);
         ex.send(200, "text/vtt; charset=utf-8", text.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -207,41 +199,5 @@ public final class CastApi {
         Path p = media.imagePath(item(grant(ex)), ex.param("kind"));
         if (p == null) throw ApiException.notFound();
         FileSender.send(ex, p, 3600);
-    }
-
-    /** Moves all cue times of a WebVTT text; cues that end before 0 are dropped. */
-    static String shift(String vtt, long deltaMs) {
-        StringBuilder out = new StringBuilder();
-        String[] blocks = vtt.replace("\r", "").split("\n\n");
-        for (String block : blocks) {
-            int arrow = block.indexOf("-->");
-            if (arrow < 0) {
-                out.append(block).append("\n\n");
-                continue;
-            }
-            int lineStart = block.lastIndexOf('\n', arrow) + 1;
-            int lineEnd = block.indexOf('\n', arrow);
-            String line = block.substring(lineStart, lineEnd < 0 ? block.length() : lineEnd);
-            Matcher m = VTT_TIME.matcher(line);
-            List<long[]> times = new ArrayList<>();
-            while (m.find()) times.add(new long[]{m.start(), m.end(), parse(m) + deltaMs});
-            if (times.size() < 2 || times.get(1)[2] <= 0) continue;
-            StringBuilder l = new StringBuilder(line);
-            for (int i = times.size() - 1; i >= 0; i--) {
-                long[] t = times.get(i);
-                l.replace((int) t[0], (int) t[1], format(Math.max(0, t[2])));
-            }
-            out.append(block, 0, lineStart).append(l).append(lineEnd < 0 ? "" : block.substring(lineEnd)).append("\n\n");
-        }
-        return out.toString();
-    }
-
-    private static long parse(Matcher m) {
-        long h = m.group(1) == null ? 0 : Long.parseLong(m.group(1));
-        return ((h * 60 + Long.parseLong(m.group(2))) * 60 + Long.parseLong(m.group(3))) * 1000 + Long.parseLong(m.group(4));
-    }
-
-    private static String format(long ms) {
-        return String.format(Locale.ROOT, "%02d:%02d:%02d.%03d", ms / 3_600_000, ms / 60_000 % 60, ms / 1000 % 60, ms % 1000);
     }
 }

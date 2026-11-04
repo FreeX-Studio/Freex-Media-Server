@@ -15,7 +15,9 @@
  * <p>
  * {@link de.mirranet.freex.server.transcode.PlaybackPlanner} compares the file with what the
  * client can decode and picks direct play, direct stream or transcoding;
- * {@link de.mirranet.freex.server.transcode.TranscodeManager} runs ffmpeg sessions that write
- * HLS segments; {@code SubtitleService} delivers subtitles as WebVTT.
+ * {@link de.mirranet.freex.server.transcode.TranscodeManager} keeps one background worker per
+ * conversion, which offers a playlist over the whole title ({@code Segments}) and runs ffmpeg
+ * wherever the player asks for a segment ({@code TranscodeWorker}); {@code SubtitleService}
+ * delivers subtitles as WebVTT.
  */
 package de.mirranet.freex.server.transcode;

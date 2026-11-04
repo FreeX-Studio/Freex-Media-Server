@@ -66,7 +66,7 @@ every language, so apps can react to it:
 | `GET` | `/api/items/{id}/image/{poster\|backdrop\|thumb}` | Artwork |
 | `POST` | `/api/items/{id}/playback` | `{caps, quality, audio, subtitle, startMs}` → playback mode and stream URL |
 | `GET` | `/api/items/{id}/stream` | The file itself (supports range requests) |
-| `GET` | `/api/transcode/{session}/index.m3u8` | HLS playlist of a conversion |
+| `GET` | `/api/transcode/{session}/index.m3u8` | HLS playlist (VOD) of a conversion over the whole title; segments `s<n>.m4s`, converted on request |
 | `GET` | `/api/items/{id}/subtitles/{id}.vtt` | Subtitle as WebVTT |
 | `PUT` | `/api/items/{id}/progress` | `{offsetMs}` resume position |
 | `POST` / `DELETE` | `/api/items/{id}/watched` | Mark watched / unwatched |
