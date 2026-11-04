@@ -1,11 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 610 610">
-  <!-- Small-size icon (favicon): the MirraNET hexagon with the play symbol of the FreeX logo. -->
+<!-- Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="84 84 344 344">
+  <!-- FreeX logo: an X with a play symbol cut out of its centre. Brand gradient #d93b42 to #f4b75c. -->
   <defs>
-    <linearGradient id="mg" gradientUnits="userSpaceOnUse" x1="90" y1="170" x2="520" y2="440">
+    <linearGradient id="fx" x1="96" y1="96" x2="416" y2="416" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#d93b42"/><stop offset="0.22" stop-color="#da4041"/>
       <stop offset="0.55" stop-color="#e98a46"/><stop offset="1" stop-color="#f4b75c"/>
     </linearGradient>
+    <mask id="fxplay" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="#fff"/>
+      <path d="M240.2 220.0 L302.6 256.0 L240.2 292.0 Z" fill="#000" stroke="#000" stroke-width="16" stroke-linejoin="round"/>
+    </mask>
   </defs>
-  <path d="M305 30 L540 165 L540 445 L305 580 L70 445 L70 165 Z" fill="none" stroke="url(#mg)" stroke-width="56" stroke-linejoin="round"/>
-  <path d="M235 190 L440 305 L235 420 Z" fill="url(#mg)" stroke="url(#mg)" stroke-width="36" stroke-linejoin="round"/>
+  <path d="M156 156 L356 356 M356 156 L156 356" fill="none" stroke="url(#fx)" stroke-width="120" stroke-linecap="round" mask="url(#fxplay)"/>
 </svg>

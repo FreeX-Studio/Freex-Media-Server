@@ -33,11 +33,18 @@ src/main/java/de/mirranet/freex/server/
   util/                   ids and file helpers
 src/main/resources/web/   FreeX Web (plain JavaScript, no build step)
 src/deb/                  Debian package: control files, launcher, systemd service, default configuration
-docs/                     documentation and screenshots
+docs/                     documentation, screenshots and brand assets
 ```
 
 The server depends only on the JDK and the SQLite JDBC driver. The web client uses no framework; the bundled
 libraries are hls.js and a QR code generator.
+
+## Brand assets
+
+The FreeX logo is an X with a play symbol cut out of its centre, in the brand gradient from `#d93b42` to `#f4b75c`.
+`docs/brand/` contains the logo (`freex-logo.svg`, `freex-logo-512.png`), the app icon on the dark background
+(`freex-app-icon.svg`, `freex-app-icon-1024.png`) for the FreeX apps, and the GitHub social preview
+(`social-preview.png`, 1280 × 640). The web interface uses the same logo as `logo.svg` and `icon.svg`.
 
 ## Versioning
 
