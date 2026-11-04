@@ -18,7 +18,7 @@
 
     <groupId>de.linzn</groupId>
     <artifactId>freex-media-server</artifactId>
-    <version>0.11.2</version>
+    <version>0.11.3</version>
     <packaging>jar</packaging>
 
     <name>FreeX Media Server</name>

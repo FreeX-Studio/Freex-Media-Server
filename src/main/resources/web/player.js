@@ -798,7 +798,7 @@
                 headers: {"Content-Type": "application/json", ...(S.token ? {"X-FreeX-Token": S.token} : {})},
                 body: JSON.stringify({offsetMs, durationMs: durationMs || Math.round((video.duration || 0) * 1000),
                     client: clientId, state: (casting ? casting.remote.isPaused : video.paused) ? "paused" : "playing", stopped: !!stopped}),
-            }).catch(() => null);
+            }).then(M.noteBuild, () => null);
         }
 
         const interval = setInterval(() => report(false), 10000);

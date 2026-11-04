@@ -27,6 +27,7 @@ window.FreeX = (() => {
         pollTimer: null,
         cleanup: null, // called when leaving the current view
         navMore: false, // sidebar shows all entries with pin buttons instead of the pinned ones
+        outdated: false, // the server has a newer FreeX Web; loaded with the next page change
     };
 
     const store = {
@@ -305,6 +306,7 @@ window.FreeX = (() => {
         } catch (e) {
             throw new ApiError(0, t("The server cannot be reached"));
         }
+        noteBuild(res);
         if (res.status === 204) return null;
         let data = null;
         try {
@@ -320,6 +322,14 @@ window.FreeX = (() => {
             throw new ApiError(res.status, (data && data.error) || t("Error {0}", res.status), data && data.code);
         }
         return data;
+    }
+
+    // The build of this page; the server sends its current one with every answer.
+    const BUILD = document.querySelector('meta[name="freex-build"]')?.content || "";
+
+    function noteBuild(res) {
+        const b = res.headers.get("X-FreeX-Build");
+        if (BUILD && b && b !== BUILD) S.outdated = true;
     }
 
     /** Switches to the user's display language; the shell is rebuilt if it was drawn in another one. */
@@ -377,6 +387,12 @@ window.FreeX = (() => {
     const link = (href, attrs, ...children) => h("a", {href, "data-link": true, ...attrs}, ...children);
 
     async function render() {
+        // The server was updated while this page was open: load the new version with the next
+        // page change, but never in the middle of a playback.
+        if (S.outdated && !location.pathname.startsWith("/play/")) {
+            location.reload();
+            return;
+        }
         if (S.cleanup) {
             const c = S.cleanup;
             S.cleanup = null;
@@ -877,7 +893,7 @@ window.FreeX = (() => {
             row);
     }
 
-    return {S, store, t, tn, tParts, num, locale, h, ICONS, icon, fmtDuration, fmtClock, fmtDate, fmtSize, fmtBitrate, language, codecName, channels,
+    return {S, store, noteBuild, t, tn, tParts, num, locale, h, ICONS, icon, fmtDuration, fmtClock, fmtDate, fmtSize, fmtBitrate, language, codecName, channels,
         audioLabel, subtitleLabel, episodeCode, deviceName, toast, img, art, api, ApiError, logoutLocal, logout, route,
         navigate, link, render, emptyState, popup, closeMenus, refreshLibraries, renderSidebar, card, hubRow, isWatched,
         setWatched, playHref, itemMenu, progressBar, unwatchedBadge, menuExtensions, PREF_LANGS, defaultTracks, avatar,

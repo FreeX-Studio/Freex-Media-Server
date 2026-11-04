@@ -28,10 +28,13 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
 import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -259,6 +262,8 @@ public final class WebServer implements AutoCloseable {
                 + "frame-src https://www.youtube-nocookie.com");
         boolean secure = tls || (trustProxy && "https".equalsIgnoreCase(raw.getRequestHeaders().getFirst("X-Forwarded-Proto")));
         if (secure) h.set("Strict-Transport-Security", "max-age=31536000");
+        // Lets an open FreeX Web notice that the server now has a newer one (see core.js).
+        h.set("X-FreeX-Build", build());
     }
 
     /**
@@ -329,8 +334,56 @@ public final class WebServer implements AutoCloseable {
                 return;
             }
         }
-        ex.raw.getResponseHeaders().set("Cache-Control", file.equals("index.html") ? "no-cache" : "public, max-age=300");
+        String cache;
+        if (file.equals("index.html")) {
+            data = index();
+            cache = "no-cache";
+        } else if (build().equals(ex.query("v"))) {
+            // Versioned by index.html: a new build has a new URL, so this one never changes.
+            cache = "public, max-age=31536000, immutable";
+        } else {
+            cache = "public, max-age=300";
+        }
+        ex.raw.getResponseHeaders().set("Cache-Control", cache);
         ex.send(200, FileSender.contentType(file), data);
+    }
+
+    private static final Pattern ASSET = Pattern.compile("(src|href)=\"/([A-Za-z0-9_./-]+\\.(?:js|css))\"");
+    private volatile String build;
+    private volatile byte[] index;
+
+    /**
+     * Version of the bundled web client, from the content of its scripts and styles. It is added
+     * to their URLs in index.html, so browsers can cache them for good and still load every new
+     * build at once.
+     */
+    String build() {
+        String b = build;
+        if (b != null) return b;
+        try {
+            byte[] html = resource("index.html");
+            if (html == null) return build = "none";
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            md.update(html);
+            Matcher m = ASSET.matcher(new String(html, StandardCharsets.UTF_8));
+            while (m.find()) {
+                byte[] data = resource(m.group(2));
+                if (data != null) md.update(data);
+            }
+            return build = HexFormat.of().formatHex(md.digest(), 0, 6);
+        } catch (IOException | GeneralSecurityException e) {
+            return build = "none";
+        }
+    }
+
+    /** index.html with the build added to the URLs of scripts and styles, and as a meta tag. */
+    private byte[] index() throws IOException {
+        byte[] i = index;
+        if (i != null) return i;
+        String html = new String(resource("index.html"), StandardCharsets.UTF_8);
+        html = ASSET.matcher(html).replaceAll("$1=\"/$2?v=" + build() + "\"");
+        html = html.replace("<head>", "<head>\n    <meta name=\"freex-build\" content=\"" + build() + "\">");
+        return index = html.getBytes(StandardCharsets.UTF_8);
     }
 
     private byte[] resource(String file) throws IOException {

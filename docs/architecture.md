@@ -160,6 +160,10 @@ Each user chooses which sidebar entries are pinned. Unpinned entries are stored 
 `library:<id>`) in the user's preferences, so the choice follows them to every device; the *More* view at the end of
 the sidebar lists all entries with pin buttons.
 
+The server adds a build id (a hash of the scripts and styles) to their URLs in `index.html`, so browsers cache them
+for good and still get every update at once. API answers carry the current build in `X-FreeX-Build`; a page that
+notices a newer one reloads with the next page change, never during a playback.
+
 All markup is created with `h()`, which sets text and attributes but never parses HTML from data, so titles or file
 names cannot inject markup. The parts share the global object `window.FreeX`. FreeX Web has its own version in
 `version.json`.

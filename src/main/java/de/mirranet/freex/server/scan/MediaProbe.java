@@ -90,7 +90,8 @@ public final class MediaProbe {
 
     /**
      * Time of the last video keyframe at or before {@code ms}, relative to the start of the file
-     * (as ffmpeg's {@code -ss} counts), or -1 if it cannot be found within 30 seconds before.
+     * (as ffmpeg's {@code -ss} counts), or -1 if it cannot be determined. Only the packets from
+     * the keyframe before {@code ms - 30 s} on are read, so this stays fast in long files.
      * A conversion that copies the video must start at a keyframe; starting there exactly keeps
      * picture and sound together.
      */
