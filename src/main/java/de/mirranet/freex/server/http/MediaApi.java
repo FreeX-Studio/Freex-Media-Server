@@ -40,6 +40,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -352,6 +353,7 @@ public final class MediaApi {
      */
     Map<String, Object> decorate(MediaItem it, User u, boolean full) {
         Map<String, Object> m = it.toPublic();
+        m.put("artVersion", artVersion(it));
         if (!full && it.type != MediaItem.Type.MOVIE) m.remove("summary");
         if (it.type.playable()) {
             m.put("progress", store.progress(u.id, it.id).toJson());
@@ -725,6 +727,21 @@ public final class MediaApi {
         };
     }
 
+    /**
+     * Changes whenever the artwork of an item changes, for example when online metadata replaces a
+     * frame from the video. The web client adds it to image URLs, so browsers do not keep showing
+     * an old picture they have cached.
+     */
+    private String artVersion(MediaItem it) {
+        int h = 17;
+        MediaItem cur = it;
+        for (int depth = 0; cur != null && depth < 3; depth++) {
+            h = 31 * h + Objects.hash(cur.posterPath, cur.backdropPath);
+            cur = cur.parentId == null ? null : store.item(cur.parentId).orElse(null);
+        }
+        return Integer.toUnsignedString(h, 36);
+    }
+
     private static Path existing(String path) {
         if (path == null) return null;
         Path p = Path.of(path);
@@ -816,7 +833,7 @@ public final class MediaApi {
                 TranscodeManager.Session s = transcoder.start(ex.user().id, it, plan, start);
                 m.put("session", s.id);
                 m.put("url", "/api/transcode/" + s.id + "/index.m3u8");
-                m.put("offsetMs", start);
+                m.put("offsetMs", s.offsetMs); // where the stream begins; the player seeks on to startMs
                 m.put("startMs", start);
                 if (activity != null) {
                     activity.started(ex, it, client, device, plan.mode().name().toLowerCase(Locale.ROOT),

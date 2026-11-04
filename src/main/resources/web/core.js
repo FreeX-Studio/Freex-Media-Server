@@ -265,11 +265,19 @@ window.FreeX = (() => {
         setTimeout(() => el.remove(), 3800);
     }
 
-    const img = (id, kind) => `/api/items/${encodeURIComponent(id)}/image/${kind}`;
+    /**
+     * URL of an item's artwork. Given the item itself rather than its id, the URL carries the
+     * item's artwork version, so a changed picture is loaded instead of the cached one.
+     */
+    const img = (item, kind) => {
+        const id = typeof item === "string" ? item : item.id;
+        const v = typeof item === "object" && item.artVersion ? `?v=${encodeURIComponent(item.artVersion)}` : "";
+        return `/api/items/${encodeURIComponent(id)}/image/${kind}${v}`;
+    };
 
     /** Image that turns into a titled placeholder when the server has no artwork. */
-    function art(id, kind, title) {
-        const i = h("img", {src: img(id, kind), alt: "", loading: "lazy", decoding: "async"});
+    function art(item, kind, title) {
+        const i = h("img", {src: img(item, kind), alt: "", loading: "lazy", decoding: "async"});
         i.addEventListener("error", () => i.replaceWith(h("div", {class: "placeholder"}, h("span", null, title || ""))));
         return i;
     }
@@ -522,7 +530,7 @@ window.FreeX = (() => {
                         closeMenus();
                         navigate(`/item/${it.id}`);
                     }},
-                    h("div", {class: "activity-art" + (landscape ? " landscape" : "")}, art(it.id, landscape ? "thumb" : "poster", it.title)),
+                    h("div", {class: "activity-art" + (landscape ? " landscape" : "")}, art(it, landscape ? "thumb" : "poster", it.title)),
                     h("div", {class: "activity-info"},
                         h("div", {class: "activity-title"}, title),
                         landscape ? h("div", {class: "activity-sub"}, it.title) : null,
@@ -844,7 +852,7 @@ window.FreeX = (() => {
                     itemMenu(e.currentTarget, item);
                 }}));
         return link(`/item/${item.id}`, {class: "card" + (landscape ? " landscape" : "")},
-            h("div", {class: "art"}, art(item.id, kind, title), unwatchedBadge(item), progressBar(item), actions),
+            h("div", {class: "art"}, art(item, kind, title), unwatchedBadge(item), progressBar(item), actions),
             h("div", {class: "title", title}, title),
             h("div", {class: "meta"}, cardMeta(item)));
     }

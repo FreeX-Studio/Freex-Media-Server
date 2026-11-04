@@ -216,9 +216,9 @@
 
         const posterKind = landscape ? "thumb" : "poster";
         const mirror = h("div", {class: "mirror" + (landscape ? " landscape" : "")},
-            h("div", {class: "poster"}, M.art(it.id, posterKind, it.title), M.progressBar(it), M.unwatchedBadge(it)),
+            h("div", {class: "poster"}, M.art(it, posterKind, it.title), M.progressBar(it), M.unwatchedBadge(it)),
             h("div", {class: "reflection", "aria-hidden": "true"},
-                h("img", {src: M.img(it.id, posterKind), alt: "", onerror: (e) => e.target.parentNode.remove()})));
+                h("img", {src: M.img(it, posterKind), alt: "", onerror: (e) => e.target.parentNode.remove()})));
 
         const ex = M.detailExtras ? M.detailExtras(it, actions) : {facts: []};
 
@@ -238,7 +238,7 @@
             ex.unmatched,
             it.media && S.user.admin ? h("div", {class: "file-line"}, `${it.media.fileName}, ${M.fmtSize(it.media.size)}`) : null);
 
-        const backdrop = h("div", {class: "backdrop"}, h("img", {src: M.img(it.id, "backdrop"), alt: "", onerror: (e) => e.target.remove()}));
+        const backdrop = h("div", {class: "backdrop"}, h("img", {src: M.img(it, "backdrop"), alt: "", onerror: (e) => e.target.remove()}));
         main.replaceChildren(h("div", {class: "detail"}, backdrop,
             h("div", {class: "detail-body"}, mirror, info),
             h("div", {class: "detail-children"}, childrenSection(it), ex.cast)));
@@ -254,7 +254,7 @@
                 const off = ep.progress && !ep.progress.watched ? ep.progress.offsetMs : 0;
                 return h("div", {class: "episode"},
                     link(M.playHref(ep), {class: "card landscape", "aria-label": t("Play {0}", ep.title)},
-                        h("div", {class: "art"}, M.art(ep.id, "thumb", ep.title), M.unwatchedBadge(ep), M.progressBar(ep),
+                        h("div", {class: "art"}, M.art(ep, "thumb", ep.title), M.unwatchedBadge(ep), M.progressBar(ep),
                             h("div", {class: "card-actions"}, h("span", {class: "card-play", html: M.ICONS.play})))),
                     h("div", {class: "ep-text"},
                         link(`/item/${ep.id}`, null, h("h3", null, ep.title)),

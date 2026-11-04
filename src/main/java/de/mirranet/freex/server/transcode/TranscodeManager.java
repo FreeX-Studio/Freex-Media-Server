@@ -16,6 +16,7 @@ import de.mirranet.freex.server.i18n.Text;
 import de.mirranet.freex.server.i18n.Translatable;
 import de.mirranet.freex.server.model.MediaFile;
 import de.mirranet.freex.server.model.MediaItem;
+import de.mirranet.freex.server.scan.MediaProbe;
 import de.mirranet.freex.server.util.Ids;
 
 import java.io.IOException;
@@ -98,6 +99,8 @@ public final class TranscodeManager implements AutoCloseable {
     private final String hwaccel;
     private final String vaapiDevice;
     private final String preset;
+    /** Finds keyframes for conversions that copy the video; null without ffprobe. */
+    private final MediaProbe probe;
     private final boolean canSignal;
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
     private final ScheduledExecutorService reaper = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -106,9 +109,10 @@ public final class TranscodeManager implements AutoCloseable {
         return t;
     });
 
-    public TranscodeManager(String ffmpeg, Path root, int maxSessions, String hwaccel, String vaapiDevice, String preset)
-            throws IOException {
+    public TranscodeManager(String ffmpeg, Path root, int maxSessions, String hwaccel, String vaapiDevice, String preset,
+                            MediaProbe probe) throws IOException {
         this.ffmpeg = ffmpeg;
+        this.probe = probe;
         this.root = root;
         this.maxSessions = maxSessions;
         this.hwaccel = hwaccel;
@@ -131,6 +135,14 @@ public final class TranscodeManager implements AutoCloseable {
                 .forEach(s -> stop(s.id));
         if (sessions.size() >= maxSessions) throw new BusyException();
 
+        // A copied video can only start at a keyframe. Starting exactly there makes audio and video
+        // begin together; the session's offset is then the keyframe, a little before the requested
+        // position, and the player seeks the rest of the way itself.
+        if (copiesVideo(plan) && offsetMs > 0 && probe != null) {
+            long key = probe.keyframeBefore(Path.of(item.file.path), item.file.videoStreamIndex, offsetMs);
+            if (key >= 0) offsetMs = key;
+        }
+
         String id = Ids.random(12);
         Path dir = root.resolve(id);
         Files.createDirectories(dir);
@@ -148,13 +160,20 @@ public final class TranscodeManager implements AutoCloseable {
         return s;
     }
 
+    private static boolean copiesVideo(PlaybackPlanner.Plan plan) {
+        return plan.mode() == PlaybackPlanner.Mode.REMUX || plan.mode() == PlaybackPlanner.Mode.AUDIO;
+    }
+
     List<String> command(MediaFile f, PlaybackPlanner.Plan plan, long offsetMs, Path dir) {
         List<String> c = new ArrayList<>(List.of(ffmpeg, "-hide_banner", "-loglevel", "warning", "-nostdin", "-y"));
         boolean transcode = plan.mode() == PlaybackPlanner.Mode.TRANSCODE;
         // VAAPI cannot overlay bitmap subtitles in this simple pipeline; burn-ins use the software path.
         String hw = transcode ? (plan.burnSubtitle() >= 0 && hwaccel.equals("vaapi") ? "none" : hwaccel) : "none";
         if (hw.equals("vaapi")) c.addAll(List.of("-vaapi_device", vaapiDevice));
-        if (offsetMs > 0) c.addAll(List.of("-ss", String.format(Locale.ROOT, "%.3f", offsetMs / 1000.0)));
+        // When copying the video, offsetMs is a keyframe: aim 1 ms behind it so that rounding cannot
+        // make ffmpeg fall back to the keyframe before.
+        double ss = offsetMs / 1000.0 + (copiesVideo(plan) ? 0.001 : 0);
+        if (offsetMs > 0) c.addAll(List.of("-ss", String.format(Locale.ROOT, "%.3f", ss)));
         c.addAll(List.of("-i", f.path));
 
         String videoMap = "0:" + (f.videoStreamIndex >= 0 ? f.videoStreamIndex : "v:0");
@@ -184,8 +203,10 @@ public final class TranscodeManager implements AutoCloseable {
             long br = plan.videoBitrate();
             String gop = "expr:gte(t,n_forced*" + SEGMENT_SECONDS + ")";
             switch (hw) {
-                case "nvenc" -> c.addAll(List.of("-c:v", "h264_nvenc", "-preset", "p4", "-profile:v", "high"));
-                case "qsv" -> c.addAll(List.of("-c:v", "h264_qsv", "-preset", "veryfast", "-profile:v", "high"));
+                // Forced keyframes must be IDR frames, or a segment does not start with a picture the
+                // browser can decode and the image freezes until the next one.
+                case "nvenc" -> c.addAll(List.of("-c:v", "h264_nvenc", "-preset", "p4", "-profile:v", "high", "-forced-idr", "1"));
+                case "qsv" -> c.addAll(List.of("-c:v", "h264_qsv", "-preset", "veryfast", "-profile:v", "high", "-forced_idr", "1"));
                 case "vaapi" -> c.addAll(List.of("-c:v", "h264_vaapi", "-profile:v", "high"));
                 default -> c.addAll(List.of("-c:v", "libx264", "-preset", preset, "-profile:v", "high", "-level:v", "4.1",
                         "-sc_threshold", "0"));
@@ -201,7 +222,10 @@ public final class TranscodeManager implements AutoCloseable {
             if (plan.mode() == PlaybackPlanner.Mode.REMUX) {
                 c.addAll(List.of("-c:a", "copy"));
             } else {
-                c.addAll(List.of("-c:a", "aac", "-b:a", "192k", "-ac", "2"));
+                // Keep the converted sound on the timestamps of the source: fills gaps and absorbs drift
+                // (common in TV recordings), which would otherwise move sound and picture apart over time.
+                c.addAll(List.of("-af", "aresample=async=1:min_hard_comp=0.100000:first_pts=0",
+                        "-c:a", "aac", "-b:a", "192k", "-ac", "2"));
             }
         }
 
@@ -210,6 +234,9 @@ public final class TranscodeManager implements AutoCloseable {
                 "-f", "hls", "-hls_time", Integer.toString(SEGMENT_SECONDS), "-hls_list_size", "0",
                 "-hls_playlist_type", "event", "-hls_segment_type", "fmp4",
                 "-hls_fmp4_init_filename", "init.mp4",
+                // Without edit lists every track keeps the timestamps it really has. Browsers apply
+                // edit lists in fragmented MP4 inconsistently, which shifted sound against picture.
+                "-hls_segment_options", "use_editlist=0",
                 "-hls_segment_filename", "seg%05d.m4s",
                 "-hls_flags", "temp_file+independent_segments",
                 "-start_number", "0", "index.m3u8"));

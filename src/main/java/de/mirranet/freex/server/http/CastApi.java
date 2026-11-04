@@ -111,7 +111,7 @@ public final class CastApi {
             try {
                 TranscodeManager.Session s = transcoder.start(ex.user().id, it, plan, start);
                 session = s.id;
-                offset = start;
+                offset = s.offsetMs;
             } catch (TranscodeManager.BusyException e) {
                 throw ApiException.of(503, e);
             }

@@ -172,7 +172,7 @@ public final class FreeXMediaServer {
             TranscodeManager transcoder = null;
             if (config.transcoderEnabled && thumbs.available()) {
                 transcoder = new TranscodeManager(config.ffmpeg, config.transcodeDirectory, config.maxTranscodeSessions,
-                        config.hardwareAcceleration, config.vaapiDevice, config.x264Preset);
+                        config.hardwareAcceleration, config.vaapiDevice, config.x264Preset, probe);
                 add(transcoder::close);
             } else if (config.transcoderEnabled) {
                 LOG.warning("Transcoding disabled: ffmpeg not found. Only files the browser can play directly will work.");

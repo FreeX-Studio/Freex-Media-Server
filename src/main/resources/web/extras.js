@@ -251,7 +251,7 @@
             const title = it ? it.title : e.title || t("Removed title");
             const parent = it && it.type === "episode" ? `${it.showTitle || ""} · ${M.episodeCode(it)}` : (it && it.year ? String(it.year) : e.parentTitle);
             const thumb = h("div", {class: "history-art" + (landscape ? " landscape" : "")},
-                it ? M.art(it.id, landscape ? "thumb" : "poster", title) : h("div", {class: "placeholder"}));
+                it ? M.art(it, landscape ? "thumb" : "poster", title) : h("div", {class: "placeholder"}));
             const time = new Date(e.watchedAt).toLocaleTimeString(M.locale(), {hour: "2-digit", minute: "2-digit"});
             const r = h("div", {class: "list-row history-row"},
                 it ? link(`/item/${it.id}`, {class: "history-link"}, thumb) : thumb,
@@ -317,7 +317,7 @@
                         }}])}, icon("close")));
         const rows = h("div", {class: "episode-list"}, pl.items.map((it, i) => h("div", {class: "episode"},
             link(`/play/${it.id}?pl=${pl.id}`, {class: "card landscape", "aria-label": t("Play {0}", it.title)},
-                h("div", {class: "art"}, M.art(it.id, "thumb", it.title), M.unwatchedBadge(it), M.progressBar(it),
+                h("div", {class: "art"}, M.art(it, "thumb", it.title), M.unwatchedBadge(it), M.progressBar(it),
                     h("div", {class: "card-actions"}, h("span", {class: "card-play", html: M.ICONS.play})))),
             h("div", {class: "ep-text"},
                 link(`/item/${it.id}`, null, h("h3", null, it.type === "episode" ? `${it.showTitle}: ${it.title}` : it.title)),

@@ -170,7 +170,7 @@
             seekWrap,
             h("div", {class: "ctl-row"},
                 h("div", {class: "ctl-left"},
-                    h("div", {class: "now-art"}, M.art(item.id, item.type === "episode" ? "thumb" : "poster", item.title)),
+                    h("div", {class: "now-art"}, M.art(item, item.type === "episode" ? "thumb" : "poster", item.title)),
                     h("div", {class: "now-text"}, h("div", {class: "now-title"}, heading), h("div", {class: "now-sub"}, sub))),
                 h("div", {class: "ctl-center"},
                     h("button", {class: "ctl", "aria-label": t("Back 10 seconds"), onclick: () => seekTo(position() - 10000, true)}, icon("replay10")),
@@ -313,13 +313,17 @@
             watchdog.reset();
             state.plan = plan;
             state.audio = plan.audio;
+            // A converted stream begins at offsetMs; when the video is copied that is the keyframe
+            // before the requested position, so the player seeks the rest of the way.
             state.offsetMs = plan.mode === "direct" ? 0 : plan.offsetMs;
-            state.pendingSeek = plan.mode === "direct" ? plan.startMs : 0;
+            const leadMs = Math.max(0, plan.startMs - state.offsetMs);
+            state.pendingSeek = leadMs;
             if (plan.mode === "direct") {
                 video.src = plan.url;
             } else if (window.Hls && window.Hls.isSupported()) {
+                state.pendingSeek = 0; // hls.js starts there itself
                 const hls = new window.Hls({
-                    startPosition: 0,
+                    startPosition: leadMs / 1000,
                     maxBufferLength: 30,
                     backBufferLength: 60,
                     liveDurationInfinity: false,
@@ -814,7 +818,7 @@
             const counter = h("span", null, left);
             const go = () => goNext();
             const box = h("div", {class: "up-next"},
-                h("div", {class: "art"}, M.art(next.id, "thumb", next.title)),
+                h("div", {class: "art"}, M.art(next, "thumb", next.title)),
                 h("div", null,
                     h("div", {class: "muted small"}, M.tParts("Up next in {0} s", counter)),
                     h("div", {class: "title"}, next.type === "episode" ? `${M.episodeCode(next)}, ${next.title}` : next.title),
@@ -931,7 +935,7 @@
                 if (Date.now() - lastHardSync > hardSyncPause) {
                     if (Date.now() - lastHardSync < hardSyncPause + 5000) hardSyncPause = Math.min(30000, hardSyncPause * 2);
                     lastHardSync = Date.now();
-                    video.playbackRate = 1;
+                    setRate(0);
                     seekTo(target);
                     return;
                 }
@@ -940,13 +944,26 @@
             }
             if (room.running) {
                 if (video.paused && notice.hidden) video.play().catch(() => tryPlay());
-                // Ahead: a little slower, behind: a little faster, by up to 8 %.
-                const ad = Math.abs(diff);
-                video.playbackRate = ad < 200 ? 1 : 1 - Math.sign(diff) * Math.min(0.08, 0.02 + ad / 25000);
+                setRate(diff);
             } else {
-                video.playbackRate = 1;
+                setRate(0);
                 if (!video.paused) video.pause();
             }
+        }
+
+        /**
+         * Evens out a small difference to the room (ms, positive = ahead) by playing 4 or 8 % slower
+         * or faster. It starts at 300 ms and stops below 60 ms, and only fixed steps are used:
+         * every change of the rate can make the browser's audio stutter.
+         */
+        function setRate(diff) {
+            const ad = Math.abs(diff);
+            let step = Math.abs(video.playbackRate - 1) < 0.001 ? 0 : Math.abs(video.playbackRate - 1);
+            if (ad < 60) step = 0;
+            else if (ad > 1500) step = 0.08;
+            else if (ad > 300 || step) step = Math.max(step, 0.04);
+            const rate = 1 - Math.sign(diff) * step;
+            if (Math.abs(video.playbackRate - rate) > 0.001) video.playbackRate = rate;
         }
 
         /** Tells the room when this player starts or stops loading (after a short delay, to skip hiccups). */

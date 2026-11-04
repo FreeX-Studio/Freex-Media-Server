@@ -58,9 +58,9 @@ native apps for iOS, Android and TV are planned and will use the same API.
 | **FreeX Android** | App for Android smartphones and tablets | planned |
 | **FreeX TV** | Smart TV and streaming device apps | later |
 
-Server and web client are versioned separately: the server uses the Maven version in `pom.xml` (e.g. `0.11.1`),
+Server and web client are versioned separately: the server uses the Maven version in `pom.xml` (e.g. `0.11.2`),
 FreeX Web the version in [`src/main/resources/web/version.json`](src/main/resources/web/version.json)
-(e.g. `1.2.1.0`). Both are shown under *Settings → Über FreeX*.
+(e.g. `1.2.2.0`). Both are shown under *Settings → Über FreeX*.
 
 ## Quick start
 

@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
@@ -82,6 +83,49 @@ public final class MediaProbe {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;
+        } finally {
+            if (p != null && p.isAlive()) p.destroyForcibly();
+        }
+    }
+
+    /**
+     * Time of the last video keyframe at or before {@code ms}, relative to the start of the file
+     * (as ffmpeg's {@code -ss} counts), or -1 if it cannot be found within 30 seconds before.
+     * A conversion that copies the video must start at a keyframe; starting there exactly keeps
+     * picture and sound together.
+     */
+    public long keyframeBefore(Path video, int streamIndex, long ms) {
+        if (!available || ms <= 0) return -1;
+        Process p = null;
+        try {
+            double startTime = 0;
+            List<Double> keys = new ArrayList<>();
+            // read_intervals takes timestamps of the file, so the file's start time is needed first.
+            p = new ProcessBuilder(ffprobe, "-v", "error", "-show_entries", "format=start_time", "-of", "csv=p=0",
+                    video.toAbsolutePath().toString()).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+            String st = readLimited(p.getInputStream(), 4096).trim();
+            if (!p.waitFor(10, TimeUnit.SECONDS)) return -1;
+            if (!st.isEmpty() && !st.equals("N/A")) startTime = parseDouble(st);
+            double target = startTime + ms / 1000.0;
+            String interval = String.format(Locale.ROOT, "%.3f%%%.3f", Math.max(startTime, target - 30), target + 0.001);
+            p = new ProcessBuilder(ffprobe, "-v", "error", "-select_streams", streamIndex >= 0 ? Integer.toString(streamIndex) : "v:0",
+                    "-show_entries", "packet=pts_time,flags", "-read_intervals", interval, "-of", "csv=p=0",
+                    video.toAbsolutePath().toString()).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+            String out = readLimited(p.getInputStream(), 4 * 1024 * 1024);
+            if (!p.waitFor(10, TimeUnit.SECONDS)) return -1;
+            for (String line : out.split("\\R")) {
+                String[] parts = line.split(",");
+                if (parts.length >= 2 && parts[1].startsWith("K") && !parts[0].equals("N/A")) keys.add(parseDouble(parts[0]));
+            }
+            double best = -1;
+            for (double k : keys) if (k <= target + 0.0005 && k > best) best = k;
+            return best < 0 ? -1 : Math.max(0, Math.round((best - startTime) * 1000));
+        } catch (IOException | RuntimeException e) {
+            LOG.fine("ffprobe keyframe lookup failed on " + video + ": " + e.getMessage());
+            return -1;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return -1;
         } finally {
             if (p != null && p.isAlive()) p.destroyForcibly();
         }
