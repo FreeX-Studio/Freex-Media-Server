@@ -136,6 +136,7 @@ h1, h2, h3 {
     grid-template-columns: var(--sidebar) 1fr;
     grid-template-rows: 56px 1fr;
     height: 100vh;
+    transition: grid-template-columns .18s ease;
 }
 
 .topbar {
@@ -153,7 +154,7 @@ h1, h2, h3 {
     display: flex;
     align-items: center;
     gap: 10px;
-    width: calc(var(--sidebar) - 12px);
+    width: calc(var(--sidebar) - 62px);
     padding-left: 6px;
     font-weight: 800;
     font-size: 20px;
@@ -193,7 +194,7 @@ h1, h2, h3 {
 }
 
 .menu-toggle {
-    display: none;
+    flex: none;
 }
 
 .search {
@@ -1976,6 +1977,45 @@ select, .field input, .inline input {
     display: grid;
     place-items: center;
     padding: 80px;
+}
+
+/* ------------------------------------------------------------------ collapsed sidebar (icons only) */
+
+@media (min-width: 861px) {
+    .shell.nav-collapsed {
+        grid-template-columns: 72px 1fr;
+    }
+
+    .shell.nav-collapsed .brand {
+        width: auto;
+    }
+
+    .shell.nav-collapsed .sidebar {
+        padding: 12px 10px;
+        overflow-x: hidden;
+    }
+
+    .shell.nav-collapsed .nav-link {
+        justify-content: center;
+        padding: 10px 0;
+    }
+
+    .shell.nav-collapsed .nav-link .label,
+    .shell.nav-collapsed .nav-link .spin {
+        display: none;
+    }
+
+    .shell.nav-collapsed .nav-link.active::before {
+        left: -10px;
+    }
+
+    /* group headings become a thin divider */
+    .shell.nav-collapsed .nav-group {
+        font-size: 0;
+        padding: 0;
+        margin: 12px 8px;
+        border-top: 1px solid var(--line);
+    }
 }
 
 /* ------------------------------------------------------------------ small screens */

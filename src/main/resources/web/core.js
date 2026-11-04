@@ -533,6 +533,17 @@ window.FreeX = (() => {
 
     // ------------------------------------------------------------------ shell
 
+    function toggleNav() {
+        const root = document.querySelector(".shell");
+        if (!root) return;
+        if (window.matchMedia("(max-width: 860px)").matches) {
+            root.classList.toggle("nav-open");
+            return;
+        }
+        const collapsed = root.classList.toggle("nav-collapsed");
+        store.set("freex.navCollapsed", collapsed ? "1" : null);
+    }
+
     function shell(path) {
         let root = document.querySelector(".shell");
         if (!root) {
@@ -561,7 +572,7 @@ window.FreeX = (() => {
 
             root = h("div", {class: "shell"},
                 h("header", {class: "topbar"},
-                    h("button", {class: "icon-btn menu-toggle", "aria-label": "Menü", onclick: () => root.classList.toggle("nav-open")}, icon("menu")),
+                    h("button", {class: "icon-btn menu-toggle", "aria-label": "Menü ein- oder ausklappen", title: "Menü", onclick: toggleNav}, icon("menu")),
                     link("/", {class: "brand", "aria-label": "Startseite"}, h("img", {src: "/icon.svg", alt: ""}), h("span", null, "Free", h("b", null, "X"))),
                     h("div", {class: "search"}, icon("search"), search),
                     h("div", {class: "spacer"}),
@@ -570,6 +581,8 @@ window.FreeX = (() => {
                     userBtn),
                 h("nav", {class: "sidebar", "aria-label": "Navigation"}),
                 h("main", {class: "main"}));
+            // Collapsed sidebar (icons only) is remembered per browser; on phones the menu slides in instead.
+            if (store.get("freex.navCollapsed") === "1") root.classList.add("nav-collapsed");
             root.querySelector(".sidebar").addEventListener("click", (e) => {
                 if (e.target.closest("a")) root.classList.remove("nav-open");
             });
