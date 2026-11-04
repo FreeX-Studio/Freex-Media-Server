@@ -1,3 +1,5 @@
+<p><img src="brand/freex-logo.svg" alt="FreeX" width="56"></p>
+
 # API
 
 FreeX Web talks to the server through a JSON API under `/api`; the upcoming FreeX apps will use the same API. It is

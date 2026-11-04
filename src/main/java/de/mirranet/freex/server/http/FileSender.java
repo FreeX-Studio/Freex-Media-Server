@@ -50,6 +50,7 @@ public final class FileSender {
             Map.entry("webp", "image/webp"), Map.entry("svg", "image/svg+xml"), Map.entry("ico", "image/x-icon"),
             Map.entry("html", "text/html; charset=utf-8"), Map.entry("css", "text/css; charset=utf-8"),
             Map.entry("js", "text/javascript; charset=utf-8"), Map.entry("json", "application/json"),
+            Map.entry("webmanifest", "application/manifest+json"),
             Map.entry("vtt", "text/vtt; charset=utf-8"), Map.entry("woff2", "font/woff2"),
             Map.entry("txt", "text/plain; charset=utf-8"), Map.entry("srt", "text/plain; charset=utf-8"));
 

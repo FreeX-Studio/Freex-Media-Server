@@ -1,3 +1,5 @@
+<p><img src="brand/freex-logo.svg" alt="FreeX" width="56"></p>
+
 # Security
 
 FreeX Media Server is meant to be reachable from the internet. It is designed to be secure without extra setup.

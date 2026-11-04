@@ -1,3 +1,5 @@
+<p><img src="brand/freex-logo.svg" alt="FreeX" width="56"></p>
+
 # Playback
 
 - [How a file is played](#how-a-file-is-played)

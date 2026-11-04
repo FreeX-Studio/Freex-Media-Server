@@ -1,3 +1,5 @@
+<p><img src="brand/freex-logo.svg" alt="FreeX" width="56"></p>
+
 # Configuration
 
 `config.yml` holds the server settings; libraries and users are managed in the web interface. A commented file is

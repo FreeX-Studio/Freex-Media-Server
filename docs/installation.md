@@ -1,3 +1,5 @@
+<p><img src="brand/freex-logo.svg" alt="FreeX" width="56"></p>
+
 # Installation
 
 FreeX Media Server is a single Java application. It runs anywhere Java 21 runs; on Debian and Ubuntu the package

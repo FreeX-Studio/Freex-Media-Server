@@ -1,3 +1,5 @@
+<p><img src="brand/freex-logo.svg" alt="FreeX" width="56"></p>
+
 # Organizing your media
 
 Add one or more folders per library in *Settings → Libraries*. A library contains either movies or TV shows. The

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/main/resources/web/logo.svg" alt="FreeX" width="128">
+  <img src="docs/brand/freex-logo.svg" alt="FreeX" width="128">
 </p>
 
 <h1 align="center">FreeX Media Server</h1>

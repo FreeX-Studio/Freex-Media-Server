@@ -1,3 +1,5 @@
+<p><img src="brand/freex-logo.svg" alt="FreeX" width="56"></p>
+
 # Development
 
 ## Building
@@ -44,7 +46,9 @@ libraries are hls.js and a QR code generator.
 The FreeX logo is an X with a play symbol cut out of its centre, in the brand gradient from `#d93b42` to `#f4b75c`.
 `docs/brand/` contains the logo (`freex-logo.svg`, `freex-logo-512.png`), the app icon on the dark background
 (`freex-app-icon.svg`, `freex-app-icon-1024.png`) for the FreeX apps, and the GitHub social preview
-(`social-preview.png`, 1280 × 640). The web interface uses the same logo as `logo.svg` and `icon.svg`.
+(`social-preview.png`, 1280 × 640). The web interface uses the same logo as `logo.svg` and `icon.svg`, plus
+`icons/` (favicon, Apple touch icon, Android icons) and `manifest.webmanifest`, so FreeX can be added to the home
+screen of a phone or tablet like an app.
 
 ## Versioning
 
