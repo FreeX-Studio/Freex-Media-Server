@@ -9,10 +9,37 @@ CACHE_DIR=/var/cache/freex-media-server
 CONFIG_DIR=/etc/freex-media-server
 CONFIG=$CONFIG_DIR/config.yml
 
+# Value of a key in the server: section of config.yml, without quotes (empty if not set).
+server_setting() {
+    awk -v key="$1:" '
+        /^server:/ { s = 1; next }
+        /^[^ #]/   { s = 0 }
+        s && $1 == key { v = $2; gsub(/["\047]/, "", v); print v; exit }
+    ' "$CONFIG" 2>/dev/null
+}
+
+# The address of the web interface: IP of the main network interface (the one of the
+# default route), the configured port, https if a keystore is set.
+web_address() {
+    port=$(server_setting port)
+    [ -n "$port" ] || port=32500
+    scheme=http
+    [ -n "$(server_setting tlsKeystore)" ] && scheme=https
+    host=$(server_setting bindAddress)
+    case "$host" in
+        ""|0.0.0.0|::|"[::]")
+            host=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "src") { print $(i + 1); exit } }')
+            [ -n "$host" ] || host=$(hostname -I 2>/dev/null | awk '{ print $1 }')
+            [ -n "$host" ] || host=$(hostname)
+            ;;
+    esac
+    echo "$scheme://$host:$port/"
+}
+
 if [ "$1" = "configure" ]; then
     if ! getent passwd "$USER_NAME" >/dev/null; then
         adduser --system --group --home "$DATA_DIR" --no-create-home \
-            --gecos "FreeX" "$USER_NAME" >/dev/null
+            --gecos "FreeX Media Server" "$USER_NAME" >/dev/null
     fi
     # GPU access for hardware transcoding (VAAPI / Quick Sync), if the groups exist.
     for g in video render; do
@@ -28,13 +55,6 @@ if [ "$1" = "configure" ]; then
         chown "$USER_NAME:$USER_NAME" "$d"
         chmod 750 "$d"
     done
-
-    # Up to 0.4.1 the caches were kept in the data directory. They are recreated on demand,
-    # so the old copies are simply removed.
-    if [ -n "$2" ] && dpkg --compare-versions "$2" lt 0.4.2; then
-        rm -rf "$DATA_DIR/thumbs" "$DATA_DIR/subtitles" "$DATA_DIR/transcode"
-        rm -f "$DATA_DIR"/sqlite-*libsqlitejdbc.so* "$DATA_DIR"/sqlite-*.lck
-    fi
 
     # The configuration is written on the first install only and then belongs to the server,
     # which changes it from its settings page. It can hold the TMDB key and the keystore
@@ -57,9 +77,15 @@ if [ "$1" = "configure" ]; then
         fi
     fi
 
+    URL=$(web_address)
     if [ -z "$2" ]; then
-        echo "FreeX Media Server is running on port 32500. Open http://<this-server>:32500/ to create the admin account."
+        echo ""
+        echo "FreeX Media Server is running: $URL"
+        echo "Open it in a browser to create the admin account."
         echo "Media folders must be readable by the user '$USER_NAME'."
+        echo ""
+    else
+        echo "FreeX Media Server updated and restarted: $URL"
     fi
 fi
 

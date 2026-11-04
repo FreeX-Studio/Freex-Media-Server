@@ -26,13 +26,16 @@ sets up everything including a hardened systemd service.
 sudo apt install ./freex-media-server_<version>_all.deb
 ```
 
-Use `apt` rather than `dpkg -i`: `apt` installs the dependencies (ffmpeg, Java) in the same step. The package
+Use `apt` rather than `dpkg -i`: `apt` installs the dependencies (ffmpeg, Java) in the same step. If the file lies in
+a folder the user `_apt` cannot read (such as `/root`), apt says *"Download is performed unsandboxed as root"*; that is
+harmless, or copy the file to `/tmp` first. The package
 
 - creates the system user `freex` (also in the groups `video` and `render` for hardware transcoding),
 - installs the systemd service `freex-media-server`, enables it and starts it,
 - writes the configuration `/etc/freex-media-server/config.yml` on the first install.
 
-Open `http://<your-server>:32500/` and create the admin account. Your media folders must be readable by the user
+At the end the installation prints the address of the web interface (IP of the main network interface and the
+configured port). Open it and create the admin account. Your media folders must be readable by the user
 `freex`, for example with `sudo setfacl -R -m u:freex:rX /srv/media` or a shared group.
 
 ```bash
