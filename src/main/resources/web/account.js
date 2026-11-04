@@ -600,10 +600,9 @@
                 h("div", {class: "about-brand"}, h("img", {src: "/logo.svg", alt: ""}),
                     h("div", null, h("div", {class: "about-name"}, "Free", h("b", null, "X")), h("div", {class: "slogan"}, M.SLOGAN)))),
             panel("Versionen",
-                h("p", {class: "muted"}, "Der FreeX Media Server stellt die Weboberfläche FreeX Web bereit. Beide haben eigene Versionsnummern."),
                 h("dl", {class: "kv"},
                     kv(st.server ? st.server.name : "FreeX Media Server", st.server ? st.server.version : st.version),
-                    kv(st.web ? st.web.name : "FreeX Web", st.web ? st.web.version : ""),
+                    kv(`${st.web ? st.web.name : "FreeX Web"} (Weboberfläche)`, st.web ? st.web.version : ""),
                     kv("Servername", st.name))),
             panel("Quellcode", h("p", null, h("a", {href: "https://github.com/LinzN/freex-media-server", target: "_blank", rel: "noopener"},
                 "github.com/LinzN/freex-media-server"))));
