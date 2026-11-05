@@ -108,6 +108,7 @@ See [Installation](docs/installation.md) for details, paths, updates and running
 | [Security](docs/security.md) | Sign-in, two-factor authentication, sessions and how the server is hardened |
 | [Architecture](docs/architecture.md) | How the server works inside: requests, data, scanning, playback, FreeX Web |
 | [API](docs/api.md) | The JSON API used by FreeX Web and the upcoming apps |
+| [Changelog](CHANGELOG.md) | What is new in each release |
 | [Development](docs/development.md) | Project structure, building, versioning and contributing |
 
 ## Requirements
