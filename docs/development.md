@@ -10,8 +10,28 @@ mvn clean package
 
 This produces
 
-- `target/freex-media-server.jar`, a self-contained jar with FreeX Web and the SQLite driver, and
-- `target/freex-media-server_<version>_all.deb`, the Debian package (built with jdeb).
+- `target/freex-media-server.jar`, a self-contained jar with FreeX Web and the SQLite driver,
+- `target/freex-media-server_<version>_all.deb`, the Debian package (built with jdeb), and
+- `target/freex-media-server-<version>-setup.exe`, the Windows installer, when NSIS is installed.
+
+### Windows installer
+
+The installer is built on Linux with [NSIS](https://nsis.sourceforge.io/): the Maven profile `windows-installer`
+switches itself on when `/usr/bin/makensis` exists and runs `src/windows/build-installer.sh`. The script downloads
+the bundled programs in fixed versions (Eclipse Temurin JRE 21, the FFmpeg essentials build by Gyan, WinSW) into
+`~/.cache/freex-build`, checks them against the checksums their publishers provide, and packs them with the server.
+To update one of them, change its version at the top of the script.
+
+On a build server such as Jenkins:
+
+```bash
+sudo apt install nsis curl unzip       # once, on the machine that runs the job
+mvn clean package                      # builds jar, .deb and setup .exe
+```
+
+Archive `target/*.jar, target/*.deb, target/*.exe` as artifacts. The build needs to reach github.com and gyan.dev;
+set `FREEX_DOWNLOAD_CACHE` to share the download cache between jobs. `WINSW_SHA256` pins the WinSW file, which
+has no published checksum.
 
 Run the server from the project directory with `LANG=C.UTF-8 java -jar target/freex-media-server.jar`; it creates
 `config.yml` and `data/` there. Install `ffmpeg` to work on scanning, thumbnails or conversion.
@@ -35,6 +55,7 @@ src/main/java/de/mirranet/freex/server/
   util/                   ids and file helpers
 src/main/resources/web/   FreeX Web (plain JavaScript, no build step)
 src/deb/                  Debian package: control files, launcher, systemd service, default configuration
+src/windows/              Windows installer: NSIS script, service definition, build script, icon
 docs/                     documentation, screenshots and brand assets
 ```
 

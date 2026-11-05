@@ -43,7 +43,8 @@ native apps for iOS, Android and TV are planned and will use the same API.
 - **Multi-user** – share all or only selected libraries per user; personal watch state, history, profile pictures
   and audio/subtitle language preferences
 - **Secure by default** – two-factor sign-in, brute-force protection, per-device sessions, strict security headers
-- **Easy to run** – one self-contained jar, or a Debian package with a hardened systemd service
+- **Easy to run** – one self-contained jar, a Debian package with a hardened systemd service, or a Windows
+  installer that brings Java and ffmpeg along
 - **Managed in the browser** – libraries, users and server settings, plus a live activity view for admins
 - **Your language, your sidebar** – English and German interface and server messages per user; pin and unpin
   sidebar entries
@@ -58,7 +59,7 @@ native apps for iOS, Android and TV are planned and will use the same API.
 | **FreeX Android** | App for Android smartphones and tablets | planned |
 | **FreeX TV** | Smart TV and streaming device apps | later |
 
-Server and web client are versioned separately: the server uses the Maven version in `pom.xml` (e.g. `0.12.2`),
+Server and web client are versioned separately: the server uses the Maven version in `pom.xml` (e.g. `0.13.0`),
 FreeX Web the version in [`src/main/resources/web/version.json`](src/main/resources/web/version.json)
 (e.g. `1.3.2.0`). Both are shown under *Settings → Über FreeX*.
 
@@ -79,6 +80,11 @@ Open `http://<your-server>:32500/`, create the admin account and add your movie 
 runs as the user `freex`, which needs read access to your media, for example
 `sudo setfacl -R -m u:freex:rX /srv/media`.
 
+### Windows
+
+Run `freex-media-server-<version>-setup.exe` from the build. It brings Java and ffmpeg along, sets up a Windows
+service and opens the web interface when it is done.
+
 ### Any system with Java 21
 
 ```bash
@@ -95,7 +101,7 @@ See [Installation](docs/installation.md) for details, paths, updates and running
 
 | | |
 |---|---|
-| [Installation](docs/installation.md) | Debian package, manual setup, systemd, file locations, backups |
+| [Installation](docs/installation.md) | Debian package, Windows installer, manual setup, file locations, backups |
 | [Configuration](docs/configuration.md) | All settings, the settings page, HTTPS and reverse proxies |
 | [Organizing your media](docs/media-library.md) | Folder and file naming, local artwork, `.nfo` files, TMDB |
 | [Playback](docs/playback.md) | Direct play and conversion, hardware acceleration, subtitles, skip intro, Watch Together, Chromecast |

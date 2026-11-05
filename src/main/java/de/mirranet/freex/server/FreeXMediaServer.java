@@ -43,6 +43,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Locale;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -76,7 +77,9 @@ public final class FreeXMediaServer {
         if (version == null) version = "dev";
         LOG.info("FreeX Media Server " + version + " starting, web client FreeX Web " + MediaApi.webClient().get("version"));
         String fsEncoding = System.getProperty("sun.jnu.encoding", "");
-        if (!fsEncoding.equalsIgnoreCase("UTF-8")) {
+        // Windows hands file names to Java as Unicode whatever the code page, so only other systems need it.
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        if (!windows && !fsEncoding.equalsIgnoreCase("UTF-8")) {
             LOG.warning("File names are decoded as '" + fsEncoding + "', so umlauts in folder and file names will be"
                     + " garbled. Start the server with a UTF-8 locale, e.g. LANG=C.UTF-8 (see README).");
         }
@@ -169,6 +172,7 @@ public final class FreeXMediaServer {
             SubtitleService subtitles = new SubtitleService(config.ffmpeg, config.cacheDirectory);
             LibraryScanner scanner = new LibraryScanner(store, probe, config.scanThreads, config.scanIntervalMinutes);
             add(scanner::close);
+            if (thumbs.available()) LOG.info("Using " + config.ffmpeg + " and " + config.ffprobe);
             TranscodeManager transcoder = null;
             if (config.transcoderEnabled && thumbs.available()) {
                 transcoder = new TranscodeManager(config.ffmpeg, config.transcodeDirectory, config.maxTranscodeSessions,

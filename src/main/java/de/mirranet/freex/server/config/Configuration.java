@@ -13,12 +13,14 @@
 package de.mirranet.freex.server.config;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -62,8 +64,10 @@ public final class Configuration {
               cacheDirectory: ""
 
             ffmpeg:
-              # Paths to the ffprobe/ffmpeg binaries. Used for media info and thumbnails;
-              # the server still works without them, just with less information.
+              # Paths to the ffprobe/ffmpeg binaries. Used for media info, thumbnails and
+              # conversion; the server still works without them, just with less information.
+              # "ffprobe"/"ffmpeg" use the copies that come with the server (Windows installer),
+              # otherwise the ones found on the PATH.
               ffprobe: "ffprobe"
               ffmpeg: "ffmpeg"
 
@@ -138,6 +142,24 @@ public final class Configuration {
     /** Values as written in the file (dotted keys), without defaults. */
     private final Map<String, String> raw;
 
+    /**
+     * A program given by its plain name is taken from the {@code ffmpeg} folder next to the server's
+     * jar if it is there (the Windows installer puts it there), otherwise from the PATH.
+     */
+    private static String tool(String configured, String name) {
+        if (!configured.equals(name)) return configured;
+        try {
+            Path jar = Path.of(Configuration.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            for (String file : List.of(name + ".exe", name)) {
+                Path bundled = jar.resolveSibling("ffmpeg").resolve(file);
+                if (Files.isRegularFile(bundled)) return bundled.toString();
+            }
+        } catch (URISyntaxException | RuntimeException e) {
+            // not started from a jar (e.g. in an IDE): use the PATH
+        }
+        return configured;
+    }
+
     private Configuration(Map<String, String> v, Path baseDir, Path file) {
         this.file = file;
         this.raw = Map.copyOf(v);
@@ -147,8 +169,8 @@ public final class Configuration {
         this.dataDirectory = baseDir.resolve(v.getOrDefault("data.directory", "data")).normalize();
         String cache = v.getOrDefault("data.cacheDirectory", "").trim();
         this.cacheDirectory = cache.isEmpty() ? dataDirectory : baseDir.resolve(cache).normalize();
-        this.ffprobe = v.getOrDefault("ffmpeg.ffprobe", "ffprobe");
-        this.ffmpeg = v.getOrDefault("ffmpeg.ffmpeg", "ffmpeg");
+        this.ffprobe = tool(v.getOrDefault("ffmpeg.ffprobe", "ffprobe"), "ffprobe");
+        this.ffmpeg = tool(v.getOrDefault("ffmpeg.ffmpeg", "ffmpeg"), "ffmpeg");
         this.scanIntervalMinutes = Math.max(0, intValue(v, "scanner.intervalMinutes", 30));
         this.scanThreads = Math.max(1, intValue(v, "scanner.threads", 4));
         String ks = v.getOrDefault("server.tlsKeystore", "").trim();

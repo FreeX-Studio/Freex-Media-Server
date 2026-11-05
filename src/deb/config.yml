@@ -26,8 +26,8 @@ data:
   cacheDirectory: "/var/cache/freex-media-server"
 
 ffmpeg:
-  # Paths to the ffprobe/ffmpeg binaries. Used for media info and thumbnails;
-  # the server still works without them, just with less information.
+  # Paths to the ffprobe/ffmpeg binaries. Used for media info, thumbnails and
+  # conversion; the server still works without them, just with less information.
   ffprobe: "ffprobe"
   ffmpeg: "ffmpeg"
 

@@ -239,9 +239,29 @@ final class TranscodeWorker {
                 .redirectErrorStream(true)
                 .redirectOutput(runDir.resolve("ffmpeg.log").toFile())
                 .start();
+        if (priority.isEmpty() && !canSignal) lowerPriorityOnWindows(p);
         active = new Run(runDir, p, start);
         runs.add(0, active);
         while (runs.size() > KEEP_RUNS) TranscodeManager.deleteTree(runs.remove(runs.size() - 1).dir);
+    }
+
+    /**
+     * Windows has no {@code nice}: lower the priority of the running ffmpeg instead, in the
+     * background so that the start is not delayed.
+     */
+    private static void lowerPriorityOnWindows(Process p) {
+        Thread.ofVirtual().start(() -> {
+            try {
+                new ProcessBuilder("powershell", "-NoProfile", "-NonInteractive", "-Command",
+                        "(Get-Process -Id " + p.pid() + ").PriorityClass = 'BelowNormal'")
+                        .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start()
+                        .waitFor(10, TimeUnit.SECONDS);
+            } catch (IOException e) {
+                // ffmpeg just keeps normal priority
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
     }
 
     /** Pauses ffmpeg while it is far ahead of the player; called regularly by the manager. */

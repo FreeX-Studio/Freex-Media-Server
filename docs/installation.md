@@ -3,10 +3,11 @@
 # Installation
 
 FreeX Media Server is a single Java application. It runs anywhere Java 21 runs; on Debian and Ubuntu the package
-sets up everything including a hardened systemd service.
+sets up everything including a hardened systemd service, on Windows the installer including a Windows service.
 
 - [Requirements](#requirements)
 - [Debian / Ubuntu package](#debian--ubuntu-package)
+- [Windows](#windows)
 - [Manual installation](#manual-installation)
 - [Data and backups](#data-and-backups)
 
@@ -78,6 +79,36 @@ sudo systemctl edit freex-media-server
 ```ini
 [Service]
 ReadWritePaths=/mnt/ssd/freex-transcode
+```
+
+## Windows
+
+Run `freex-media-server-<version>-setup.exe` (Windows 10 or 11, 64-bit). It brings everything with it, Java and
+ffmpeg included, and
+
+- installs the server into `C:\Program Files\FreeX Media Server`,
+- sets up the Windows service *FreeX Media Server*, which starts with Windows (also without anyone signed in),
+- allows it in the Windows firewall for private and domain networks,
+- adds *FreeX* (opens the web interface) and *Configuration and logs* to the start menu.
+
+At the end the installer opens the web interface; create the admin account there. If other devices cannot reach
+the server, check that Windows treats your network as *private*.
+
+| Path | Content |
+|---|---|
+| `C:\Program Files\FreeX Media Server\` | The server, its Java runtime (`jre`), ffmpeg (`ffmpeg`), the service (`freex-media-server-service.exe`) |
+| `C:\ProgramData\FreeX Media Server\config.yml` | Configuration, created on the first start |
+| `C:\ProgramData\FreeX Media Server\data\` | Database, library index, metadata, artwork: **this is what you back up** |
+| `C:\ProgramData\FreeX Media Server\logs\` | Log of the service |
+
+Only the system and administrators can open the folder in ProgramData, because it holds the database. Updates are
+installed by running the newer installer; configuration and data are kept. Uninstalling (*Settings → Apps*) asks
+whether to delete them as well. The service runs as *Local System*: media on a network share needs a share it can
+reach, or a different service account (`services.msc` → *FreeX Media Server* → *Log On*).
+
+```bat
+sc query freex-media-server          :: state
+net stop freex-media-server          :: stop (start with net start, e.g. after editing config.yml)
 ```
 
 ## Manual installation
