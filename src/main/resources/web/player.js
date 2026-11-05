@@ -542,14 +542,25 @@
             if (casting) return casting.controller.muteOrUnmute();
             video.muted = !video.muted;
         });
-        vol.addEventListener("input", () => {
+        function setVolume(v) {
+            v = Math.min(1, Math.max(0, Math.round(v * 20) / 20));
             if (casting) {
-                casting.remote.volumeLevel = Number(vol.value);
+                casting.remote.volumeLevel = v;
                 return casting.controller.setVolumeLevel();
             }
-            video.volume = Number(vol.value);
-            video.muted = video.volume === 0;
-        });
+            video.volume = v;
+            video.muted = v === 0;
+        }
+
+        vol.addEventListener("input", () => setVolume(Number(vol.value)));
+        const currentVolume = () => casting ? (casting.remote.isMuted ? 0 : casting.remote.volumeLevel)
+            : video.muted ? 0 : video.volume;
+        // The mouse wheel over the picture changes the volume, also when the controls are hidden.
+        video.addEventListener("wheel", (e) => {
+            e.preventDefault();
+            setVolume(currentVolume() + (e.deltaY < 0 ? 0.05 : -0.05));
+            wake();
+        }, {passive: false});
         seek.addEventListener("input", () => {
             dragging = true;
             timeNow.textContent = M.fmtClock(seek.value * 1000);
@@ -565,7 +576,13 @@
         }
 
         fsBtn.addEventListener("click", toggleFullscreen);
-        const onFs = () => fsBtn.replaceChildren(icon(document.fullscreenElement ? "exitFullscreen" : "fullscreen"));
+        const onFs = () => {
+            // The browser itself can put only the video into full screen (its context menu, a media key);
+            // our controls are not part of that, so the browser's own controls are shown meanwhile.
+            video.controls = document.fullscreenElement === video;
+            fsBtn.replaceChildren(icon(document.fullscreenElement ? "exitFullscreen" : "fullscreen"));
+            wake();
+        };
         document.addEventListener("fullscreenchange", onFs);
 
         // ---- settings menu
@@ -625,7 +642,20 @@
             }, 3000);
         }
 
-        player.addEventListener("mousemove", wake);
+        // Listen on the whole document: in full screen some browsers send the events of the top layer
+        // past the player element.
+        // Browsers also send a move when the page changes under a resting mouse (e.g. the controls
+        // fade out), so only a real change of position counts.
+        let lastX = -1;
+        let lastY = -1;
+        const onPointer = (e) => {
+            if (e.type === "pointermove" && e.pointerType === "mouse" && e.clientX === lastX && e.clientY === lastY) return;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            wake();
+        };
+        document.addEventListener("pointermove", onPointer);
+        document.addEventListener("pointerdown", onPointer);
         player.addEventListener("touchstart", wake, {passive: true});
         wake();
 
@@ -646,6 +676,9 @@
                 toggleFullscreen();
             } else if (k === "m") {
                 video.muted = !video.muted;
+            } else if (k === "ArrowUp" || k === "ArrowDown") {
+                e.preventDefault();
+                setVolume(currentVolume() + (k === "ArrowUp" ? 0.05 : -0.05));
             } else if (k === "Escape" && !document.fullscreenElement) {
                 const m = player.querySelector(".player-menu");
                 if (m) m.remove(); else back();
@@ -1018,6 +1051,8 @@
             clearTimeout(clickTimer);
             clearTimeout(idleTimer);
             document.removeEventListener("keydown", onKey);
+            document.removeEventListener("pointermove", onPointer);
+            document.removeEventListener("pointerdown", onPointer);
             document.removeEventListener("click", closePlayerMenu);
             document.removeEventListener("fullscreenchange", onFs);
             window.removeEventListener("pagehide", onHide);

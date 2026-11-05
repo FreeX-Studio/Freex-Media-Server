@@ -1287,9 +1287,18 @@ select, .field input, .inline input {
 }
 
 .player video {
+    position: relative;
+    z-index: 0;
     width: 100%;
     height: 100%;
     display: block;
+}
+
+/* Everything over the picture gets its own layer, so that it is drawn above the video also when the
+   browser shows the video on a hardware plane (common in full screen). */
+:where(.player > :not(video)) {
+    z-index: 1;
+    will-change: opacity;
 }
 
 .player.idle {

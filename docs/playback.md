@@ -102,4 +102,5 @@ next episode is cast automatically.
 | `→` / `L` | 30 seconds forward |
 | `F` | Fullscreen |
 | `M` | Mute |
+| `↑` / `↓`, mouse wheel over the picture | Volume |
 | `Esc` | Close the player (the × at the top right does the same) |
