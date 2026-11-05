@@ -1294,11 +1294,16 @@ select, .field input, .inline input {
     display: block;
 }
 
-/* Everything over the picture gets its own layer, so that it is drawn above the video also when the
-   browser shows the video on a hardware plane (common in full screen). */
+/* Everything else in the player is drawn over the picture. */
 :where(.player > :not(video)) {
     z-index: 1;
-    will-change: opacity;
+}
+
+/* In full screen, Chrome on Windows moves the video onto a hardware overlay, which is shown above
+   the page, so the controls stay invisible even when they are shown. A filter that changes nothing
+   visible keeps the video in the normal page drawing. */
+.player:fullscreen video {
+    filter: opacity(0.9999);
 }
 
 .player.idle {
