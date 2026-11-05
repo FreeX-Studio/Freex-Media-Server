@@ -140,6 +140,12 @@
         };
         const markers = item.markers || {};
 
+        // FreeX Desktop with mpv as player: the file plays there, directly (see desktop.js).
+        if (M.desktop && !roomCode && !(M.cast && M.cast.session) && await M.desktop.usesMpv()) {
+            return M.desktop.playInMpv(item, {audio: state.audio, subtitle: state.subtitle,
+                startMs: Number(query.get("t") || 0), nextItem, nextHref});
+        }
+
         const video = h("video", {playsinline: true, preload: "auto"});
         video.volume = Math.min(1, Math.max(0, Number(M.store.get("freex.volume") ?? 1)));
         video.muted = M.store.get("freex.muted") === "1";

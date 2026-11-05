@@ -61,7 +61,8 @@
             const res = await api("POST", "/api/login", {username: user.value, password: pass.value});
             if (res.twoFactorRequired) return secondFactor(res.challenge);
             afterLogin(res);
-        }, h("p", {class: "auth-foot"}, t("On {0}", S.status.name)));
+        }, h("p", {class: "auth-foot"}, t("On {0}", S.status.name),
+            M.desktop ? [" · ", h("button", {type: "button", class: "link-btn", onclick: M.desktop.switchServer}, t("Switch server"))] : null));
     }, {auth: false, shell: false});
 
     function secondFactor(challenge) {
@@ -127,6 +128,8 @@
         ["libraries", "Libraries", true],
         ["users", "Users", true],
         ["server", "Server", true],
+        // Only inside the Windows app (see desktop.js).
+        ...(M.desktop ? [["desktop", "FreeX Desktop", false]] : []),
         ["about", "About FreeX", false],
     ];
 
@@ -141,7 +144,7 @@
                 TABS.filter(([, , admin]) => admin).map(([id, label]) => link(`/settings/${id}`, {class: "nav-link" + (id === tab ? " active" : "")}, t(label)))] : null);
         const content = h("div", {class: "settings-content"});
         main.replaceChildren(h("div", {class: "page settings"}, nav, content));
-        await {account, security, libraries, users, server, about}[tab](content);
+        await {account, security, libraries, users, server, about, desktop: M.desktop && M.desktop.settingsPage}[tab](content);
     });
 
     const panel = (title, ...children) => h("section", {class: "panel"}, h("h2", null, title), children);
@@ -680,6 +683,7 @@
     /** Product, slogan and the versions of server and web client, for every user. */
     async function about(c) {
         const st = await api("GET", "/api/status");
+        const app = M.desktop ? await M.desktop.info() : null;
         const kv = (a, b) => [h("dt", null, a), h("dd", null, b)];
         c.append(h("h1", null, t("About FreeX")),
             h("section", {class: "panel about"},
@@ -689,6 +693,7 @@
                 h("dl", {class: "kv"},
                     kv(st.server ? st.server.name : "FreeX Media Server", st.server ? st.server.version : st.version),
                     kv(`${st.web ? st.web.name : "FreeX Web"} (${t("web interface")})`, st.web ? st.web.version : ""),
+                    app ? kv(`${app.app} (${t("Windows app")})`, app.version) : null,
                     kv(t("Server name"), st.name))),
             panel(t("Source code"), h("p", null, h("a", {href: "https://github.com/LinzN/freex-media-server", target: "_blank", rel: "noopener"},
                 "github.com/LinzN/freex-media-server"))));

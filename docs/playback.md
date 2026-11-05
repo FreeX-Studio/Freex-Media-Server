@@ -93,6 +93,15 @@ next episode is cast automatically.
   plus six hours. Only URLs under `/api/cast/` may be loaded by other origins, because the receiver runs on Google's
   domain.
 
+## FreeX Desktop and mpv
+
+In the Windows app [FreeX Desktop](https://github.com/LinzN/freex-desktop) videos can play in mpv instead of the
+built-in player (*Settings → FreeX Desktop*). mpv decodes practically every format itself, so the file is always
+played directly and the server converts nothing. FreeX Web announces the playback with `"player": "external"`
+(it then appears in the activity view as *FreeX Desktop (mpv)*), hands the stream URL, the chosen audio track and
+subtitle to the app and saves the position that mpv reports. External subtitle files are passed to mpv as well,
+so all tracks can be switched in mpv. Watch Together always uses the built-in player.
+
 ## Keyboard shortcuts
 
 | Key | Action |

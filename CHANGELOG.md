@@ -2,6 +2,20 @@
 
 # Changelog
 
+## FreeX Media Server 0.14.0 · FreeX Web 1.4.0.0
+
+**FreeX Desktop: the Windows app.** [FreeX Desktop](https://github.com/LinzN/freex-desktop) shows FreeX Web from
+your server in its own window and can play every file directly with mpv. This release adds what the app needs:
+
+- FreeX Web recognizes the app and adds *Settings → FreeX Desktop* (player choice, switch server, app version),
+  *Switch server* in the account menu, on the sign-in page and when the server cannot be reached, and the app
+  version under *About FreeX*
+- Playback in mpv: the file plays directly without conversion, the position and watch state are saved as usual,
+  and the next episode starts after a short countdown
+- The player's full screen also makes the app window full screen
+- API: `POST /api/items/{id}/playback` accepts `"player": "external"` for native players that decode every format
+  themselves; the server then always plans direct play and lists the playback in the activity view
+
 ## FreeX Media Server 0.13.0 · FreeX Web 1.3.2.0
 
 **The first release of FreeX: your media, your server, your freedom.**

@@ -167,6 +167,11 @@ public final class PlaybackPlanner {
         return new Plan(Mode.TRANSCODE, audioIndex, burn, target, height, why);
     }
 
+    /** Direct play for a native player that decodes every format itself (mpv in FreeX Desktop). */
+    public static Plan external(MediaFile f, int requestedAudio) {
+        return new Plan(Mode.DIRECT, chooseAudio(f, requestedAudio), -1, 0, 0, new Text("playback.external"));
+    }
+
     /** The requested track if valid, otherwise the one flagged as default, otherwise the first. */
     static int chooseAudio(MediaFile f, int requested) {
         if (f.audioStreams.isEmpty()) return -1;

@@ -802,7 +802,9 @@ public final class MediaApi {
 
     /**
      * Decides how to play an item for this browser and, if needed, starts ffmpeg.
-     * Body: {@code {caps, quality, audio, subtitle, startMs}}.
+     * Body: {@code {caps, quality, audio, subtitle, startMs}}. With {@code "player": "external"}
+     * (a native player such as mpv in FreeX Desktop, which decodes everything itself) the file is
+     * always played directly; the call then only announces the playback in the activity list.
      */
     private void playback(Exchange ex) throws Exception {
         MediaItem it = playable(ex);
@@ -814,7 +816,9 @@ public final class MediaApi {
         long start = Math.max(0, Json.num(body, "startMs", 0));
         if (it.file.durationMs > 0 && start >= it.file.durationMs) start = 0;
 
-        PlaybackPlanner.Plan plan = PlaybackPlanner.plan(it.file, caps, quality, audio, subtitle, transcoder != null);
+        PlaybackPlanner.Plan plan = "external".equals(Json.str(body, "player", ""))
+                ? PlaybackPlanner.external(it.file, audio)
+                : PlaybackPlanner.plan(it.file, caps, quality, audio, subtitle, transcoder != null);
         String client = ActivityApi.client(Json.str(body, "client", null));
         String device = Json.str(body, "device", "");
         Map<String, Object> m = new LinkedHashMap<>();

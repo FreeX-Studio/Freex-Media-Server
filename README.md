@@ -21,7 +21,8 @@ browser, converting on the fly when a device cannot play a file. No account with
 telemetry: your media stays on your hardware.
 
 It is the core of **FreeX**, a family of apps around one server. The web client **FreeX Web** is built in;
-native apps for iOS, Android and TV are planned and will use the same API.
+the Windows app **FreeX Desktop** shows it in its own window and plays every file directly with mpv; native
+apps for iOS, Android and TV are planned and will use the same API.
 
 <p align="center">
   <img src="docs/screenshots/library.png" alt="Movie library with poster grid" width="49%">
@@ -55,6 +56,7 @@ native apps for iOS, Android and TV are planned and will use the same API.
 |---|---|---|
 | **FreeX Media Server** | The core: libraries, users, streaming, conversion and the API | this repository |
 | **FreeX Web** | Web interface and browser client, served by the server | included (`src/main/resources/web`) |
+| **FreeX Desktop** | Windows app, plays every file directly with mpv | [LinzN/freex-desktop](https://github.com/LinzN/freex-desktop) |
 | **FreeX iOS** | Native iPhone and iPad app | planned |
 | **FreeX Android** | App for Android smartphones and tablets | planned |
 | **FreeX TV** | Smart TV and streaming device apps | later |

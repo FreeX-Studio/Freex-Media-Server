@@ -413,7 +413,9 @@ window.FreeX = (() => {
             } catch (e) {
                 document.getElementById("app").replaceChildren(h("div", {class: "auth"},
                     h("div", {class: "auth-box"}, h("h1", null, t("Server not reachable")), h("p", null, e.message),
-                        h("button", {class: "btn", onclick: () => location.reload()}, t("Try again")))));
+                        h("div", {class: "btn-row center"},
+                            h("button", {class: "btn", onclick: () => location.reload()}, t("Try again")),
+                            window.FreeX.desktop ? h("button", {class: "btn", onclick: () => window.FreeX.desktop.switchServer()}, t("Switch server")) : null))));
                 return;
             }
             document.title = S.status.name;
@@ -609,6 +611,7 @@ window.FreeX = (() => {
                     null,
                     {label: t("Account and security"), onclick: () => navigate("/settings/security")},
                     S.user.admin ? {label: t("Server settings"), onclick: () => navigate("/settings/libraries")} : undefined,
+                    window.FreeX.desktop ? {label: t("Switch server"), onclick: () => window.FreeX.desktop.switchServer()} : undefined,
                     null,
                     {label: t("Sign out"), onclick: logout},
                 ])}, avatar(S.user));
