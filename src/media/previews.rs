@@ -83,17 +83,19 @@ pub fn grid(duration_ms: i64) -> (i64, i64, i64) {
 pub struct Previews {
     dir: PathBuf,
     ffmpeg: String,
+    /// zscale and tonemap are there: frames of HDR videos get natural colours.
+    tonemap: bool,
     queued: Mutex<HashSet<String>>,
     serial: tokio::sync::Mutex<()>,
 }
 
 impl Previews {
-    pub fn new(cache_dir: &Path, ffmpeg: String) -> Previews {
+    pub fn new(cache_dir: &Path, ffmpeg: String, tonemap: bool) -> Previews {
         let dir = cache_dir.join("previews");
         if let Err(e) = std::fs::create_dir_all(&dir) {
             tracing::warn!("Cannot create {}: {e}", dir.display());
         }
-        Previews { dir, ffmpeg, queued: Mutex::default(), serial: tokio::sync::Mutex::new(()) }
+        Previews { dir, ffmpeg, tonemap, queued: Mutex::default(), serial: tokio::sync::Mutex::new(()) }
     }
 
     /// Movies and episodes with a picture and a length worth scrubbing through.
@@ -178,7 +180,10 @@ impl Previews {
         c.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-skip_frame", "nokey", "-i"])
             .arg(&file.path)
             .args(["-map", "0:v:0", "-an", "-sn", "-dn", "-vf"])
-            .arg(format!("fps=1/{interval}:round=down,scale={FRAME_WIDTH}:-2:flags=fast_bilinear,tile={COLUMNS}x{rows}"))
+            .arg(format!(
+                "fps=1/{interval}:round=down,scale={FRAME_WIDTH}:-2:flags=fast_bilinear,{}tile={COLUMNS}x{rows}",
+                if self.tonemap && file.tone_mappable() { format!("{},", super::probe::SOFTWARE_TONEMAP) } else { String::new() }
+            ))
             .args(["-frames:v", "1", "-q:v", "5", "-update", "1"])
             .arg(&tmp)
             .stdout(Stdio::null())

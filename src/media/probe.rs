@@ -28,6 +28,21 @@ pub struct Tools {
     pub ffmpeg: String,
     pub ffprobe_ok: bool,
     pub ffmpeg_ok: bool,
+    /// Filters of this ffmpeg build that tone mapping needs.
+    pub tonemap: Tonemap,
+}
+
+/// HDR (PQ or HLG, BT.2020) to SDR (BT.709) in software: to linear light, the primaries to
+/// BT.709, the Hable curve, back to the BT.709 transfer.
+pub const SOFTWARE_TONEMAP: &str =
+    "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv";
+
+/// Which tone mapping filters ffmpeg has: `zscale` and `tonemap` in software (needs zimg),
+/// `tonemap_vaapi` for VAAPI.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Tonemap {
+    pub software: bool,
+    pub vaapi: bool,
 }
 
 impl Tools {
@@ -40,8 +55,22 @@ impl Tools {
         if !ffmpeg_ok {
             tracing::warn!("ffmpeg not found ('{ffmpeg}'): no generated thumbnails and no conversion");
         }
-        Tools { ffprobe, ffmpeg, ffprobe_ok, ffmpeg_ok }
+        let tonemap = if ffmpeg_ok { tonemap_filters(&ffmpeg).await } else { Tonemap::default() };
+        if ffmpeg_ok && !tonemap.software {
+            tracing::info!("This ffmpeg has no zscale filter: converted HDR videos keep their washed-out colours");
+        }
+        Tools { ffprobe, ffmpeg, ffprobe_ok, ffmpeg_ok, tonemap }
     }
+}
+
+async fn tonemap_filters(ffmpeg: &str) -> Tonemap {
+    let mut c = command(ffmpeg);
+    c.args(["-hide_banner", "-filters"]).stdout(Stdio::piped()).stderr(Stdio::null());
+    let Ok(Ok(out)) = tokio::time::timeout(Duration::from_secs(10), c.output()).await else { return Tonemap::default() };
+    let names: Vec<String> =
+        String::from_utf8_lossy(&out.stdout).lines().filter_map(|l| l.split_whitespace().nth(1).map(str::to_string)).collect();
+    let has = |n: &str| names.iter().any(|x| x == n);
+    Tonemap { software: has("zscale") && has("tonemap"), vaapi: has("tonemap_vaapi") }
 }
 
 /// A bare program name is taken from the `ffmpeg` folder next to the server if there is one
@@ -238,6 +267,12 @@ pub fn apply(json: &Value, f: &mut MediaFile) {
                 f.pixel_format = s(st, "pix_fmt");
                 f.width = n(st, "width") as i32;
                 f.height = n(st, "height") as i32;
+                f.color_transfer = s(st, "color_transfer");
+                f.color_primaries = s(st, "color_primaries");
+                f.dovi_profile = st["side_data_list"]
+                    .as_array()
+                    .and_then(|l| l.iter().find(|d| s(d, "side_data_type").contains("DOVI")))
+                    .map_or(0, |d| n(d, "dv_profile") as i32);
                 f.video_stream_index = index;
                 have_video = true;
             }

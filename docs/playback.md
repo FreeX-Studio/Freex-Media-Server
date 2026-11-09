@@ -6,6 +6,7 @@
 - [Hardware acceleration](#hardware-acceleration)
 - [Audio tracks and subtitles](#audio-tracks-and-subtitles)
 - [Skip intro and credits](#skip-intro-and-credits)
+- [HDR](#hdr)
 - [Seek previews](#seek-previews)
 - [Chapters](#chapters)
 - [Watch Together](#watch-together)
@@ -73,6 +74,19 @@ version.
 
 During playback a *Skip intro* button appears in the intro. When the credits start, *Next episode* appears with a
 countdown; for the last episode *Skip credits*.
+
+## HDR
+
+HDR10, HLG and Dolby Vision files are recognised during the scan (the item page shows it next to the video codec).
+Direct play leaves the picture to the device, which shows HDR or converts it itself. When the server converts such a
+file, ffmpeg tone maps it to ordinary SDR (BT.709) on the way, so the picture keeps its colours instead of looking
+pale and washed out: in software with `zscale` and `tonemap` (the Hable curve), with VAAPI on the graphics chip
+(`tonemap_vaapi`) when the driver offers it. Thumbnails and seek previews of HDR files are tone mapped as well.
+
+Software tone mapping needs an ffmpeg built with zimg (Debian and Ubuntu ship it that way). The server checks the
+filters at start; without them it logs a note and converts as before. It costs CPU: a 4K HDR film needs a decent processor or VAAPI.
+Dolby Vision profile 5 has no HDR10 base layer and cannot be converted with the right colours; profiles 7 and 8 are
+converted from their HDR10 layer.
 
 ## Seek previews
 

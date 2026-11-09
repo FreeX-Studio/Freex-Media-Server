@@ -28,6 +28,9 @@
 - **Quality per user and network:** a default quality for the home network and for on the go, kept on the server
   and remembered from the player; *Automatic* plays the original at home and picks the quality from the measured
   connection on the go (see [Playback](docs/playback.md#how-a-file-is-played))
+- **HDR tone mapping:** converted HDR10, HLG and Dolby Vision (profiles 7 and 8) videos are tone mapped to SDR, in
+  software or with VAAPI, and keep their colours; thumbnails and seek previews too. The item page shows HDR
+  (see [Playback](docs/playback.md#hdr)). Files are probed once more on the next scan
 - FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; *Automatic* quality and the quality defaults under Account; a switch for the previews in the server settings
 
 ## FreeX Media Server 0.20.0 · FreeX Web 1.5.0.0

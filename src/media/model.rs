@@ -20,7 +20,7 @@ use serde_json::{Value, json};
 
 /// Version of the probe data. Files probed with an older version are probed again on the next
 /// scan, so new fields get filled for existing libraries.
-pub const PROBE_VERSION: i32 = 3;
+pub const PROBE_VERSION: i32 = 4;
 
 /// Subtitle codecs that can be converted to WebVTT; everything else is a bitmap format.
 const TEXT_SUBTITLE_CODECS: [&str; 16] = [
@@ -255,6 +255,11 @@ pub struct MediaFile {
     pub audio_streams: Vec<AudioStream>,
     pub subtitle_streams: Vec<SubtitleStream>,
     pub chapters: Vec<Chapter>,
+    /// Transfer characteristic and primaries of the video (`smpte2084`, `arib-std-b67`, `bt2020`).
+    pub color_transfer: String,
+    pub color_primaries: String,
+    /// Dolby Vision profile (5, 7, 8), 0 without Dolby Vision.
+    pub dovi_profile: i32,
 }
 
 impl Default for MediaFile {
@@ -281,6 +286,9 @@ impl Default for MediaFile {
             audio_streams: Vec::new(),
             subtitle_streams: Vec::new(),
             chapters: Vec::new(),
+            color_transfer: String::new(),
+            color_primaries: String::new(),
+            dovi_profile: 0,
         }
     }
 }
@@ -288,6 +296,25 @@ impl Default for MediaFile {
 impl MediaFile {
     pub fn probe_current(&self) -> bool {
         self.probed && self.probe_version >= PROBE_VERSION
+    }
+
+    /// The kind of high dynamic range video: `HDR10`, `HLG` or `Dolby Vision`; None for SDR.
+    pub fn hdr(&self) -> Option<&'static str> {
+        if self.dovi_profile > 0 {
+            Some("Dolby Vision")
+        } else {
+            match self.color_transfer.as_str() {
+                "smpte2084" => Some("HDR10"),
+                "arib-std-b67" => Some("HLG"),
+                _ => None,
+            }
+        }
+    }
+
+    /// Whether the picture can be tone mapped from its HDR10 or HLG signal: not for Dolby Vision
+    /// profile 5, which has no such base layer.
+    pub fn tone_mappable(&self) -> bool {
+        self.hdr().is_some() && self.dovi_profile != 5
     }
 
     pub fn file_name(&self) -> &str {
@@ -350,6 +377,8 @@ impl MediaFile {
             "bitrate": self.bitrate,
             "audioChannels": self.audio_channels,
             "resolution": self.resolution_label(),
+            "hdr": self.hdr(),
+            "doviProfile": (self.dovi_profile > 0).then_some(self.dovi_profile),
             "fileName": self.file_name(),
             "audio": audio,
             "subtitles": subs,

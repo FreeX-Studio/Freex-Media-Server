@@ -175,7 +175,18 @@ struct Job {
     hw: String,
     vaapi_device: String,
     preset: String,
+    /// HDR to SDR: None, in software (zscale + tonemap) or with VAAPI (tonemap_vaapi).
+    tonemap: ToneMapping,
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ToneMapping {
+    None,
+    Software,
+    Vaapi,
+}
+
+use probe::SOFTWARE_TONEMAP;
 
 pub struct Transcoder {
     ffmpeg: String,
@@ -183,12 +194,19 @@ pub struct Transcoder {
     root: PathBuf,
     config: Config,
     priority: Vec<String>,
+    tonemap: probe::Tonemap,
     sessions: Mutex<HashMap<String, Arc<Session>>>,
     keyframes: Mutex<Vec<(String, Arc<Vec<i64>>)>>,
 }
 
 impl Transcoder {
-    pub fn new(ffmpeg: String, ffprobe: Option<String>, root: PathBuf, config: Config) -> std::io::Result<Arc<Transcoder>> {
+    pub fn new(
+        ffmpeg: String,
+        ffprobe: Option<String>,
+        root: PathBuf,
+        config: Config,
+        tonemap: probe::Tonemap,
+    ) -> std::io::Result<Arc<Transcoder>> {
         std::fs::create_dir_all(&root)?;
         clean_directory(&root); // leftovers from a crash
         if config.hardware_acceleration != "none" {
@@ -200,6 +218,7 @@ impl Transcoder {
             root,
             config,
             priority: probe::low_priority(),
+            tonemap,
             sessions: Mutex::default(),
             keyframes: Mutex::default(),
         });
@@ -248,6 +267,16 @@ impl Transcoder {
         // VAAPI cannot overlay bitmap subtitles in this simple pipeline; burn-ins use the software path.
         let hw = if !transcode || (plan.burn_subtitle >= 0 && hw == "vaapi") { "none".to_string() } else { hw.clone() };
         let audio_stream = usize::try_from(plan.audio_index).ok().and_then(|i| f.audio_streams.get(i)).map(|a| a.stream_index);
+        // HDR video converted for an ordinary (SDR) screen, or the colours look washed out.
+        let tonemap = if !transcode || !f.tone_mappable() {
+            ToneMapping::None
+        } else if hw == "vaapi" && self.tonemap.vaapi {
+            ToneMapping::Vaapi
+        } else if self.tonemap.software {
+            ToneMapping::Software
+        } else {
+            ToneMapping::None
+        };
         let job = Job {
             ffmpeg: self.ffmpeg.clone(),
             file: f,
@@ -259,6 +288,7 @@ impl Transcoder {
             hw,
             vaapi_device: self.config.vaapi_device.clone(),
             preset: self.config.preset.clone(),
+            tonemap,
         };
         let id = crate::auth::id();
         let dir = self.root.join(&id);
@@ -374,12 +404,20 @@ fn command(j: &Job, start_ms: i64) -> Vec<String> {
             input.clear();
         }
         let h = j.max_height;
+        let software_scale = if h > 0 { format!("scale=-2:'min({h},ih)'") } else { "scale=-2:ih".into() };
+        let software_tonemap = if j.tonemap == ToneMapping::Software { format!("{SOFTWARE_TONEMAP},") } else { String::new() };
         if j.hw == "vaapi" {
             let scale = if h > 0 { format!("scale_vaapi=w=-2:h='min({h},ih)'") } else { "null".into() };
-            filters.push(format!("{input}format=nv12,hwupload,{scale}"));
+            match j.tonemap {
+                ToneMapping::Vaapi => {
+                    filters.push(format!("{input}format=p010,hwupload,tonemap_vaapi=format=nv12:t=bt709:m=bt709:p=bt709,{scale}"))
+                }
+                // Scaled down first in software, so that tone mapping has fewer pixels to do.
+                ToneMapping::Software => filters.push(format!("{input}{software_scale},{software_tonemap}format=nv12,hwupload")),
+                ToneMapping::None => filters.push(format!("{input}format=nv12,hwupload,{scale}")),
+            }
         } else {
-            let scale = if h > 0 { format!("scale=-2:'min({h},ih)'") } else { "scale=-2:ih".into() };
-            filters.push(format!("{input}{scale},format=yuv420p"));
+            filters.push(format!("{input}{software_scale},{software_tonemap}format=yuv420p"));
         }
         add(&mut c, &["-filter_complex", &format!("{}[v]", filters.join(",")), "-map", "[v]"]);
     } else {
@@ -402,6 +440,9 @@ fn command(j: &Job, start_ms: i64) -> Vec<String> {
             _ => add(&mut c, &["-c:v", "libx264", "-preset", &j.preset, "-profile:v", "high", "-level:v", "4.1", "-sc_threshold", "0"]),
         }
         add(&mut c, &["-b:v", &br, "-maxrate", &br, "-bufsize", &(j.video_bitrate * 2).to_string(), "-force_key_frames", &gop]);
+        if j.tonemap != ToneMapping::None {
+            add(&mut c, &["-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709"]);
+        }
     } else {
         add(&mut c, &["-c:v", "copy"]);
         if codec_kind(&f.video_codec) == "hevc" {
@@ -490,6 +531,7 @@ mod tests {
             hw: "none".into(),
             vaapi_device: String::new(),
             preset: "veryfast".into(),
+            tonemap: ToneMapping::None,
         };
         let c = command(&job, 8000).join(" ");
         assert!(c.contains("-noaccurate_seek -ss 8.001 -copyts"));
@@ -500,5 +542,14 @@ mod tests {
         assert!(c.contains("[0:0][0:3]overlay=eof_action=pass,scale=-2:'min(720,ih)',format=yuv420p[v]"));
         assert!(c.contains("-force_key_frames expr:gte(t,n_forced*4.000)"));
         assert!(!c.contains("-ss"));
+        // HDR: tone mapped after scaling, and tagged as BT.709.
+        let hdr = Job { burn_subtitle: -1, tonemap: ToneMapping::Software, ..t };
+        let c = command(&hdr, 0).join(" ");
+        assert!(c.contains(&format!("[0:0]scale=-2:'min(720,ih)',{SOFTWARE_TONEMAP},format=yuv420p[v]")));
+        assert!(c.contains("-color_trc bt709"));
+        let vaapi = Job { hw: "vaapi".into(), tonemap: ToneMapping::Vaapi, ..hdr };
+        assert!(
+            command(&vaapi, 0).join(" ").contains("format=p010,hwupload,tonemap_vaapi=format=nv12:t=bt709:m=bt709:p=bt709,scale_vaapi")
+        );
     }
 }

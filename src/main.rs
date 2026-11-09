@@ -156,9 +156,9 @@ fn run(config_path: PathBuf) -> Result<Outcome, String> {
                 tracing::info!("Seek previews are switched off (previews.enabled)");
                 None
             } else {
-                ffmpeg.clone().map(|f| media::previews::Previews::new(&cache, f))
+                ffmpeg.clone().map(|f| media::previews::Previews::new(&cache, f, tools.tonemap.software))
             };
-            let thumbs = media::thumbs::Thumbs::new(cache, ffmpeg.clone());
+            let thumbs = media::thumbs::Thumbs::new(cache, ffmpeg.clone(), tools.tonemap.software);
             let markers = if !config.markers.enabled {
                 tracing::info!("Intro/credits detection is switched off (markers.enabled)");
                 None
@@ -174,7 +174,7 @@ fn run(config_path: PathBuf) -> Result<Outcome, String> {
             } else {
                 let ffprobe = tools.ffprobe_ok.then(|| tools.ffprobe.clone());
                 let dir = config.transcode_dir();
-                match transcode::Transcoder::new(tools.ffmpeg.clone(), ffprobe, dir.clone(), config.transcoder.clone()) {
+                match transcode::Transcoder::new(tools.ffmpeg.clone(), ffprobe, dir.clone(), config.transcoder.clone(), tools.tonemap) {
                     Ok(t) => Some(t),
                     Err(e) => {
                         tracing::error!("Conversion is off: cannot use {}: {e}", dir.display());

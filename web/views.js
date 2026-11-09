@@ -257,7 +257,7 @@
                     a.setAttribute("href", playUrl(it, i > 0)));
             };
             const m = it.media;
-            const videoText = [m.resolution, M.codecName(m.videoCodec), m.bitrate ? M.fmtBitrate(m.bitrate) : ""].filter(Boolean).join(" ");
+            const videoText = [m.resolution, M.codecName(m.videoCodec), m.hdr || "", m.bitrate ? M.fmtBitrate(m.bitrate) : ""].filter(Boolean).join(" ");
             const audioSel = m.audio.length > 1 ? h("select", {"aria-label": t("Audio track"), onchange: (e) => save("audio", Number(e.target.value))},
                 m.audio.map((a) => h("option", {value: a.index, selected: saved.audio != null ? saved.audio === a.index : a.index === def.audio}, M.audioLabel(a))))
                 : h("span", null, m.audio.length ? M.audioLabel(m.audio[0]) : t("No audio"));

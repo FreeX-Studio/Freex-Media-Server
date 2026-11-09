@@ -28,6 +28,8 @@ const RETRY_AFTER_MS: i64 = 6 * 3600 * 1000;
 pub struct Thumbs {
     dir: PathBuf,
     ffmpeg: Option<String>,
+    /// zscale and tonemap are there: frames of HDR videos get natural colours.
+    tonemap: bool,
     /// At most two ffmpeg processes at once: a library page can ask for dozens of frames.
     slots: Semaphore,
     /// One extraction per item at a time.
@@ -37,12 +39,12 @@ pub struct Thumbs {
 
 impl Thumbs {
     /// `ffmpeg` is None when it is not available; then only already cached frames are served.
-    pub fn new(cache_dir: PathBuf, ffmpeg: Option<String>) -> Thumbs {
+    pub fn new(cache_dir: PathBuf, ffmpeg: Option<String>, tonemap: bool) -> Thumbs {
         let dir = cache_dir.join("thumbs");
         if let Err(e) = std::fs::create_dir_all(&dir) {
             tracing::warn!("Cannot create {}: {e}", dir.display());
         }
-        Thumbs { dir, ffmpeg, slots: Semaphore::new(2), locks: Mutex::default(), failed: Mutex::default() }
+        Thumbs { dir, ffmpeg, tonemap, slots: Semaphore::new(2), locks: Mutex::default(), failed: Mutex::default() }
     }
 
     /// The cached frame of a movie or episode, made if needed; None if there is none.
@@ -74,6 +76,11 @@ impl Thumbs {
         result
     }
 
+    /// `scale` followed by tone mapping for HDR videos.
+    fn filter(&self, file: &super::MediaFile, scale: &str) -> String {
+        if self.tonemap && file.tone_mappable() { format!("{scale},{}", super::probe::SOFTWARE_TONEMAP) } else { scale.to_string() }
+    }
+
     async fn extract(&self, ffmpeg: &str, item: &Item, out: &std::path::Path) -> bool {
         let Some(file) = &item.file else { return false };
         // Skip intros and black frames: 15 % in, but at most 5 minutes; 30 s if the length is unknown.
@@ -82,7 +89,7 @@ impl Thumbs {
         let mut c = command(ffmpeg);
         c.args(["-hide_banner", "-loglevel", "error", "-y", "-ss", &format!("{:.3}", seek_ms as f64 / 1000.0), "-i"])
             .arg(&file.path)
-            .args(["-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "4"])
+            .args(["-frames:v", "1", "-vf", &self.filter(file, "scale=640:-2"), "-q:v", "4"])
             .arg(&tmp)
             .stdout(Stdio::null())
             .stderr(Stdio::null());
