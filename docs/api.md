@@ -62,7 +62,7 @@ every language, so apps can react to it:
 | `GET` | `/api/libraries/{id}/collections` | Collections of a library |
 | `GET` | `/api/hubs` | Rows of the home screen |
 | `GET` | `/api/search?q=` | Search |
-| `GET` | `/api/items/{id}` | Details, with seasons and episodes; for movies and episodes `media` (tracks, subtitles, `chapters`), `markers` and `previews`; for movies and shows `extras` (entries of type `extra` with `extraType`; they play like movies, keep no progress and do not appear in lists or search) |
+| `GET` | `/api/items/{id}` | Details, with seasons and episodes; for movies and episodes `media` (tracks, subtitles, `chapters`), `markers` and `previews`; for movies in several versions `versions` (`id`, `label`, `resolution`, `videoCodec`, `size`, `primary`, `current`; a version id works wherever an item id does, e.g. `/api/items/{versionId}/playback`, and its progress is the movie's); for movies and shows `extras` (entries of type `extra` with `extraType`; they play like movies, keep no progress and do not appear in lists or search) |
 | `GET` | `/api/items/{id}/image/{poster\|backdrop\|thumb}` | Artwork |
 | `GET` | `/api/items/{id}/previews` | Seek preview sprite sheet (JPEG). The grid is `previews` in the item details: `{intervalMs, width, height, columns, rows, count, version}`; frame `n` shows `n × intervalMs` and sits in column `n % columns`, row `n / columns`. Missing while it is not made yet |
 | `POST` | `/api/items/{id}/playback` | `{caps, quality, audio, subtitle, startMs}` → playback mode and stream URL; with `"player": "external"` (a native player that decodes every format, e.g. mpv in FreeX Desktop) always direct play |

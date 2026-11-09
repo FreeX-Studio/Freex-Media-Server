@@ -62,6 +62,7 @@ FreeXI18n.add("de", {
     "Back": "Zurück",
     "Back 10 seconds": "10 Sekunden zurück",
     "Chapters": "Kapitel",
+    "Version": "Version",
     "Trailers and extras": "Trailer und Extras",
     "Featurette": "Featurette",
     "Behind the scenes": "Hinter den Kulissen",

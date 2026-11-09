@@ -858,6 +858,12 @@ window.FreeX = (() => {
         return Object.values(EXTRA_LABELS).includes(item.title) ? t(item.title) : item.title;
     }
 
+    /** "4K · 2160p HEVC · 18.2 GB": what tells the versions of a movie apart. */
+    function versionLabel(v) {
+        const parts = [v.label, v.resolution, codecName(v.videoCodec), v.size ? fmtSize(v.size) : ""].filter(Boolean);
+        return parts.filter((p, i) => parts.indexOf(p) === i).join(" · ") || v.fileName;
+    }
+
     /** A trailer or other extra: plays at once, it has no page of its own. */
     function extraCard(item) {
         const title = extraTitle(item);
@@ -920,7 +926,7 @@ window.FreeX = (() => {
             row);
     }
 
-    return {S, store, noteBuild, extraTitle, t, tn, tParts, num, locale, h, ICONS, icon, fmtDuration, fmtClock, fmtDate, fmtSize, fmtBitrate, language, codecName, channels,
+    return {S, store, noteBuild, extraTitle, versionLabel, t, tn, tParts, num, locale, h, ICONS, icon, fmtDuration, fmtClock, fmtDate, fmtSize, fmtBitrate, language, codecName, channels,
         audioLabel, subtitleLabel, episodeCode, deviceName, toast, img, art, api, ApiError, logoutLocal, logout, route,
         navigate, link, render, emptyState, popup, closeMenus, refreshLibraries, renderSidebar, card, hubRow, isWatched,
         setWatched, playHref, itemMenu, progressBar, unwatchedBadge, menuExtensions, PREF_LANGS, defaultTracks, avatar,

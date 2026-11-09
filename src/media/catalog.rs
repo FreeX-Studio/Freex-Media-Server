@@ -29,14 +29,25 @@ pub struct Index {
     top: HashMap<String, Vec<Arc<Item>>>,
     /// Extras by the id of their movie or show; they are neither children nor top-level entries.
     extras: HashMap<String, Vec<Arc<Item>>>,
+    /// Stand-in entries for the versions of movies with several files, by version id.
+    versions: HashMap<String, Arc<Item>>,
 }
 
 impl Index {
-    fn build(items: HashMap<String, Arc<Item>>) -> Index {
+    pub(crate) fn build(items: HashMap<String, Arc<Item>>) -> Index {
         let mut children: HashMap<String, Vec<Arc<Item>>> = HashMap::new();
         let mut top: HashMap<String, Vec<Arc<Item>>> = HashMap::new();
         let mut extras: HashMap<String, Vec<Arc<Item>>> = HashMap::new();
+        let mut versions: HashMap<String, Arc<Item>> = HashMap::new();
         for it in items.values() {
+            for v in &it.versions {
+                let mut one = Item::clone(it);
+                one.id = v.id.clone();
+                one.file = Some(v.file.clone());
+                one.versions = Vec::new();
+                one.version_of = Some(it.id.clone());
+                versions.insert(v.id.clone(), Arc::new(one));
+            }
             if it.kind == Kind::Extra {
                 if let Some(p) = &it.parent_id {
                     extras.entry(p.clone()).or_default().push(it.clone());
@@ -57,7 +68,7 @@ impl Index {
         for list in extras.values_mut() {
             list.sort_by(|a, b| extra_order(&a.extra_type).cmp(&extra_order(&b.extra_type)).then_with(|| a.sort_title.cmp(&b.sort_title)));
         }
-        Index { items, children, top, extras }
+        Index { items, children, top, extras, versions }
     }
 
     /// Trailers, featurettes and other bonus videos of a movie or show.
@@ -65,8 +76,14 @@ impl Index {
         self.extras.get(id).map_or(&[], Vec::as_slice)
     }
 
+    /// An entry by id; a version id gives a stand-in for the movie with just that file.
     pub fn item(&self, id: &str) -> Option<&Arc<Item>> {
-        self.items.get(id)
+        self.items.get(id).or_else(|| self.versions.get(id))
+    }
+
+    /// The stand-in entries of all versions of a movie, in the movie's order.
+    pub fn versions_of(&self, it: &Item) -> Vec<&Arc<Item>> {
+        it.versions.iter().filter_map(|v| self.versions.get(&v.id)).collect()
     }
 
     pub fn parent(&self, it: &Item) -> Option<&Arc<Item>> {

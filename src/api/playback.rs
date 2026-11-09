@@ -244,7 +244,9 @@ pub async fn progress(
         // Trailers and bonus videos keep no resume position and no history.
         return ok(Progress::default().to_json());
     }
-    let old = app.db.progress(&u.id, &it.id);
+    // A version of a movie shares the movie's watch state.
+    let key = it.key().to_string();
+    let old = app.db.progress(&u.id, &key);
     let now = now_ms();
     let p = if duration > 0 && offset as f64 >= duration as f64 * WATCHED_THRESHOLD {
         let new_view = !old.watched || old.offset_ms > 0;
@@ -257,7 +259,7 @@ pub async fn progress(
     } else {
         Progress { offset_ms: offset, updated_at: now, ..old }
     };
-    app.db.set_progress(&u.id, &it.id, p);
+    app.db.set_progress(&u.id, &key, p);
     ok(p.to_json())
 }
 
@@ -273,7 +275,7 @@ fn record_history(app: &AppState, idx: &Index, u: &User, it: &Item, now: i64) {
     } else {
         String::new()
     };
-    app.db.add_history(&u.id, &it.id, now, &it.title, &parent);
+    app.db.add_history(&u.id, it.key(), now, &it.title, &parent);
 }
 
 /// Marks an item (a movie, an episode, or all episodes of a season or show) as watched or not.
@@ -293,13 +295,13 @@ fn set_watched(app: &AppState, ctx: &Ctx, id: &str, watched: bool) -> ApiResult 
     let mut leaves = Vec::new();
     collect_leaves(&idx, &it, &mut leaves);
     for leaf in leaves {
-        let old = app.db.progress(&u.id, &leaf.id);
+        let old = app.db.progress(&u.id, leaf.key());
         let p = if watched {
             Progress { offset_ms: 0, watched: true, view_count: old.view_count.max(1), updated_at: now }
         } else {
             Progress { offset_ms: 0, watched: false, view_count: old.view_count, updated_at: now }
         };
-        app.db.set_progress(&u.id, &leaf.id, p);
+        app.db.set_progress(&u.id, leaf.key(), p);
     }
     ok(View::new(app, &idx, u).decorate(&it, false))
 }

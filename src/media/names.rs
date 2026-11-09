@@ -126,6 +126,27 @@ pub fn title_year(name: &str) -> TitleYear {
     TitleYear { title, year }
 }
 
+static EDITION: LazyLock<Regex> = LazyLock::new(|| re(r"(?i)\{\s*edition\s*[-=:]\s*([^}]+)\}"));
+
+/// What sets one version of a movie apart, from its file name: the edition tag
+/// (`{edition-Director's Cut}`) or what follows the year (`Inception (2010) - 4K` → `4K`).
+/// Empty if the name says nothing.
+pub fn version_label(base: &str) -> String {
+    if let Some(c) = EDITION.captures(base).ok().flatten() {
+        return cleanup(&c[1]);
+    }
+    let s = TMDB_TAG.replace_all(base, " ");
+    let s = OTHER_ID_TAG.replace_all(&s, " ");
+    let s = normalize_separators(&s);
+    let Some(m) = YEAR.captures_iter(&s).flatten().filter_map(|c| c.get(1)).filter(|m| m.start() > 0).last() else {
+        return String::new();
+    };
+    let rest = s[m.end()..].trim_start_matches([')', ']']);
+    let rest = cleanup(&BRACKETS.replace_all(rest, " ").replace(['(', ')', '[', ']'], " "));
+    let rest = rest.trim_matches(|c: char| c == '-' || c == '–' || c == '.' || c.is_whitespace());
+    rest.chars().take(40).collect::<String>().trim().to_string()
+}
+
 /// Season number from a folder name, or -1 when the folder is not a season folder.
 pub fn season_from_folder(folder: &str) -> i32 {
     let f = folder.trim();
@@ -221,6 +242,15 @@ mod tests {
     fn ty(s: &str) -> (String, i32) {
         let t = title_year(s);
         (t.title, t.year)
+    }
+
+    #[test]
+    fn version_labels() {
+        assert_eq!(version_label("Inception (2010) - 4K"), "4K");
+        assert_eq!(version_label("Blade Runner (1982) {edition-Final Cut}"), "Final Cut");
+        assert_eq!(version_label("Inception (2010)"), "");
+        assert_eq!(version_label("Inception.2010.1080p.BluRay"), "1080p BluRay");
+        assert_eq!(version_label("Inception"), "");
     }
 
     #[test]

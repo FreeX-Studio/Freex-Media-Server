@@ -62,7 +62,26 @@ impl<'a> View<'a> {
             m.as_object_mut().expect("object").remove("summary");
         }
         if it.kind.playable() {
-            m["progress"] = self.progress(&it.id).to_json();
+            m["progress"] = self.progress(it.key()).to_json();
+        }
+        if let Some(of) = &it.version_of {
+            m["versionOf"] = json!(of);
+        }
+        // All versions of a movie, also in the view of one version (the player switches with it).
+        if full && let Some(owner) = self.idx.item(it.key()).filter(|o| o.versions.len() > 1) {
+            let current = it.file.as_ref().map(|f| f.path.as_str());
+            let list: Vec<Value> = owner
+                .versions
+                .iter()
+                .enumerate()
+                .map(|(i, v)| {
+                    let f = &v.file;
+                    json!({"id": v.id, "label": v.label, "resolution": f.resolution_label(), "videoCodec": f.video_codec,
+                           "width": f.width, "height": f.height, "bitrate": f.bitrate, "size": f.size, "durationMs": f.duration_ms,
+                           "fileName": f.file_name(), "primary": i == 0, "current": Some(f.path.as_str()) == current})
+                })
+                .collect();
+            m["versions"] = json!(list);
         }
         if matches!(it.kind, Kind::Movie | Kind::Show) {
             m["onWatchlist"] = json!(self.watchlist.contains(&it.id));

@@ -17,8 +17,9 @@
 //! state survives rescans; unchanged files keep their probe data. A folder that is missing (an
 //! unmounted disk) keeps its old entries instead of emptying the library.
 
+use super::catalog::Index;
 use super::names::{self, sort_title, title_year};
-use super::{Item, Kind, MediaFile, Subtitle, nfo, probe};
+use super::{Item, Kind, MediaFile, Subtitle, Version, nfo, probe};
 use crate::AppState;
 use crate::auth::{now_ms, sha256};
 use crate::db::Library;
@@ -165,7 +166,7 @@ impl Scanner {
 
 async fn scan_now(app: &Arc<AppState>, lib: Library) {
     let start = Instant::now();
-    let previous: HashMap<String, Arc<Item>> = app.catalog.snapshot().of_library(&lib.id).map(|it| (it.id.clone(), it.clone())).collect();
+    let previous = previous_entries(&app.catalog.snapshot(), &lib.id);
     let probe_ok = app.tools.ffprobe_ok;
     let walk_lib = lib.clone();
     let built = tokio::task::spawn_blocking(move || Build::run(&walk_lib, previous, probe_ok)).await;
@@ -199,6 +200,9 @@ async fn scan_now(app: &Arc<AppState>, lib: Library) {
         }
     }
 
+    if lib.kind == "movies" {
+        merge_versions(&lib.id, &mut items);
+    }
     finish_shows(&lib, &mut items);
     app.metadata.apply_all(&mut items);
     let count = items.len();
@@ -209,6 +213,96 @@ async fn scan_now(app: &Arc<AppState>, lib: Library) {
     crate::markers::Service::analyze_library(app, &lib.id, false);
     super::previews::Previews::generate_library(app, &lib.id, false);
     tracing::info!("Scanned library '{}': {count} entries, {probed} files probed, {} ms", lib.name, start.elapsed().as_millis());
+}
+
+/// The entries of the last scan by id. A movie with several versions is listed once per file,
+/// under the id it would have with just that file, so unchanged files keep their probe data and
+/// the scan sees them as before.
+fn previous_entries(idx: &Index, library_id: &str) -> HashMap<String, Arc<Item>> {
+    let mut out = HashMap::new();
+    for it in idx.of_library(library_id) {
+        if it.versions.is_empty() {
+            out.insert(it.id.clone(), it.clone());
+            continue;
+        }
+        for v in &it.versions {
+            let id = stable_id(&[library_id, "movie", &v.file.path]);
+            let mut one = Item::clone(it);
+            one.added_at = if id == it.id { it.added_at } else { v.added_at };
+            one.id = id.clone();
+            one.file = Some(v.file.clone());
+            one.versions = Vec::new();
+            out.insert(id, Arc::new(one));
+        }
+    }
+    out
+}
+
+/// Joins movies in the same folder with the same title and year into one entry with versions.
+/// The entry keeps the id of the file that was there first, so its watch state stays; `file`
+/// is the best version (most pixels, then bitrate), which plays by default.
+fn merge_versions(library_id: &str, items: &mut Vec<Item>) {
+    let mut groups: HashMap<(String, String, i32), Vec<usize>> = HashMap::new();
+    for (i, it) in items.iter().enumerate() {
+        if let (Kind::Movie, Some(folder), Some(_)) = (it.kind, &it.folder, &it.file) {
+            groups.entry((folder.clone(), crate::metadata::matching::normalize(&it.title), it.year)).or_default().push(i);
+        }
+    }
+    let mut merged: HashMap<usize, Item> = HashMap::new();
+    let mut moved: HashMap<String, String> = HashMap::new();
+    for mut members in groups.into_values().filter(|g| g.len() > 1) {
+        members.sort_by(|&a, &b| (items[a].added_at, &items[a].id).cmp(&(items[b].added_at, &items[b].id)));
+        let base = members[0];
+        let mut versions: Vec<Version> = members
+            .iter()
+            .map(|&i| {
+                let f = items[i].file.clone().expect("grouped with a file");
+                let base_name = names::strip_extension(f.file_name()).to_string();
+                Version {
+                    id: stable_id(&[library_id, "version", &f.path]),
+                    label: names::version_label(&base_name),
+                    added_at: items[i].added_at,
+                    file: f,
+                }
+            })
+            .collect();
+        versions.sort_by(|a, b| {
+            let px = |v: &Version| i64::from(v.file.width) * i64::from(v.file.height);
+            px(b).cmp(&px(a)).then(b.file.bitrate.cmp(&a.file.bitrate)).then(b.file.size.cmp(&a.file.size))
+        });
+        let mut m = items[base].clone();
+        for &i in &members[1..] {
+            let o = &items[i];
+            m.poster_path = m.poster_path.or_else(|| o.poster_path.clone());
+            m.backdrop_path = m.backdrop_path.or_else(|| o.backdrop_path.clone());
+            if m.tmdb_hint == 0 {
+                m.tmdb_hint = o.tmdb_hint;
+            }
+            if m.imdb_hint.is_empty() {
+                m.imdb_hint.clone_from(&o.imdb_hint);
+            }
+            moved.insert(o.id.clone(), m.id.clone());
+        }
+        m.added_at = versions.iter().map(|v| v.added_at).min().unwrap_or(m.added_at);
+        m.file = Some(versions[0].file.clone());
+        m.versions = versions;
+        merged.insert(base, m);
+    }
+    if merged.is_empty() {
+        return;
+    }
+    let old = std::mem::take(items);
+    for (i, mut it) in old.into_iter().enumerate() {
+        if let Some(m) = merged.remove(&i) {
+            items.push(m);
+        } else if !moved.contains_key(&it.id) {
+            // Extras of a joined file now belong to the joined entry.
+            if let Some(owner) = it.parent_id.as_ref().and_then(|p| moved.get(p)) {
+                it.parent_id = Some(owner.clone());
+            }
+            items.push(it);
+        }
+    }
 }
 
 /// Shows and seasons count as "added" when their newest episode was added.
@@ -741,6 +835,51 @@ mod tests {
         assert_eq!((subs.len(), subs[0].language.as_str(), subs[0].forced), (1, "de", true));
         assert_eq!(probes.len(), 2);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn joins_versions() {
+        let root = temp("versions");
+        touch(&root.join("Inception (2010)/Inception (2010) - 1080p.mkv"), 10);
+        touch(&root.join("Inception (2010)/Inception (2010) - 4K.mkv"), 20);
+        touch(&root.join("Inception (2010)/Inception (2010) - 1080p-trailer.mkv"), 5);
+        touch(&root.join("Dune (2021)/Dune (2021).mkv"), 10);
+        let (mut items, _) = Build::run(&lib("movies", &root), HashMap::new(), true);
+        for it in items.iter_mut() {
+            if let Some(f) = it.file.as_mut() {
+                (f.width, f.height) = if f.path.contains("4K") { (3840, 2160) } else { (1920, 1080) };
+            }
+        }
+        let first_id = items.iter().find(|i| i.file.as_ref().is_some_and(|f| f.path.ends_with("1080p.mkv"))).unwrap().id.clone();
+        for it in items.iter_mut() {
+            it.added_at = if it.id == first_id { 1 } else { 5 };
+        }
+        merge_versions("lib", &mut items);
+        let movies: Vec<_> = items.iter().filter(|i| i.kind == Kind::Movie).collect();
+        assert_eq!(movies.len(), 2);
+        let inc = movies.iter().find(|m| m.title == "Inception").unwrap();
+        // The id of the file that was there first, the best file to play, both versions listed.
+        assert_eq!(inc.id, first_id);
+        assert!(inc.file.as_ref().unwrap().path.ends_with("4K.mkv"));
+        let labels: Vec<_> = inc.versions.iter().map(|v| v.label.as_str()).collect();
+        assert_eq!(labels, vec!["4K", "1080p"]);
+        assert_eq!(inc.added_at, 1);
+        // The trailer of the joined file belongs to the joined entry.
+        let trailer = items.iter().find(|i| i.kind == Kind::Extra).unwrap();
+        assert_eq!(trailer.parent_id.as_deref(), Some(first_id.as_str()));
+        assert!(movies.iter().find(|m| m.title == "Dune").unwrap().versions.is_empty());
+
+        // The next scan sees the files as before and joins them under the same id.
+        let idx = Index::build(items.into_iter().map(|i| (i.id.clone(), Arc::new(i))).collect());
+        let previous = previous_entries(&idx, "lib");
+        assert_eq!(previous.values().filter(|i| i.kind == Kind::Movie).count(), 3);
+        assert_eq!(previous[&first_id].added_at, 1);
+        assert!(idx.item(&inc_version_id(&idx, &first_id)).is_some_and(|v| v.version_of.as_deref() == Some(first_id.as_str())));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    fn inc_version_id(idx: &Index, id: &str) -> String {
+        idx.item(id).unwrap().versions[1].id.clone()
     }
 
     #[test]

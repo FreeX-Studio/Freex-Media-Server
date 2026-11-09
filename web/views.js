@@ -128,13 +128,16 @@
     function playUrl(item, fromStart) {
         const tracks = savedTracks(item.id);
         const q = new URLSearchParams();
+        // A movie in several versions plays the chosen one (its own id); the watch state is shared.
+        const version = item.versions && item.versions.find((v) => v.id === tracks.version);
+        const id = version && !version.primary ? version.id : item.id;
         const off = item.progress && !item.progress.watched ? item.progress.offsetMs : 0;
         if (off && !fromStart) q.set("t", off);
         if (tracks.audio != null) q.set("a", tracks.audio);
         // "none" = switched off on purpose; without "s" the player applies the preferences
         if ("sub" in tracks) q.set("s", tracks.sub || "none");
         const qs = q.toString();
-        return `/play/${item.id}` + (qs ? "?" + qs : "");
+        return `/play/${id}` + (qs ? "?" + qs : "");
     }
 
     M.route("/item/:id", async (main, p) => {
@@ -202,10 +205,27 @@
             const subSel = h("select", {"aria-label": t("Subtitles"), onchange: (e) => save("sub", e.target.value || null)},
                 h("option", {value: ""}, t("None")),
                 m.subtitles.map((s) => h("option", {value: s.id, selected: "sub" in saved ? saved.sub === s.id : def.sub === s.id}, M.subtitleLabel(s))));
-            tracks = h("dl", {class: "tracks"},
-                h("dt", null, "Video"), h("dd", null, videoText || t("Unknown")),
+            // Several versions: the choice is kept per title; audio and subtitle tracks of another
+            // file are chosen in the player.
+            const versions = it.versions && it.versions.length > 1 ? it.versions : null;
+            const versionSel = versions ? h("select", {"aria-label": t("Version"), onchange: (e) => {
+                const tracks = savedTracks(it.id);
+                tracks.version = e.target.value;
+                delete tracks.audio;
+                delete tracks.sub;
+                M.store.set(trackKey(it.id), JSON.stringify(tracks));
+                const other = !versions.find((v) => v.id === e.target.value).primary;
+                trackRows.forEach((el) => el.hidden = other);
+                actions.querySelectorAll("a.play, a.from-start").forEach((a, i) => a.setAttribute("href", playUrl(it, i > 0)));
+            }}, versions.map((v) => h("option", {value: v.id, selected: saved.version ? saved.version === v.id : v.primary}, M.versionLabel(v)))) : null;
+            const chosenOther = versions && saved.version && versions.some((v) => v.id === saved.version && !v.primary);
+            const trackRows = [h("dt", null, "Video"), h("dd", null, videoText || t("Unknown")),
                 h("dt", null, "Audio"), h("dd", null, audioSel),
-                h("dt", null, t("Subtitles")), h("dd", null, m.subtitles.length ? subSel : h("span", {class: "muted"}, t("None available"))));
+                h("dt", null, t("Subtitles")), h("dd", null, m.subtitles.length ? subSel : h("span", {class: "muted"}, t("None available")))];
+            trackRows.forEach((el) => el.hidden = !!chosenOther);
+            tracks = h("dl", {class: "tracks"},
+                versions ? [h("dt", null, t("Version")), h("dd", null, versionSel)] : null,
+                trackRows);
         }
 
         const summary = it.summary ? h("p", {class: "summary clamp"}, it.summary) : null;

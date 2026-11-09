@@ -742,6 +742,11 @@
                     if (v === "original") state.directPlay = true;
                     restart();
                 }),
+                item.versions && item.versions.length > 1 ? section(t("Version"), item.versions.map((v) => [v.id, M.versionLabel(v)]),
+                    (item.versions.find((v) => v.current) || {}).id, (v) => {
+                        const pos = Math.round(position());
+                        M.navigate(`/play/${encodeURIComponent(v)}?t=${pos}`, true);
+                    }) : null,
                 audio.length > 1 ? section("Audio", audio, state.audio, (v) => {
                     state.audio = Number(v);
                     restart();

@@ -35,6 +35,22 @@ Shows/
 Folders named `Samples`, system folders (`@eaDir`, `#recycle`, …) and folders that contain a `.ignore` file are
 skipped, as are files with "sample" in the name under 300 MB.
 
+### Several versions of a movie
+
+Files of the same movie in one folder, with the same title and year, become one entry with a version picker on the
+item page and in the player's settings:
+
+```
+Blade Runner (1982)/
+  Blade Runner (1982) - 4K.mkv
+  Blade Runner (1982) {edition-Final Cut}.mkv
+```
+
+The name of a version is the edition tag (`{edition-…}`) or what follows the year; without one, resolution, codec
+and size tell the versions apart. The best version (most pixels, then bitrate) plays unless another is chosen. All
+versions share one watch state and resume position, kept under the id of the file that was in the library first, so
+adding a 4K file to a movie keeps its watch state.
+
 ### Trailers and extras
 
 Bonus videos are shown on the page of their movie or show under *Trailers and extras* and play like any other title

@@ -137,7 +137,14 @@ impl Previews {
                 let _turn = service.serial.lock().await;
                 let idx = app.catalog.snapshot();
                 let mut made = 0;
+                // Movies with several versions: the main entry has the best version's file, the
+                // other versions get their own sheets.
+                let mut todo: Vec<&Arc<Item>> = Vec::new();
                 for it in idx.of_library(&id).filter(|it| Self::wanted(it)) {
+                    todo.push(it);
+                    todo.extend(idx.versions_of(it).into_iter().skip(1));
+                }
+                for it in todo {
                     if !force && (service.get(it).is_some() || service.failed(it)) {
                         continue;
                     }

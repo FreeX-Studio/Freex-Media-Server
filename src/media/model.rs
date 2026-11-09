@@ -99,6 +99,24 @@ pub struct Item {
     /// `scene`, `short` or `other`.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub extra_type: String,
+    /// Movies with several files (4K and 1080p, editions): every file, the one in `file` included.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub versions: Vec<Version>,
+    /// Set on the stand-in entry the index makes for one version: the id of the movie.
+    #[serde(skip)]
+    pub version_of: Option<String>,
+}
+
+/// One file of a movie that exists in several versions.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Version {
+    /// Own id, used to play exactly this file.
+    pub id: String,
+    /// "4K", "Director's Cut", from the file name; empty if the name says nothing.
+    pub label: String,
+    pub added_at: i64,
+    pub file: MediaFile,
 }
 
 impl Item {
@@ -141,6 +159,11 @@ impl Item {
     pub fn has_genre(&self, genre: &str) -> bool {
         let genre = genre.trim().to_lowercase();
         self.genre_list().any(|g| g.to_lowercase() == genre)
+    }
+
+    /// The id watch state is kept under: the movie's for one of its versions.
+    pub fn key(&self) -> &str {
+        self.version_of.as_deref().unwrap_or(&self.id)
     }
 
     pub fn duration_ms(&self) -> i64 {
