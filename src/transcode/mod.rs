@@ -240,6 +240,17 @@ impl Transcoder {
         self.sessions.lock().unwrap().get(id).cloned()
     }
 
+    /// Process ids of the ffmpeg processes of a session.
+    pub fn session_pids(&self, id: &str) -> Vec<u32> {
+        self.session(id).map(|s| s.worker().pids()).unwrap_or_default()
+    }
+
+    /// Process ids of all running conversions.
+    pub fn all_pids(&self) -> Vec<u32> {
+        let sessions: Vec<Arc<Session>> = self.sessions.lock().unwrap().values().cloned().collect();
+        sessions.iter().flat_map(|s| s.worker().pids()).collect()
+    }
+
     pub fn active_sessions(&self) -> usize {
         self.sessions.lock().unwrap().len()
     }

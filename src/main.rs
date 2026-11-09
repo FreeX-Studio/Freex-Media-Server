@@ -27,6 +27,7 @@ mod markers;
 mod media;
 mod metadata;
 mod settings;
+mod system;
 mod tls;
 mod together;
 mod transcode;
@@ -59,6 +60,8 @@ pub struct AppState {
     pub activity: activity::Activity,
     /// None when detection is switched off or ffmpeg is missing.
     pub markers: Option<markers::Service>,
+    /// Load of the machine for the dashboard.
+    pub system: system::System,
     /// Seek preview thumbnails; None if switched off or ffmpeg is missing.
     pub previews: Option<media::previews::Previews>,
     pub together: Arc<together::Together>,
@@ -195,6 +198,7 @@ fn run(config_path: PathBuf) -> Result<Outcome, String> {
                 activity: activity::Activity::default(),
                 markers,
                 previews,
+                system: system::System::new(),
                 together,
                 cast_grants: api::Grants::default(),
                 scanner: media::scanner::Scanner::default(),
@@ -219,6 +223,7 @@ fn run(config_path: PathBuf) -> Result<Outcome, String> {
             );
             spawn_housekeeping(app.clone());
             fill_age_ratings(&app);
+            system::System::spawn(app.clone());
             media::scanner::Scanner::spawn_timer(app.clone(), app.config.scanner.interval_minutes);
             let handle = axum_server::Handle::new();
             let stopper = handle.clone();

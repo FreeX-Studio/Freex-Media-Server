@@ -37,6 +37,8 @@ pub struct Playback {
     pub offset_ms: i64,
     pub state: String,
     pub last_seen: i64,
+    /// Estimated bits per second of the stream.
+    pub bitrate: i64,
 }
 
 /// What a player announces when it starts.
@@ -52,6 +54,7 @@ pub struct Start<'a> {
     pub offset_ms: i64,
     pub ip: &'a str,
     pub user_agent: &'a str,
+    pub bitrate: i64,
 }
 
 #[derive(Default)]
@@ -89,6 +92,7 @@ impl Activity {
             offset_ms: 0,
             state: String::new(),
             last_seen: now,
+            bitrate: 0,
         });
         p.mode = s.mode.to_string();
         p.reason = s.reason;
@@ -100,6 +104,7 @@ impl Activity {
         p.offset_ms = s.offset_ms;
         p.state = "playing".into();
         p.last_seen = now;
+        p.bitrate = s.bitrate;
     }
 
     /// A position report; `stopped` ends the playback.
@@ -152,6 +157,7 @@ mod tests {
             offset_ms: 0,
             ip: "1.2.3.4",
             user_agent: "UA",
+            bitrate: 0,
         }
     }
 

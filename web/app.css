@@ -1024,6 +1024,148 @@ select, .field input, .inline input, .filter-field input {
     height: 34px;
 }
 
+.dash-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 12px;
+}
+
+.dash-tile {
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-m);
+    background: rgba(255, 255, 255, .03);
+    display: grid;
+    gap: 6px;
+}
+
+.dash-label, .dash-sub {
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.dash-value {
+    font-size: 26px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.dash-meter, .dash-bar-track {
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, .1);
+    overflow: hidden;
+}
+
+.dash-meter span, .dash-bar-track span {
+    display: block;
+    height: 100%;
+    background: var(--glass);
+    border-radius: 3px;
+}
+
+.panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.dash-days {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 110px;
+    margin: 18px 0 4px;
+    border-bottom: 1px solid var(--line);
+}
+
+.dash-days span {
+    flex: 1;
+    min-height: 1px;
+    background: var(--glass);
+    border-radius: 2px 2px 0 0;
+    opacity: .85;
+}
+
+.dash-days-axis {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.dash-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 24px;
+    margin-top: 18px;
+}
+
+.dash-bars {
+    display: grid;
+    gap: 8px;
+}
+
+.dash-bar {
+    display: grid;
+    grid-template-columns: minmax(80px, 38%) 1fr auto;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+}
+
+.dash-bar-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dash-bar-value {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.dash-lib {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    gap: 4px;
+}
+
+.dash-lib:last-child {
+    border-bottom: 0;
+}
+
+.dash-lib-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dash-lib-head svg {
+    width: 18px;
+    height: 18px;
+}
+
+.dash-lib-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+}
+
+.dash-lib-mix {
+    font-size: 13px;
+}
+
+.activity-more {
+    display: block;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+}
+
 .switch-list {
     display: flex;
     flex-wrap: wrap;

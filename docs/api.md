@@ -89,7 +89,8 @@ every language, so apps can react to it:
 
 | Method | Path | |
 |---|---|---|
-| `GET` | `/api/admin/activity` | Running playbacks and library scans |
+| `GET` | `/api/admin/activity` | Running playbacks (with the estimated `bitrate` and, for conversions on Linux, the `cpu` of ffmpeg in percent of one core) and library scans |
+| `GET` | `/api/admin/dashboard?days=30&tz=-60` | The dashboard: `load` (CPU, server memory, bandwidth, playbacks, conversions), `plays` over the period (per day by the browser's time zone, per user, the ten most watched titles) and `libraries` (entries, files, size, length, resolutions, codecs, HDR) |
 | `GET` | `/api/history?user=` | Watch history of all (or one) users |
 | `GET` | `/api/admin/settings` | Settings of `config.toml` (secrets only as set / not set) and `pendingRestart` |
 | `PUT` | `/api/admin/settings` | `{currentPassword, values: {"server.port": 32600, …}}`; a secret sent as `null` stays unchanged |

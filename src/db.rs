@@ -837,6 +837,30 @@ impl Db {
         .collect()
     }
 
+    /// All entries since a time (ms), oldest first, for the statistics of the dashboard.
+    pub fn history_since(&self, since: i64) -> Vec<HistoryEntry> {
+        let c = self.c();
+        let mut st = c
+            .prepare_cached(
+                "SELECT id, user_id, item_id, watched_at, title, parent_title FROM watch_history \
+                 WHERE watched_at >= ?1 ORDER BY watched_at",
+            )
+            .unwrap();
+        st.query_map([since], |r| {
+            Ok(HistoryEntry {
+                id: r.get(0)?,
+                user_id: r.get(1)?,
+                item_id: r.get(2)?,
+                watched_at: r.get(3)?,
+                title: r.get(4)?,
+                parent_title: r.get(5)?,
+            })
+        })
+        .unwrap()
+        .filter_map(Result::ok)
+        .collect()
+    }
+
     /// Deletes one entry of the user; false if there is none with that id.
     pub fn remove_history(&self, user_id: &str, id: i64) -> bool {
         self.c().execute("DELETE FROM watch_history WHERE id = ?1 AND user_id = ?2", params![id, user_id]).unwrap_or(0) > 0

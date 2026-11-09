@@ -15,6 +15,7 @@
 
 mod account;
 mod admin;
+mod dashboard;
 mod extras;
 mod filter;
 mod lists;
@@ -109,6 +110,7 @@ pub fn router(app: Arc<AppState>) -> Router {
         )
         .route("/api/users/{id}/avatar", get(profile::avatar))
         .route("/api/admin/activity", get(profile::activity))
+        .route("/api/admin/dashboard", get(dashboard::dashboard))
         .route("/api/admin/settings", get(admin::get_settings).put(admin::save_settings))
         .route("/api/admin/restart", post(admin::restart))
         .route("/api/libraries/{id}/markers", post(extras::analyze_markers))

@@ -125,6 +125,7 @@
     const TABS = [
         ["account", "Account", false],
         ["security", "Security", false],
+        ["dashboard", "Dashboard", true],
         ["libraries", "Libraries", true],
         ["users", "Users", true],
         ["server", "Server", true],
@@ -144,7 +145,7 @@
                 TABS.filter(([, , admin]) => admin).map(([id, label]) => link(`/settings/${id}`, {class: "nav-link" + (id === tab ? " active" : "")}, t(label)))] : null);
         const content = h("div", {class: "settings-content"});
         main.replaceChildren(h("div", {class: "page settings"}, nav, content));
-        await {account, security, libraries, users, server, about, desktop: M.desktop && M.desktop.settingsPage}[tab](content);
+        await {account, security, dashboard, libraries, users, server, about, desktop: M.desktop && M.desktop.settingsPage}[tab](content);
     });
 
     const panel = (title, ...children) => h("section", {class: "panel"}, h("h2", null, title), children);
@@ -164,6 +165,84 @@
                 await onConfirm();
             }}, label);
         return b;
+    }
+
+    // ------------------------------------------------------------------ dashboard
+
+    /** Load right now (refreshed every 3 s while the page is open), plays and the libraries. */
+    async function dashboard(c) {
+        const days = Number(M.store.get("freex.dashDays")) || 30;
+        const tz = new Date().getTimezoneOffset();
+        const loadBox = h("div", {class: "dash-tiles"});
+        const daysSel = h("select", {"aria-label": t("Period"), onchange: (e) => {
+            M.store.set("freex.dashDays", e.target.value);
+            M.render();
+        }}, [[7, t("Last 7 days")], [30, t("Last 30 days")], [90, t("Last 3 months")], [365, t("Last year")]]
+            .map(([v, l]) => h("option", {value: v, selected: v === days}, l)));
+        const playsBox = h("div");
+        const libsBox = h("div");
+        c.append(h("h1", null, t("Dashboard")), panel(t("Right now"), loadBox),
+            h("section", {class: "panel"}, h("div", {class: "panel-head"}, h("h2", null, t("Watched")), daysSel), playsBox),
+            panel(t("Libraries"), libsBox));
+
+        const tile = (label, value, sub, pct) => h("div", {class: "dash-tile"},
+            h("div", {class: "dash-label"}, label), h("div", {class: "dash-value"}, value ?? "–"),
+            pct != null ? h("div", {class: "dash-meter"}, h("span", {style: {width: Math.min(100, Math.max(0, pct)) + "%"}})) : null,
+            sub ? h("div", {class: "dash-sub"}, sub) : null);
+        const hours = (ms) => ms < 3600000 ? t("{0} min", Math.round(ms / 60000)) : t("{0} h", M.num(ms / 3600000, ms < 36e6 ? 1 : 0));
+        const uptime = (s) => s >= 86400 ? t("{0} days", Math.floor(s / 86400)) : s >= 3600 ? t("{0} h", Math.floor(s / 3600)) : t("{0} min", Math.max(1, Math.floor(s / 60)));
+
+        const renderLoad = (l) => loadBox.replaceChildren(
+            tile(t("CPU"), l.cpu != null ? `${M.num(l.cpu, 0)} %` : null, t("{0} cores, ffmpeg {1} %, server {2} %", l.cores, M.num(l.ffmpegCpu || 0, 0), M.num(l.serverCpu || 0, 0)), l.cpu),
+            tile(t("Playbacks"), String(l.playbacks), t("{0} of {1} conversions", l.transcodes, l.maxTranscodes), l.maxTranscodes ? l.transcodes / l.maxTranscodes * 100 : null),
+            tile(t("Bandwidth"), l.bandwidth ? M.fmtBitrate(l.bandwidth) : "0", t("estimated from the running streams")),
+            tile(t("Memory"), l.memory ? M.fmtSize(l.memory) : null, t("Running for {0}", uptime(l.uptimeS))));
+
+        const bars = (rows, max) => h("div", {class: "dash-bars"}, rows.map(([label, n, extra]) => h("div", {class: "dash-bar"},
+            h("span", {class: "dash-bar-label", title: label}, label), h("span", {class: "dash-bar-track"}, h("span", {style: {width: (max ? n / max * 100 : 0) + "%"}})),
+            h("span", {class: "dash-bar-value"}, extra || String(n)))));
+
+        const renderPlays = (p) => {
+            const maxDay = Math.max(1, ...p.perDay);
+            const day = (i) => new Date(p.since + i * 86400000).toLocaleDateString(M.locale(), {day: "numeric", month: "numeric"});
+            playsBox.replaceChildren(
+                h("div", {class: "dash-tiles"}, tile(t("Plays"), String(p.total)), tile(t("Watching time"), hours(p.watchedMs)),
+                    tile(t("Viewers"), String(p.users.length))),
+                h("div", {class: "dash-days", role: "img", "aria-label": t("Plays per day")}, p.perDay.map((n, i) =>
+                    h("span", {title: `${day(i)}: ${n}`, style: {height: (n / maxDay * 100) + "%"}}))),
+                h("div", {class: "dash-days-axis"}, h("span", null, day(0)), h("span", null, day(p.perDay.length - 1))),
+                h("div", {class: "dash-columns"},
+                    h("div", null, h("h3", null, t("By user")), p.users.length ? bars(p.users.map((u) => [u.username, u.plays, `${u.plays} · ${hours(u.watchedMs)}`]), p.users[0].plays)
+                        : h("p", {class: "muted"}, t("Nothing watched in this period."))),
+                    h("div", null, h("h3", null, t("Most watched")), p.titles.length ? bars(p.titles.map((x) => [x.title, x.plays]), p.titles[0].plays)
+                        : h("p", {class: "muted"}, t("Nothing watched in this period.")))));
+        };
+
+        const renderLibs = (libs) => libsBox.replaceChildren(...libs.map((l) => {
+            const counts = l.type === "shows" ? tn(l.shows, "1 show", "{0} shows") + ", " + tn(l.episodes, "1 episode", "{0} episodes")
+                : tn(l.movies, "1 movie", "{0} movies");
+            const share = (m) => Object.entries(m).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k === "?" ? t("unknown") : (k.length <= 5 ? k.toUpperCase().replace("P", "p").replace("K", "K") : k)} ${n}`).join(" · ");
+            return h("div", {class: "dash-lib"},
+                h("div", {class: "dash-lib-head"}, icon(l.type === "shows" ? "shows" : "movies"), h("strong", null, l.name), h("span", {class: "muted"}, counts)),
+                h("div", {class: "dash-lib-facts"},
+                    h("span", null, t("{0} files", l.files)), h("span", null, M.fmtSize(l.size) || "0 MB"), h("span", null, hours(l.durationMs)),
+                    l.hdr ? h("span", null, `HDR ${l.hdr}`) : null),
+                h("div", {class: "dash-lib-mix"}, share(l.resolutions)),
+                h("div", {class: "dash-lib-mix muted"}, share(l.codecs)));
+        }));
+
+        const first = await api("GET", `/api/admin/dashboard?days=${days}&tz=${tz}`);
+        renderLoad(first.load);
+        renderPlays(first.plays);
+        renderLibs(first.libraries);
+        const timer = setInterval(async () => {
+            if (!loadBox.isConnected) return clearInterval(timer);
+            try {
+                renderLoad((await api("GET", `/api/admin/dashboard?days=1&tz=${tz}`)).load);
+            } catch (e) {
+                // next time
+            }
+        }, 3000);
     }
 
     // ------------------------------------------------------------------ account

@@ -230,6 +230,7 @@ pub async fn start_cast(
         .lock()
         .unwrap()
         .insert(token, Grant { user_id: u.id.clone(), item_id: it.id.clone(), session: session.clone(), expires: now_ms() + validity });
+    let bitrate = playback::stream_bitrate(f, &plan);
     app.activity.started(Start {
         user_id: &u.id,
         item_id: &it.id,
@@ -242,6 +243,7 @@ pub async fn start_cast(
         offset_ms: start,
         ip: &ctx.ip,
         user_agent: &ctx.user_agent,
+        bitrate,
     });
     ok(m)
 }

@@ -286,6 +286,20 @@ pub fn plan(f: &MediaFile, caps: &Capabilities, q: Quality, requested_audio: i32
     }
 }
 
+/// Estimated bits per second of the stream a plan sends: the file's for direct play and copied
+/// video, the target of a conversion plus its sound.
+pub fn stream_bitrate(f: &MediaFile, plan: &Plan) -> i64 {
+    let audio = match plan.audio_out {
+        AudioOut::Copy => 0,
+        AudioOut::AacStereo => 192_000,
+        AudioOut::Ac3 | AudioOut::Eac3 => 640_000,
+    };
+    match plan.mode {
+        Mode::Transcode => plan.video_bitrate + audio,
+        _ => f.bitrate,
+    }
+}
+
 /// Bitrate and frame height of a conversion at quality `q`.
 fn transcode_targets(f: &MediaFile, q: Quality) -> (i64, i32) {
     let source = if f.bitrate > 0 { f.bitrate } else { 8_000_000 };

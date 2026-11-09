@@ -128,6 +128,7 @@ pub async fn start(State(app): State<Arc<AppState>>, Extension(ctx): Extension<C
             }
         },
     }
+    let bitrate = playback::stream_bitrate(f, &plan);
     app.activity.started(Start {
         user_id: &u.id,
         item_id: &it.id,
@@ -140,6 +141,7 @@ pub async fn start(State(app): State<Arc<AppState>>, Extension(ctx): Extension<C
         offset_ms: start,
         ip: &ctx.ip,
         user_agent: &ctx.user_agent,
+        bitrate,
     });
     ok(m)
 }

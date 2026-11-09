@@ -36,7 +36,10 @@
   those, AAC stereo otherwise
 - **Subtitle look:** size, background, position and colour of text subtitles per user (*Account → Playback*, the size
   also in the player); text subtitles can be **burned into the picture** from the player menu
-- FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; *Automatic* quality and the quality defaults under Account; the subtitle look and burning in text subtitles; a switch for the previews in the server settings
+- **Server dashboard** (*Settings → Dashboard*): CPU, memory, bandwidth and conversions right now, plays per day,
+  per user and per title, and what each library holds (size, length, resolutions, codecs, HDR); the activity view
+  shows the bandwidth of each playback and the CPU of each conversion
+- FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; *Automatic* quality and the quality defaults under Account; the subtitle look and burning in text subtitles; the server dashboard; a switch for the previews in the server settings
 
 ## FreeX Media Server 0.20.0 · FreeX Web 1.5.0.0
 

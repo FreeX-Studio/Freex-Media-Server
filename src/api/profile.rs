@@ -123,6 +123,7 @@ pub async fn activity(State(app): State<Arc<AppState>>, Extension(ctx): Extensio
     let viewer = ctx.admin()?;
     let idx = app.catalog.snapshot();
     let view = View::new(&app, &idx, viewer);
+    let load = app.system.load();
     let sessions: Vec<_> = app
         .activity
         .list()
@@ -146,6 +147,13 @@ pub async fn activity(State(app): State<Arc<AppState>>, Extension(ctx): Extensio
                 "ip": p.ip,
                 "startedAt": p.started_at,
                 "transcoding": transcoding,
+                "bitrate": p.bitrate,
+                // CPU of the conversion's ffmpeg, in percent of one core (Linux only).
+                "cpu": p.session.as_deref().filter(|_| transcoding).and_then(|s| {
+                    let pids = app.transcoder.as_ref()?.session_pids(s);
+                    let v: Vec<f64> = pids.iter().filter_map(|pid| load.processes.get(pid).copied()).collect();
+                    (!v.is_empty()).then(|| v.iter().fold(0.0, |a, b| a + b))
+                }),
             }))
         })
         .collect();

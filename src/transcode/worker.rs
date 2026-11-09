@@ -141,6 +141,11 @@ impl Worker {
         Worker { dir, segments, command, priority, runs: Vec::new(), active: false, run_number: 0, last_requested: 0 }
     }
 
+    /// Process ids of the running ffmpeg processes.
+    pub fn pids(&self) -> Vec<u32> {
+        self.runs.iter().filter(|r| r.exit.is_none()).map(|r| r.child.id()).collect()
+    }
+
     pub fn segments(&self) -> &Segments {
         &self.segments
     }

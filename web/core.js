@@ -558,12 +558,13 @@ window.FreeX = (() => {
                             h("span", null, [s.user ? s.user.username : "", s.device || deviceName(s.userAgent)].filter(Boolean).join(" · "))),
                         h("div", {class: "activity-mode" + (s.mode === "transcode" ? " transcode" : "")},
                             s.state === "paused" ? t("Paused") + " · " : "", MODE_LABELS[s.mode] ? t(MODE_LABELS[s.mode]) : s.mode || "",
-                            s.quality && s.quality !== "Original" ? ` · ${s.quality}` : ""),
+                            s.quality && s.quality !== "Original" ? ` · ${s.quality}` : "",
+                            s.bitrate ? ` · ${fmtBitrate(s.bitrate)}` : "", s.cpu != null ? ` · CPU ${num(s.cpu, 0)} %` : ""),
                         h("div", {class: "activity-progress"}, h("span", {style: {width: pct + "%"}})),
                         h("div", {class: "activity-time"}, `${fmtClock(s.offsetMs)} / ${fmtClock(s.durationMs)}`)));
             });
             const tasks = a.tasks.map((task) => h("div", {class: "activity-task"}, h("span", {class: "spin"}), task.title));
-            body.replaceChildren(...rows, ...tasks);
+            body.replaceChildren(...rows, ...tasks, link("/settings/dashboard", {class: "activity-more", onclick: () => closeMenus()}, t("Server dashboard")));
             if (!rows.length && !tasks.length) body.append(h("div", {class: "activity-empty"}, t("Nothing is playing right now.")));
         };
         const load = async () => {

@@ -44,6 +44,7 @@ fingerprints, file system walks) runs on blocking threads.
 | `transcode` | ffmpeg sessions and their background workers |
 | `markers` | Audio fingerprints and intro/credits detection |
 | `together`, `activity` | Watch Together rooms; running playbacks |
+| `system` | Load of the machine for the dashboard (from `/proc` on Linux, every 3 seconds) |
 | `auth`, `tls` | Password hashing, TOTP, brute-force protection; HTTPS from PEM files |
 
 ## Startup and restart
