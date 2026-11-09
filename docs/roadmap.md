@@ -46,7 +46,6 @@ The gaps that show in daily use. All of them fit the current architecture.
 
 | Feature | Notes |
 |---|---|
-| **Live TV and recordings** | Tuners via SAT>IP and HDHomeRun, programme guide (XMLTV), recordings into the library. Large. |
 | **Ratings and reviews** | Personal ratings and reviews per user, shown to the other users of the server. |
 | **More metadata sources** | TVDB, AniDB for anime, MusicBrainz for music; selectable per library. |
 | **DLNA** | Serving to DLNA renderers. Low priority, most devices will have an app. |
@@ -55,6 +54,7 @@ The gaps that show in daily use. All of them fit the current architecture.
 ## Not planned
 
 - Anything that needs an account with a third party to use the server at home.
+- Live TV and recordings.
 - Advertising, streaming channels, rentals.
 
 ## Order of work
@@ -63,6 +63,5 @@ The gaps that show in daily use. All of them fit the current architecture.
 2. FreeX apps for Android TV / Fire TV and iOS/Android, then Apple TV; offline downloads once they exist.
 3. Music, then photos.
 4. Remote access setup and inviting friends.
-5. Live TV and recordings if there is demand.
 
 Each item gets its own issue when it is started; this page is updated with the version that delivered it.
