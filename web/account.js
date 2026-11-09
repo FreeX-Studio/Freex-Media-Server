@@ -181,9 +181,11 @@
             .map(([v, l]) => h("option", {value: v, selected: v === days}, l)));
         const playsBox = h("div");
         const libsBox = h("div");
+        const maintBox = h("div");
         c.append(h("h1", null, t("Dashboard")), panel(t("Right now"), loadBox),
             h("section", {class: "panel"}, h("div", {class: "panel-head"}, h("h2", null, t("Watched")), daysSel), playsBox),
-            panel(t("Libraries"), libsBox));
+            panel(t("Libraries"), libsBox),
+            panel(t("Maintenance"), maintBox));
 
         const tile = (label, value, sub, pct) => h("div", {class: "dash-tile"},
             h("div", {class: "dash-label"}, label), h("div", {class: "dash-value"}, value ?? "–"),
@@ -231,14 +233,38 @@
                 h("div", {class: "dash-lib-mix muted"}, share(l.codecs)));
         }));
 
+        const renderMaint = (m) => {
+            const last = m.last;
+            maintBox.replaceChildren(
+                h("p", null, m.enabled ? t("Every night at {0}.", m.start) : t("The nightly maintenance is switched off."), " ",
+                    link("/settings/server", null, t("Change"))),
+                last ? h("dl", {class: "kv"},
+                    h("dt", null, t("Last run")), h("dd", null, M.fmtDate(last.startedAt)),
+                    h("dt", null, t("Database backup")), h("dd", null, last.backup || (last.backupError ? t("failed: {0}", last.backupError) : t("none"))),
+                    h("dt", null, t("Cache clean-up")), h("dd", null, t("{0} files, {1}", last.removedFiles, M.fmtSize(last.freedBytes) || "0 MB")),
+                    h("dt", null, t("Rescan")), h("dd", null, tn(last.librariesScanned, "1 library", "{0} libraries"))) : h("p", {class: "muted"}, t("Not run since the server started.")),
+                h("button", {class: "btn", disabled: m.running, onclick: async (e) => {
+                    e.target.disabled = true;
+                    try {
+                        await api("POST", "/api/admin/maintenance");
+                        M.toast(t("Maintenance started"));
+                    } catch (err) {
+                        M.toast(err.message, true);
+                    }
+                }}, m.running ? t("Running …") : t("Run now")));
+        };
+
         const first = await api("GET", `/api/admin/dashboard?days=${days}&tz=${tz}`);
+        renderMaint(first.maintenance);
         renderLoad(first.load);
         renderPlays(first.plays);
         renderLibs(first.libraries);
         const timer = setInterval(async () => {
             if (!loadBox.isConnected) return clearInterval(timer);
             try {
-                renderLoad((await api("GET", `/api/admin/dashboard?days=1&tz=${tz}`)).load);
+                const d = await api("GET", `/api/admin/dashboard?days=1&tz=${tz}`);
+                renderLoad(d.load);
+                if (!maintBox.contains(document.activeElement)) renderMaint(d.maintenance);
             } catch (e) {
                 // next time
             }
@@ -950,6 +976,10 @@
             ["transcoder.preset", "x264 preset", "Faster needs less CPU, the amount of data grows a little."],
             ["transcoder.directory", "Transcoding folder",
                 "Holds the video segments of running conversions, e.g. on a fast SSD. Relative to the cache folder or an absolute path. The server only deletes its own session folders there."]]],
+        ["Maintenance", [
+            ["maintenance.enabled", "Nightly maintenance", "Database backup, cache clean-up and a rescan of all libraries with metadata, intro detection and seek previews."],
+            ["maintenance.start", "Starts at", "Time of day in the server's time zone, e.g. 03:00."],
+            ["maintenance.backups", "Database backups kept", "In the backups folder of the data folder. 0 = none."]]],
         ["Library scan", [
             ["scanner.intervalMinutes", "Scan automatically every … minutes", "0 = only by hand"],
             ["scanner.threads", "Files examined at the same time"]]],

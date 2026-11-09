@@ -81,6 +81,14 @@ vaapi_device = "/dev/dri/renderD128"
 # x264 speed/quality trade-off for software encoding ("ultrafast" ... "medium")
 preset = "veryfast"
 
+[maintenance]
+# A nightly window: database backup, cache clean-up, rescan of all libraries (with metadata,
+# intro detection and seek previews). Time of day in the server's time zone
+enabled = true
+start = "03:00"
+# Database backups kept in <data>/backups (0 = none)
+backups = 7
+
 [scanner]
 # Automatic rescan of all libraries, in minutes (0 = only manual scans)
 interval_minutes = 30
@@ -106,6 +114,7 @@ pub struct Config {
     pub tmdb: TmdbConfig,
     pub markers: MarkersConfig,
     pub previews: PreviewsConfig,
+    pub maintenance: MaintenanceConfig,
     /// Folder of the configuration file; relative paths are resolved against it.
     #[serde(skip)]
     pub base_dir: PathBuf,
@@ -160,6 +169,30 @@ pub struct MarkersConfig {
 impl Default for MarkersConfig {
     fn default() -> Self {
         MarkersConfig { enabled: true }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct MaintenanceConfig {
+    pub enabled: bool,
+    /// "HH:MM", local time.
+    pub start: String,
+    pub backups: u32,
+}
+
+impl Default for MaintenanceConfig {
+    fn default() -> Self {
+        MaintenanceConfig { enabled: true, start: "03:00".into(), backups: 7 }
+    }
+}
+
+impl MaintenanceConfig {
+    /// Hour and minute of `start`; None if it is not a time of day.
+    pub fn start_time(&self) -> Option<(u32, u32)> {
+        let (h, m) = self.start.trim().split_once(':')?;
+        let (h, m) = (h.parse::<u32>().ok()?, m.parse::<u32>().ok()?);
+        (h < 24 && m < 60 && self.start.trim().len() <= 5).then_some((h, m))
     }
 }
 
@@ -225,6 +258,7 @@ impl Default for Config {
             tmdb: TmdbConfig::default(),
             markers: MarkersConfig::default(),
             previews: PreviewsConfig::default(),
+            maintenance: MaintenanceConfig::default(),
             base_dir: PathBuf::from("."),
         }
     }

@@ -12,6 +12,7 @@ argon2 = "0.5"
 axum = { version = "0.8.9", features = ["macros"] }
 axum-server = { version = "0.9", default-features = false, features = ["tls-rustls-no-provider"] }
 base64 = "0.22"
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
 fancy-regex = "0.14"
 futures-core = "0.3"
 hex = "0.4.3"

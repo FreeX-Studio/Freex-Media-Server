@@ -99,6 +99,9 @@ pub const FIELDS: &[Field] = &[
     choice("transcoder.hardwareAcceleration", "transcoder", "hardware_acceleration", &["none", "nvenc", "qsv", "vaapi"]),
     text("transcoder.vaapiDevice", "transcoder", "vaapi_device", 100, "setting.format.vaapiDevice"),
     choice("transcoder.preset", "transcoder", "preset", &["ultrafast", "superfast", "veryfast", "faster", "fast", "medium"]),
+    of("maintenance.enabled", "maintenance", "enabled", Kind::Bool),
+    text("maintenance.start", "maintenance", "start", 5, "setting.format.time"),
+    number("maintenance.backups", "maintenance", "backups", 0, 60),
     number("scanner.intervalMinutes", "scanner", "interval_minutes", 0, 10080),
     number("scanner.threads", "scanner", "threads", 1, 32),
 ];
@@ -155,6 +158,9 @@ impl Field {
             "transcoder.vaapiDevice" => c.transcoder.vaapi_device.clone(),
             "transcoder.preset" => c.transcoder.preset.clone(),
             "scanner.intervalMinutes" => c.scanner.interval_minutes.to_string(),
+            "maintenance.enabled" => c.maintenance.enabled.to_string(),
+            "maintenance.start" => c.maintenance.start.clone(),
+            "maintenance.backups" => c.maintenance.backups.to_string(),
             "scanner.threads" => c.scanner.threads.to_string(),
             _ => String::new(),
         }
@@ -231,6 +237,9 @@ fn format_ok(format: &str, s: &str) -> bool {
                     && b[4].is_ascii_uppercase())
         }
         "setting.format.region" => s.len() == 2 && s.bytes().all(|b| b.is_ascii_uppercase()),
+        "setting.format.time" => {
+            crate::config::MaintenanceConfig { start: s.to_string(), ..Default::default() }.start_time().is_some() && s.len() == 5
+        }
         "setting.format.vaapiDevice" => {
             s.strip_prefix("/dev/dri/").is_some_and(|r| !r.is_empty() && r.bytes().all(|b| b.is_ascii_alphanumeric()))
         }

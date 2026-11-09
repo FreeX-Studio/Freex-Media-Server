@@ -36,10 +36,35 @@ pub async fn dashboard(
     let days: i64 = q.get("days").and_then(|d| d.parse().ok()).unwrap_or(30).clamp(1, 365);
     let tz_ms = q.get("tz").and_then(|t| t.parse::<i64>().ok()).unwrap_or(0).clamp(-14 * 60, 14 * 60) * 60_000;
     ok(json!({
+        "maintenance": maintenance(&app),
         "load": load(&app),
         "plays": plays(&app, days, tz_ms),
         "libraries": libraries(&app),
     }))
+}
+
+fn maintenance(app: &AppState) -> Value {
+    let m = &app.config.maintenance;
+    json!({
+        "enabled": m.enabled && m.start_time().is_some(),
+        "start": m.start,
+        "backups": m.backups,
+        "running": app.maintenance.running(),
+        "last": app.maintenance.last(),
+    })
+}
+
+/// Starts the maintenance now (admins); 409 while it runs.
+pub async fn run_maintenance(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ctx>) -> ApiResult {
+    ctx.admin()?;
+    if app.maintenance.running() {
+        return Err(crate::http::ApiError::new(axum::http::StatusCode::CONFLICT, "error.maintenanceRunning"));
+    }
+    let a = app.clone();
+    tokio::spawn(async move {
+        crate::maintenance::Maintenance::run(&a).await;
+    });
+    ok(json!({"started": true}))
 }
 
 fn load(app: &AppState) -> Value {

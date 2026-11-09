@@ -157,9 +157,12 @@ package). Caches go to the cache directory (`cache/`, `/var/cache/freex-media-se
 | `freex.db` | SQLite database: users, password hashes, two-factor secrets, sessions, login history, preferences, libraries and the scanned index, watch state and history, playlists, watchlist, own collections, TMDB metadata, intro and credits markers |
 | `metadata/` | Downloaded artwork of titles, people and movie series |
 | `avatars/` | Profile pictures, re-encoded by the server |
+| `backups/` | Database backups of the nightly maintenance (`freex-YYYY-MM-DD-HHMM.db`, the newest seven by default) |
 | cache: `thumbs/`, `previews/`, `subtitles/`, `transcode/` | Preview frames, seek preview sheets, extracted subtitles, segments of running conversions; safe to delete while the server is stopped |
 
-For a backup, stop the server and copy the data directory, or back up the database while it runs:
+The nightly maintenance keeps copies of the database in `backups/` (see [Configuration](configuration.md)); to restore
+one, stop the server and copy it over `freex.db`. For a complete backup, stop the server and copy the data directory,
+or back up the database while it runs:
 
 ```bash
 sqlite3 /var/lib/freex-media-server/freex.db ".backup freex-backup.db"

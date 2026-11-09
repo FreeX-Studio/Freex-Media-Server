@@ -51,6 +51,13 @@ tvmaze = true
 # Detect intros and end credits of TV episodes ("Skip intro")
 enabled = true
 
+[maintenance]
+# Nightly: database backup, cache clean-up, rescan of all libraries (server time zone)
+enabled = true
+start = "03:00"
+# Backups kept in /var/lib/freex-media-server/backups (0 = none)
+backups = 7
+
 [previews]
 # Small frames above the seek bar while scrubbing, made in the background after scans
 enabled = true

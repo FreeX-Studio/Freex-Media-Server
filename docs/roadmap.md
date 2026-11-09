@@ -22,7 +22,7 @@ The gaps that show in daily use. All of them fit the current architecture.
 | ~~**Audio passthrough and multi-channel**~~ | **Delivered in 0.21.0** – see [Playback](playback.md#how-a-file-is-played). |
 | ~~**Subtitle styling and burn-in options**~~ | **Delivered in 0.21.0** – see [Playback](playback.md#audio-tracks-and-subtitles). |
 | ~~**Server dashboard**~~ | **Delivered in 0.21.0** – *Settings → Dashboard* in FreeX Web; CPU figures need Linux. |
-| **Scheduled maintenance** | A nightly window for rescans, metadata refresh, marker detection, cache clean-up and a database backup. Today: periodic scans only. |
+| ~~**Scheduled maintenance**~~ | **Delivered in 0.21.0** – see [Configuration](configuration.md). |
 | **Webhooks** | HTTP calls on play, pause, stop and new items, for home automation. |
 | **Delete files from the library** | Delete a movie or episode from disk from the item page (admins only, with confirmation). |
 | **Manual metadata editing** | Edit title, summary, artwork and genres by hand and lock them against refreshes. Today: fix match only. |

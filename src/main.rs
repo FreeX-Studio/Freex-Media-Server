@@ -23,6 +23,7 @@ mod db;
 mod files;
 mod http;
 mod i18n;
+mod maintenance;
 mod markers;
 mod media;
 mod metadata;
@@ -60,6 +61,8 @@ pub struct AppState {
     pub activity: activity::Activity,
     /// None when detection is switched off or ffmpeg is missing.
     pub markers: Option<markers::Service>,
+    /// The nightly maintenance window.
+    pub maintenance: maintenance::Maintenance,
     /// Load of the machine for the dashboard.
     pub system: system::System,
     /// Seek preview thumbnails; None if switched off or ffmpeg is missing.
@@ -199,6 +202,7 @@ fn run(config_path: PathBuf) -> Result<Outcome, String> {
                 markers,
                 previews,
                 system: system::System::new(),
+                maintenance: maintenance::Maintenance::default(),
                 together,
                 cast_grants: api::Grants::default(),
                 scanner: media::scanner::Scanner::default(),
@@ -224,6 +228,7 @@ fn run(config_path: PathBuf) -> Result<Outcome, String> {
             spawn_housekeeping(app.clone());
             fill_age_ratings(&app);
             system::System::spawn(app.clone());
+            maintenance::Maintenance::spawn(app.clone());
             media::scanner::Scanner::spawn_timer(app.clone(), app.config.scanner.interval_minutes);
             let handle = axum_server::Handle::new();
             let stopper = handle.clone();

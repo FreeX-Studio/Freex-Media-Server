@@ -481,6 +481,12 @@ impl Db {
         Ok(Db { conn: Mutex::new(conn) })
     }
 
+    /// Writes a consistent copy of the database to `path` (which must not exist yet).
+    pub fn backup_to(&self, path: &Path) -> Result<(), String> {
+        let target = path.to_str().ok_or("path is not UTF-8")?;
+        self.c().execute("VACUUM INTO ?1", [target]).map(|_| ()).map_err(|e| e.to_string())
+    }
+
     fn c(&self) -> MutexGuard<'_, Connection> {
         self.conn.lock().unwrap_or_else(|e| e.into_inner())
     }
