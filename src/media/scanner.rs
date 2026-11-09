@@ -464,6 +464,9 @@ impl Build {
         if item.backdrop_path.is_none() && own_folder {
             item.backdrop_path = sc.image(&["fanart", "backdrop", "background", "art"]);
         }
+        if own_folder {
+            item.theme_path = sc.theme();
+        }
         item.file = Some(self.file_info(&id, video, &sc, &base)?);
         item.added_at = self.added_at(&id, video)?;
         self.put(item);
@@ -513,6 +516,7 @@ impl Build {
                     show.tvdb_hint = tvdb_tag(&show_title_raw).unwrap_or(0);
                 }
                 show.poster_path = ssc.image(&["poster", "folder", "cover", "show"]);
+                show.theme_path = ssc.theme();
                 show.backdrop_path = ssc.image(&["fanart", "backdrop", "background", "art"]);
             }
             show.added_at = self.previous.get(&show_id).map_or(0, |o| o.added_at);
@@ -779,6 +783,11 @@ impl Sidecars {
 
     fn find(&self, name: &str) -> Option<&Path> {
         self.by_lower_name.get(&name.to_lowercase()).map(PathBuf::as_path)
+    }
+
+    /// Theme music: `theme.mp3` (or .m4a, .ogg, .opus, .flac, .wav).
+    fn theme(&self) -> Option<String> {
+        ["mp3", "m4a", "aac", "ogg", "opus", "flac", "wav"].iter().find_map(|e| self.find(&format!("theme.{e}")).map(text))
     }
 
     /// First existing image among the given base names (any supported image extension).

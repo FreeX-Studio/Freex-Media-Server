@@ -98,6 +98,9 @@ pub struct Item {
     /// Age rating ("FSK 12", "PG-13") from the `.nfo` or the online metadata; empty if unknown.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub content_rating: String,
+    /// Theme music (`theme.mp3`) in the folder of a show or movie.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub theme_path: Option<String>,
     /// For extras: `trailer`, `featurette`, `behindTheScenes`, `deletedScene`, `interview`,
     /// `scene`, `short` or `other`.
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -145,6 +148,7 @@ impl Item {
             "addedAt": self.added_at,
             "hasPoster": self.poster_path.is_some(),
             "hasBackdrop": self.backdrop_path.is_some(),
+            "hasTheme": self.theme_path.is_some(),
         });
         if let Some(f) = &self.file {
             m["media"] = f.to_public();

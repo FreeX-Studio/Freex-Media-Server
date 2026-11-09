@@ -102,6 +102,7 @@ impl<'a> View<'a> {
         if let Some(show) = self.idx.show_of(it) {
             m["showTitle"] = json!(show.title);
             m["showId"] = json!(show.id);
+            m["hasTheme"] = json!(show.theme_path.is_some());
         }
         if matches!(it.kind, Kind::Show | Kind::Season) {
             let (leaves, viewed) = self.count_leaves(it);
@@ -593,6 +594,21 @@ pub async fn image(
     let it = visible_item(&app.catalog.snapshot(), u, &id)?;
     let path = image_path(&app, &it, &kind).await.ok_or_else(ApiError::not_found)?;
     crate::files::send(&path, IMAGE_CACHE_SECONDS, &headers).await
+}
+
+/// The theme music of a show or movie; seasons and episodes have their show's.
+pub async fn theme(
+    State(app): State<Arc<AppState>>,
+    Extension(ctx): Extension<Ctx>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+) -> ApiResult {
+    let u = ctx.user()?;
+    let idx = app.catalog.snapshot();
+    let it = visible_item(&idx, u, &id)?;
+    let top = idx.show_of(&it).cloned().unwrap_or(it);
+    let path = top.theme_path.clone().ok_or_else(ApiError::not_found)?;
+    crate::files::send(std::path::Path::new(&path), IMAGE_CACHE_SECONDS, &headers).await
 }
 
 /// The seek preview sprite sheet of a movie or episode; its grid is `previews` in the item view.

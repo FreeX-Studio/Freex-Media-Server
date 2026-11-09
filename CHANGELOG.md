@@ -48,7 +48,9 @@
   season or show with its subtitles, artwork and extras, after a confirmation that lists the files
 - **Editing metadata by hand** (admins, *… → Edit metadata*): title, sort title, year, rating, age rating, genres,
   tagline, summary and own poster and background; edited fields stay through scans and refreshes until reset
-- FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; *Automatic* quality and the quality defaults under Account; the subtitle look and burning in text subtitles; the server dashboard with the maintenance; webhooks; deleting from disk and editing metadata in the item menu; a switch for the previews in the server settings
+- **Theme music:** a `theme.mp3` in the folder of a show or movie plays quietly on its pages (the show's also on its
+  seasons), with a button to switch it off on the device
+- FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; *Automatic* quality and the quality defaults under Account; the subtitle look and burning in text subtitles; the server dashboard with the maintenance; webhooks; deleting from disk and editing metadata in the item menu; theme music; a switch for the previews in the server settings
 
 ## FreeX Media Server 0.20.0 · FreeX Web 1.5.0.0
 

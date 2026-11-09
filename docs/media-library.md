@@ -26,6 +26,7 @@ Movies/
 Shows/
   Dark (2017)/
     poster.jpg   fanart.jpg   tvshow.nfo
+    theme.mp3                       theme music, played on the show's pages (also .m4a, .ogg, .flac)
     season01-poster.jpg
     Season 1/                       also "Staffel 1", "S01", "Specials"
       Dark - S01E01 - Secrets.mkv   also S01E01-E02, 1x01, or "01 - Title.mkv" in a season folder

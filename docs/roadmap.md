@@ -26,7 +26,7 @@ The gaps that show in daily use. All of them fit the current architecture.
 | ~~**Webhooks**~~ | **Delivered in 0.21.0** – see [API](api.md#webhooks). |
 | ~~**Delete files from the library**~~ | **Delivered in 0.21.0** – see [Configuration](configuration.md). |
 | ~~**Manual metadata editing**~~ | **Delivered in 0.21.0** – see [Media library](media-library.md#editing-metadata-by-hand). |
-| **Theme music** | Play a show's theme on its page. Low priority. |
+| ~~**Theme music**~~ | **Delivered in 0.21.0** – `theme.mp3` in the show or movie folder, see [Media library](media-library.md#folder-layout). |
 
 ## Phase 2 – more kinds of media and the apps
 

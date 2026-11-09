@@ -199,6 +199,60 @@
         return `/play/${id}` + (qs ? "?" + qs : "");
     }
 
+    // ------------------------------------------------------------------ theme music
+
+    /** Theme music of a show (also on its seasons) or movie: quiet, faded in, stopped on leaving. */
+    const theme = {audio: null, key: null, stopTimer: null};
+    const THEME_KEY = "freex.themeMusic";
+    const themeOn = () => M.store.get(THEME_KEY) !== "0";
+
+    function stopTheme() {
+        const a = theme.audio;
+        theme.audio = null;
+        theme.key = null;
+        if (!a) return;
+        // A short fade instead of a hard cut.
+        const step = setInterval(() => {
+            a.volume = Math.max(0, a.volume - 0.03);
+            if (a.volume <= 0.01) {
+                clearInterval(step);
+                a.pause();
+                a.src = "";
+            }
+        }, 50);
+    }
+
+    function playTheme(id, key) {
+        clearTimeout(theme.stopTimer);
+        // Moving between the pages of one show keeps the music going.
+        S.cleanup = () => theme.stopTimer = setTimeout(stopTheme, 150);
+        if (!themeOn() || theme.key === key) return;
+        stopTheme();
+        const a = new Audio(`/api/items/${encodeURIComponent(id)}/theme`);
+        a.volume = 0;
+        theme.audio = a;
+        theme.key = key;
+        a.play().then(() => {
+            const fade = setInterval(() => {
+                if (theme.audio !== a) return clearInterval(fade);
+                a.volume = Math.min(0.25, a.volume + 0.02);
+                if (a.volume >= 0.25) clearInterval(fade);
+            }, 100);
+        }).catch(() => null); // no sound before the first click on the page: browsers forbid it
+    }
+
+    function themeButton(id, key) {
+        const btn = h("button", {class: "round-btn", title: t("Theme music"), "aria-label": t("Theme music"), "aria-pressed": String(themeOn()),
+            onclick: () => {
+                const on = !themeOn();
+                M.store.set(THEME_KEY, on ? null : "0");
+                btn.setAttribute("aria-pressed", String(on));
+                btn.replaceChildren(icon(on ? "volume" : "mute"));
+                if (on) playTheme(id, key); else stopTheme();
+            }}, icon(themeOn() ? "volume" : "mute"));
+        return btn;
+    }
+
     M.route("/item/:id", async (main, p) => {
         const it = await api("GET", `/api/items/${p.id}`);
         const playable = it.type === "movie" || it.type === "episode";
@@ -243,6 +297,12 @@
         }
         actions.append(h("button", {class: "round-btn", title: t("More"), "aria-label": t("More"), "data-menu": true,
             onclick: (e) => M.itemMenu(e.currentTarget, it)}, icon("more")));
+        // Theme music on the pages of a show and its seasons, and of a movie.
+        if (it.hasTheme && ["show", "season", "movie"].includes(it.type)) {
+            const key = it.type === "movie" ? it.id : it.showId || it.id;
+            actions.append(themeButton(it.id, key));
+            playTheme(it.id, key);
+        }
 
         // Track selection on the detail page
         let tracks = null;

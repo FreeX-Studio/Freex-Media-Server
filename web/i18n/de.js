@@ -63,6 +63,7 @@ FreeXI18n.add("de", {
     "Back 10 seconds": "10 Sekunden zurück",
     "Chapters": "Kapitel",
     "Dashboard": "Dashboard",
+    "Theme music": "Titelmusik",
     "Edit metadata …": "Metadaten bearbeiten …",
     "Edit metadata": "Metadaten bearbeiten",
     "reset on save": "wird beim Speichern zurückgesetzt",
