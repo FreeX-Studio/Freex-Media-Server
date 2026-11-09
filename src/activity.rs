@@ -72,12 +72,15 @@ fn key(user: &str, item: &str, client: &str) -> String {
 }
 
 impl Activity {
-    /// A player started (or restarted after a jump or a quality change) a playback.
-    pub fn started(&self, s: Start) {
-        let Some(client) = client(s.client) else { return };
+    /// A player started (or restarted after a jump or a quality change) a playback; true if it
+    /// is a new one.
+    pub fn started(&self, s: Start) -> bool {
+        let Some(client) = client(s.client) else { return false };
         let now = now_ms();
         let mut all = self.playbacks.lock().unwrap();
-        let p = all.entry(key(s.user_id, s.item_id, client)).or_insert_with(|| Playback {
+        let k = key(s.user_id, s.item_id, client);
+        let fresh = all.get(&k).is_none_or(|p| now - p.last_seen > TIMEOUT_MS);
+        let p = all.entry(k).or_insert_with(|| Playback {
             user_id: s.user_id.to_string(),
             item_id: s.item_id.to_string(),
             client: client.to_string(),
@@ -105,24 +108,37 @@ impl Activity {
         p.state = "playing".into();
         p.last_seen = now;
         p.bitrate = s.bitrate;
+        fresh
     }
 
-    /// A position report; `stopped` ends the playback.
-    pub fn progress(&self, user_id: &str, item_id: &str, client_id: Option<&str>, offset_ms: i64, state: &str, stopped: bool) {
-        let Some(client) = client(client_id) else { return };
+    /// A position report; `stopped` ends the playback. Returns what changed for webhooks:
+    /// `pause`, `resume` or `stop`.
+    pub fn progress(
+        &self,
+        user_id: &str,
+        item_id: &str,
+        client_id: Option<&str>,
+        offset_ms: i64,
+        state: &str,
+        stopped: bool,
+    ) -> Option<&'static str> {
+        let client = client(client_id)?;
         let k = key(user_id, item_id, client);
         let mut all = self.playbacks.lock().unwrap();
         if stopped {
-            all.remove(&k);
-            return;
+            return all.remove(&k).map(|_| "stop");
         }
         // Not announced (e.g. after a restart of the server): the next start announces it.
-        let Some(p) = all.get_mut(&k) else { return };
+        let p = all.get_mut(&k)?;
         p.offset_ms = offset_ms;
-        if matches!(state, "paused" | "playing" | "buffering") {
-            p.state = state.to_string();
-        }
+        let before = std::mem::take(&mut p.state);
+        p.state = if matches!(state, "paused" | "playing" | "buffering") { state.to_string() } else { before.clone() };
         p.last_seen = now_ms();
+        match (before.as_str(), p.state.as_str()) {
+            ("playing" | "buffering", "paused") => Some("pause"),
+            ("paused", "playing") => Some("resume"),
+            _ => None,
+        }
     }
 
     /// Running playbacks, oldest first.

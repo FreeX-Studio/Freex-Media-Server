@@ -23,6 +23,7 @@ use crate::media::catalog::Index;
 use crate::media::playback::{self, Capabilities, Mode, QUALITIES};
 use crate::media::{Item, Kind};
 use crate::transcode::{Session, StartError};
+use crate::webhooks::Webhooks;
 use axum::Extension;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
@@ -129,7 +130,8 @@ pub async fn start(State(app): State<Arc<AppState>>, Extension(ctx): Extension<C
         },
     }
     let bitrate = playback::stream_bitrate(f, &plan);
-    app.activity.started(Start {
+    let mode = plan.mode.name();
+    let fresh = app.activity.started(Start {
         user_id: &u.id,
         item_id: &it.id,
         client: body.str("client"),
@@ -143,7 +145,22 @@ pub async fn start(State(app): State<Arc<AppState>>, Extension(ctx): Extension<C
         user_agent: &ctx.user_agent,
         bitrate,
     });
+    if fresh {
+        let idx = app.catalog.snapshot();
+        let device = body.str("device").unwrap_or("");
+        Webhooks::emit(&app, "play", playback_event(&idx, u, &it, device, &ctx.ip, start, Some(mode)));
+    }
     ok(m)
+}
+
+/// The body of a playback webhook.
+pub(super) fn playback_event(idx: &Index, u: &User, it: &Item, device: &str, ip: &str, offset_ms: i64, mode: Option<&str>) -> Value {
+    json!({
+        "user": crate::webhooks::user_json(u),
+        "item": crate::webhooks::item_json(idx, it),
+        "player": {"device": device, "ip": ip, "mode": mode},
+        "offsetMs": offset_ms,
+    })
 }
 
 /// A conversion session of the signed-in user; 404 for anyone else.
@@ -270,7 +287,7 @@ pub async fn progress(
         }
         app.catalog.update_item(&app.db, changed);
     }
-    app.activity.progress(
+    let change = app.activity.progress(
         &u.id,
         &it.id,
         body.str("client"),
@@ -278,6 +295,9 @@ pub async fn progress(
         body.str("state").unwrap_or("playing"),
         body.bool("stopped").unwrap_or(false),
     );
+    if let Some(event) = change {
+        Webhooks::emit(&app, event, playback_event(&idx, u, &it, body.str("device").unwrap_or(""), &ctx.ip, offset, None));
+    }
     if it.kind == Kind::Extra {
         // Trailers and bonus videos keep no resume position and no history.
         return ok(Progress::default().to_json());
@@ -290,6 +310,7 @@ pub async fn progress(
         let new_view = !old.watched || old.offset_ms > 0;
         if new_view {
             record_history(&app, &idx, u, &it, now);
+            Webhooks::emit(&app, "watched", playback_event(&idx, u, &it, body.str("device").unwrap_or(""), &ctx.ip, offset, None));
         }
         Progress { offset_ms: 0, watched: true, view_count: old.view_count + i64::from(new_view), updated_at: now }
     } else if offset < MIN_RESUME_MS {

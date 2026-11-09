@@ -129,6 +129,7 @@
         ["libraries", "Libraries", true],
         ["users", "Users", true],
         ["server", "Server", true],
+        ["webhooks", "Webhooks", true],
         // Only inside the Windows app (see desktop.js).
         ...(M.desktop ? [["desktop", "FreeX Desktop", false]] : []),
         ["about", "About FreeX", false],
@@ -145,7 +146,7 @@
                 TABS.filter(([, , admin]) => admin).map(([id, label]) => link(`/settings/${id}`, {class: "nav-link" + (id === tab ? " active" : "")}, t(label)))] : null);
         const content = h("div", {class: "settings-content"});
         main.replaceChildren(h("div", {class: "page settings"}, nav, content));
-        await {account, security, dashboard, libraries, users, server, about, desktop: M.desktop && M.desktop.settingsPage}[tab](content);
+        await {account, security, dashboard, libraries, users, server, webhooks, about, desktop: M.desktop && M.desktop.settingsPage}[tab](content);
     });
 
     const panel = (title, ...children) => h("section", {class: "panel"}, h("h2", null, title), children);
@@ -165,6 +166,74 @@
                 await onConfirm();
             }}, label);
         return b;
+    }
+
+    // ------------------------------------------------------------------ webhooks
+
+    const EVENT_LABELS = {play: "Playback starts", pause: "Paused", resume: "Resumed", stop: "Playback stops",
+        watched: "Title watched", "library.new": "New titles in a library"};
+
+    async function webhooks(c) {
+        const data = await api("GET", "/api/admin/webhooks");
+        const form = (hook) => {
+            const url = h("input", {id: "wh-url", type: "url", placeholder: "https://homeassistant.local:8123/api/webhook/…", value: hook ? hook.url : ""});
+            const boxes = data.events.map((e) => ({e, cb: h("input", {type: "checkbox", checked: hook ? hook.events.includes(e) : ["play", "pause", "resume", "stop"].includes(e)})}));
+            const error = h("div", {class: "error-text", role: "alert"});
+            const el = h("div", null,
+                field("wh-url", t("Address"), url),
+                h("div", {class: "field"}, h("label", null, t("Events")), h("div", {class: "check-grid"},
+                    boxes.map(({e, cb}) => h("label", {class: "check"}, cb, t(EVENT_LABELS[e] || e), h("code", null, e))))),
+                error);
+            const value = () => ({url: url.value, events: boxes.filter((b) => b.cb.checked).map((b) => b.e)});
+            return {el, value, error};
+        };
+        const rows = data.webhooks.map((hk) => {
+            const last = hk.last;
+            const secret = h("code", {class: "secret"}, hk.secret);
+            return h("div", {class: "list-row webhook-row"},
+                h("div", {class: "grow"},
+                    h("div", {class: "name"}, hk.url),
+                    h("div", {class: "detail-line"}, hk.events.map((e) => t(EVENT_LABELS[e] || e)).join(", ")),
+                    h("div", {class: "detail-line"}, t("Secret for the signature:"), " ", secret),
+                    h("div", {class: "detail-line" + (last && !last.ok ? " error-text" : "")}, last
+                        ? t("Last call {0} ({1}): {2}", M.fmtDate(last.at), last.event, last.ok ? t("OK ({0})", last.detail) : last.detail)
+                        : t("Not called yet"))),
+                h("button", {class: "btn small", onclick: async (e) => {
+                    e.target.disabled = true;
+                    const r = await api("POST", `/api/admin/webhooks/${hk.id}/test`).catch((err) => ({ok: false, detail: err.message}));
+                    M.toast(r.ok ? t("Test sent: {0}", r.detail) : t("Test failed: {0}", r.detail), !r.ok);
+                    M.render();
+                }}, t("Test")),
+                h("button", {class: "btn small", onclick: () => {
+                    const f = form(hk);
+                    const close = M.modal(t("Edit webhook"), f.el, h("div", {class: "btn-row"}, h("button", {class: "btn primary", onclick: async () => {
+                        try {
+                            await api("PUT", `/api/admin/webhooks/${hk.id}`, f.value());
+                            close();
+                            M.render();
+                        } catch (err) {
+                            f.error.textContent = err.message;
+                        }
+                    }}, t("Save"))));
+                }}, t("Edit")),
+                confirmButton(t("Delete"), t("Really delete?"), async () => {
+                    await api("DELETE", `/api/admin/webhooks/${hk.id}`);
+                    M.render();
+                }));
+        });
+        const f = form(null);
+        c.append(h("h1", null, "Webhooks"),
+            h("p", {class: "muted"}, t("The server calls these addresses with an HTTP POST and a JSON body when something happens, e.g. for home automation. Each call carries the header X-FreeX-Signature: sha256=<HMAC-SHA256 of the body with the secret>.")),
+            rows.length ? h("div", {class: "list"}, rows) : h("p", {class: "muted"}, t("No webhooks yet.")),
+            panel(t("Add webhook"), f.el, h("button", {class: "btn primary", onclick: async () => {
+                try {
+                    await api("POST", "/api/admin/webhooks", f.value());
+                    M.toast(t("Webhook added"));
+                    M.render();
+                } catch (err) {
+                    f.error.textContent = err.message;
+                }
+            }}, t("Add"))));
     }
 
     // ------------------------------------------------------------------ dashboard

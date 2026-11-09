@@ -1024,6 +1024,28 @@ select, .field input, .inline input, .filter-field input {
     height: 34px;
 }
 
+.check-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 6px 16px;
+}
+
+.check-grid code, .webhook-row code {
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 6px;
+}
+
+.webhook-row .name {
+    word-break: break-all;
+}
+
+.webhook-row code.secret {
+    margin-left: 0;
+    user-select: all;
+    word-break: break-all;
+}
+
 .dash-tiles {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));

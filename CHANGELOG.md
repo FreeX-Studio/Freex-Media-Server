@@ -42,7 +42,9 @@
 - **Nightly maintenance** (`[maintenance]`, 03:00 by default): a backup of the database (seven kept in
   `<data>/backups`), clean-up of thumbnails and subtitles of removed or replaced files, and a rescan of all libraries;
   *Run now* and the last report on the dashboard
-- FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; *Automatic* quality and the quality defaults under Account; the subtitle look and burning in text subtitles; the server dashboard with the maintenance; a switch for the previews in the server settings
+- **Webhooks** (*Settings → Webhooks*): an HTTP POST with JSON on play, pause, resume, stop, watched and new titles,
+  signed with HMAC-SHA256, with a test button and the outcome of the last call (see [API](docs/api.md#webhooks))
+- FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; *Automatic* quality and the quality defaults under Account; the subtitle look and burning in text subtitles; the server dashboard with the maintenance; webhooks; a switch for the previews in the server settings
 
 ## FreeX Media Server 0.20.0 · FreeX Web 1.5.0.0
 

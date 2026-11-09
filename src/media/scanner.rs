@@ -167,6 +167,7 @@ impl Scanner {
 async fn scan_now(app: &Arc<AppState>, lib: Library) {
     let start = Instant::now();
     let previous = previous_entries(&app.catalog.snapshot(), &lib.id);
+    let known: HashSet<String> = previous.keys().cloned().collect();
     let probe_ok = app.tools.ffprobe_ok;
     let walk_lib = lib.clone();
     let built = tokio::task::spawn_blocking(move || Build::run(&walk_lib, previous, probe_ok)).await;
@@ -206,8 +207,25 @@ async fn scan_now(app: &Arc<AppState>, lib: Library) {
     finish_shows(&lib, &mut items);
     app.metadata.apply_all(&mut items);
     let count = items.len();
+    // New movies and episodes, for webhooks (not on the first scan of a library).
+    let added: Vec<String> = if lib.last_scan > 0 {
+        items
+            .iter()
+            .filter(|it| matches!(it.kind, Kind::Movie | Kind::Episode) && !known.contains(&it.id))
+            .map(|it| it.id.clone())
+            .collect()
+    } else {
+        Vec::new()
+    };
     app.catalog.replace_library(&app.db, &lib.id, items);
     app.db.set_last_scan(&lib.id, now_ms());
+    if !added.is_empty() {
+        let idx = app.catalog.snapshot();
+        let list: Vec<serde_json::Value> =
+            added.iter().filter_map(|id| idx.item(id)).take(100).map(|it| crate::webhooks::item_json(&idx, it)).collect();
+        let event = serde_json::json!({"library": {"id": lib.id, "name": lib.name}, "count": added.len(), "items": list});
+        crate::webhooks::Webhooks::emit(app, "library.new", event);
+    }
     // New entries, renamed ones and old metadata are fetched in the background.
     crate::metadata::Service::refresh_library(app, &lib.id, false);
     crate::markers::Service::analyze_library(app, &lib.id, false);

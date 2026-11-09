@@ -32,6 +32,7 @@ mod system;
 mod tls;
 mod together;
 mod transcode;
+mod webhooks;
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -61,6 +62,8 @@ pub struct AppState {
     pub activity: activity::Activity,
     /// None when detection is switched off or ffmpeg is missing.
     pub markers: Option<markers::Service>,
+    /// HTTP calls on playback events and new titles.
+    pub webhooks: webhooks::Webhooks,
     /// The nightly maintenance window.
     pub maintenance: maintenance::Maintenance,
     /// Load of the machine for the dashboard.
@@ -188,6 +191,7 @@ fn run(config_path: PathBuf) -> Result<Outcome, String> {
                     }
                 }
             };
+            let hooks = webhooks::Webhooks::new(&db);
             let app = Arc::new(AppState {
                 build: web.build.clone(),
                 web,
@@ -203,6 +207,7 @@ fn run(config_path: PathBuf) -> Result<Outcome, String> {
                 previews,
                 system: system::System::new(),
                 maintenance: maintenance::Maintenance::default(),
+                webhooks: hooks,
                 together,
                 cast_grants: api::Grants::default(),
                 scanner: media::scanner::Scanner::default(),

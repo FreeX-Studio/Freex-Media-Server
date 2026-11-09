@@ -95,3 +95,34 @@ every language, so apps can react to it:
 | `GET` | `/api/admin/settings` | Settings of `config.toml` (secrets only as set / not set) and `pendingRestart` |
 | `PUT` | `/api/admin/settings` | `{currentPassword, values: {"server.port": 32600, …}}`; a secret sent as `null` stays unchanged |
 | `POST` | `/api/admin/restart` | Restart the server with the saved configuration |
+| `POST` | `/api/admin/maintenance` | Run the nightly maintenance now (409 while it runs); its schedule and last report are `maintenance` in the dashboard |
+| `GET` / `POST` | `/api/admin/webhooks` | Webhooks with their secret and last delivery / `{url, events}` adds one |
+| `PUT` / `DELETE` | `/api/admin/webhooks/{id}` | `{url, events, newSecret}` changes one / deletes it; `POST …/{id}/test` sends a test event |
+
+## Webhooks
+
+Admins can have the server call addresses on events (*Settings → Webhooks*), for home automation or notifications:
+an HTTP `POST` with a JSON body, the headers `X-FreeX-Event: <event>` and
+`X-FreeX-Signature: sha256=<hex HMAC-SHA256 of the body, keyed with the webhook's secret>`, a timeout of ten seconds
+and one retry after five seconds. Redirects are not followed.
+
+| Event | When |
+|---|---|
+| `play` | A playback starts (not again for jumps or quality changes) |
+| `pause`, `resume` | The player pauses or continues |
+| `stop` | The player is closed or moves on |
+| `watched` | A title counts as watched (90 %) |
+| `library.new` | A scan found new movies or episodes (not on a library's first scan); up to 100 of them |
+
+```json
+{
+  "event": "play", "time": 1794246580212, "server": "FreeX",
+  "user": {"id": "67db…", "username": "niklas"},
+  "item": {"id": "e8eb…", "type": "episode", "title": "Secrets", "year": 2017, "show": "Dark", "season": 1, "episode": 1, "durationMs": 3112000},
+  "player": {"device": "Chrome on Windows", "ip": "192.168.1.20", "mode": "direct"},
+  "offsetMs": 0
+}
+```
+
+`library.new` has `library` (`id`, `name`), `count` and `items` instead. A check in Python:
+`hmac.compare_digest(sig, "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest())`.

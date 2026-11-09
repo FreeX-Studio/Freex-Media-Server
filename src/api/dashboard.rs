@@ -15,7 +15,7 @@
 
 use crate::AppState;
 use crate::auth::now_ms;
-use crate::http::{ApiResult, Ctx, ok};
+use crate::http::{ApiError, ApiResult, Ctx, ok};
 use crate::media::{Item, Kind};
 use axum::Extension;
 use axum::extract::{Query, State};
@@ -58,7 +58,7 @@ fn maintenance(app: &AppState) -> Value {
 pub async fn run_maintenance(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ctx>) -> ApiResult {
     ctx.admin()?;
     if app.maintenance.running() {
-        return Err(crate::http::ApiError::new(axum::http::StatusCode::CONFLICT, "error.maintenanceRunning"));
+        return Err(ApiError::new(axum::http::StatusCode::CONFLICT, "error.maintenanceRunning"));
     }
     let a = app.clone();
     tokio::spawn(async move {
@@ -190,4 +190,91 @@ fn libraries(app: &AppState) -> Value {
         })
         .collect();
     json!(list)
+}
+
+// ====================================================================== webhooks
+
+fn hook_json(app: &AppState, h: &crate::webhooks::Hook) -> Value {
+    let last = app.webhooks.last(&h.id).map(|d| json!({"at": d.at, "event": d.event, "ok": d.ok, "detail": d.detail}));
+    json!({"id": h.id, "url": h.url, "events": h.events, "secret": h.secret, "createdAt": h.created_at, "last": last})
+}
+
+/// The webhooks with the outcome of their last delivery, and the events there are.
+pub async fn webhooks(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ctx>) -> ApiResult {
+    ctx.admin()?;
+    let list: Vec<Value> = app.db.webhooks().iter().map(|h| hook_json(&app, h)).collect();
+    ok(json!({"webhooks": list, "events": crate::webhooks::EVENTS}))
+}
+
+/// `{url, events}` from a request, checked: an http(s) address and known events.
+fn hook_input(body: &crate::http::JsonBody) -> Result<(String, Vec<String>), ApiError> {
+    let url = body.string("url").trim().to_string();
+    let parsed = url::Url::parse(&url).map_err(|_| ApiError::bad_request("error.webhookUrl"))?;
+    if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() || url.len() > 2000 {
+        return Err(ApiError::bad_request("error.webhookUrl"));
+    }
+    let events: Vec<String> = body
+        .get("events")
+        .and_then(Value::as_array)
+        .map(|a| a.iter().filter_map(Value::as_str).filter(|e| crate::webhooks::EVENTS.contains(e)).map(str::to_string).collect())
+        .unwrap_or_default();
+    if events.is_empty() {
+        return Err(ApiError::bad_request("error.webhookEvents"));
+    }
+    Ok((url, events))
+}
+
+pub async fn create_webhook(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ctx>, body: crate::http::JsonBody) -> ApiResult {
+    ctx.admin()?;
+    let (url, events) = hook_input(&body)?;
+    let h = crate::webhooks::Hook { id: crate::auth::id(), url, events, secret: crate::auth::token(), created_at: now_ms() };
+    app.db.save_webhook(&h);
+    app.webhooks.reload(&app.db);
+    crate::http::created(hook_json(&app, &h))
+}
+
+fn find_hook(app: &AppState, id: &str) -> Result<crate::webhooks::Hook, ApiError> {
+    app.db.webhooks().into_iter().find(|h| h.id == id).ok_or_else(ApiError::not_found)
+}
+
+pub async fn update_webhook(
+    State(app): State<Arc<AppState>>,
+    Extension(ctx): Extension<Ctx>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    body: crate::http::JsonBody,
+) -> ApiResult {
+    ctx.admin()?;
+    let mut h = find_hook(&app, &id)?;
+    (h.url, h.events) = hook_input(&body)?;
+    if body.bool("newSecret") == Some(true) {
+        h.secret = crate::auth::token();
+    }
+    app.db.save_webhook(&h);
+    app.webhooks.reload(&app.db);
+    ok(hook_json(&app, &h))
+}
+
+pub async fn delete_webhook(
+    State(app): State<Arc<AppState>>,
+    Extension(ctx): Extension<Ctx>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> ApiResult {
+    ctx.admin()?;
+    if !app.db.delete_webhook(&id) {
+        return Err(ApiError::not_found());
+    }
+    app.webhooks.reload(&app.db);
+    crate::http::no_content()
+}
+
+/// Sends a test event and answers with the outcome.
+pub async fn test_webhook(
+    State(app): State<Arc<AppState>>,
+    Extension(ctx): Extension<Ctx>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> ApiResult {
+    ctx.admin()?;
+    let h = find_hook(&app, &id)?;
+    let d = app.webhooks.test(&app.config.server.name, &h).await;
+    ok(json!({"ok": d.ok, "detail": d.detail}))
 }

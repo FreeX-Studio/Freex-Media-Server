@@ -188,6 +188,16 @@ const MIGRATIONS: &[&str] = &[
     r#"
     ALTER TABLE users ADD COLUMN subtitle_style TEXT NOT NULL DEFAULT '';
     "#,
+    // 11: webhooks
+    r#"
+    CREATE TABLE webhooks (
+        id TEXT PRIMARY KEY,
+        url TEXT NOT NULL,
+        events TEXT NOT NULL,
+        secret TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+    );
+    "#,
 ];
 
 /// Login events kept per user.
@@ -479,6 +489,38 @@ impl Db {
         }
         restrict_permissions(path);
         Ok(Db { conn: Mutex::new(conn) })
+    }
+
+    // ------------------------------------------------------------------ webhooks
+
+    pub fn webhooks(&self) -> Vec<crate::webhooks::Hook> {
+        let c = self.c();
+        let mut st = c.prepare_cached("SELECT id, url, events, secret, created_at FROM webhooks ORDER BY created_at").unwrap();
+        st.query_map([], |r| {
+            let events: String = r.get(2)?;
+            Ok(crate::webhooks::Hook {
+                id: r.get(0)?,
+                url: r.get(1)?,
+                events: events.split(',').filter(|e| !e.is_empty()).map(str::to_string).collect(),
+                secret: r.get(3)?,
+                created_at: r.get(4)?,
+            })
+        })
+        .unwrap()
+        .filter_map(Result::ok)
+        .collect()
+    }
+
+    pub fn save_webhook(&self, h: &crate::webhooks::Hook) {
+        let _ = self.c().execute(
+            "INSERT INTO webhooks (id, url, events, secret, created_at) VALUES (?1, ?2, ?3, ?4, ?5) \
+             ON CONFLICT(id) DO UPDATE SET url = ?2, events = ?3, secret = ?4",
+            params![h.id, h.url, h.events.join(","), h.secret, h.created_at],
+        );
+    }
+
+    pub fn delete_webhook(&self, id: &str) -> bool {
+        self.c().execute("DELETE FROM webhooks WHERE id = ?1", [id]).unwrap_or(0) > 0
     }
 
     /// Writes a consistent copy of the database to `path` (which must not exist yet).

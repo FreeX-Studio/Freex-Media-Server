@@ -231,7 +231,8 @@ pub async fn start_cast(
         .unwrap()
         .insert(token, Grant { user_id: u.id.clone(), item_id: it.id.clone(), session: session.clone(), expires: now_ms() + validity });
     let bitrate = playback::stream_bitrate(f, &plan);
-    app.activity.started(Start {
+    let mode = plan.mode.name();
+    let fresh = app.activity.started(Start {
         user_id: &u.id,
         item_id: &it.id,
         client: body.str("client"),
@@ -245,6 +246,11 @@ pub async fn start_cast(
         user_agent: &ctx.user_agent,
         bitrate,
     });
+    if fresh {
+        let idx = app.catalog.snapshot();
+        let ev = super::playback::playback_event(&idx, u, &it, body.str("device").unwrap_or("Chromecast"), &ctx.ip, start, Some(mode));
+        crate::webhooks::Webhooks::emit(&app, "play", ev);
+    }
     ok(m)
 }
 
