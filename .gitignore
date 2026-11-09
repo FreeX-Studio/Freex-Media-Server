@@ -1,0 +1,7 @@
+target/
+build/
+/config.yml
+/data/
+.idea/
+*.iml
+dist/

@@ -1,0 +1,24 @@
+FreeX Media Server for Windows - third-party software
+======================================================
+
+FreeX Media Server itself is free software under the GNU Lesser General Public
+License v3.0 (see LICENSE.txt). The Windows installer also contains the
+following programs. They are separate programs that FreeX Media Server runs; each
+keeps its own license.
+
+FFmpeg (ffmpeg.exe, ffprobe.exe), folder "ffmpeg"
+    Build: "essentials" release build by Gyan Doshi (https://www.gyan.dev/ffmpeg/builds/)
+    License: GNU General Public License v3.0 (the build contains GPL components
+    such as x264); the license text is in ffmpeg\LICENSE.
+    Source code of FFmpeg: https://ffmpeg.org/download.html and https://github.com/FFmpeg/FFmpeg
+    Sources of the build: https://github.com/GyanD/codexffmpeg
+    You may replace ffmpeg.exe and ffprobe.exe with other builds, or point
+    ffmpeg.ffmpeg and ffmpeg.ffprobe in config.toml to them.
+
+WinSW - Windows Service Wrapper (freex-media-server-service.exe)
+    License: MIT License, Copyright (c) 2008-2020 Kohsuke Kawaguchi, Sun Microsystems, Inc., CloudBees,
+    Inc., Oleg Nenashev and other contributors
+    Project and source code: https://github.com/winsw/winsw
+
+FreeX Web, which is part of FreeX Media Server, contains the font Manrope (SIL Open
+Font License), hls.js (Apache License 2.0) and qrcode-generator (MIT License).

@@ -1,0 +1,15 @@
+<!-- Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="84 84 344 344">
+  <!-- FreeX logo: an X with a play symbol cut out of its centre. Brand gradient #d93b42 to #f4b75c. -->
+  <defs>
+    <linearGradient id="fx" x1="96" y1="96" x2="416" y2="416" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d93b42"/><stop offset="0.22" stop-color="#da4041"/>
+      <stop offset="0.55" stop-color="#e98a46"/><stop offset="1" stop-color="#f4b75c"/>
+    </linearGradient>
+    <mask id="fxplay" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="#fff"/>
+      <path d="M240.2 220.0 L302.6 256.0 L240.2 292.0 Z" fill="#000" stroke="#000" stroke-width="16" stroke-linejoin="round"/>
+    </mask>
+  </defs>
+  <path d="M156 156 L356 356 M356 156 L156 356" fill="none" stroke="url(#fx)" stroke-width="120" stroke-linecap="round" mask="url(#fxplay)"/>
+</svg>

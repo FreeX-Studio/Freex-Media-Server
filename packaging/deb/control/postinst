@@ -1,0 +1,106 @@
+#!/bin/sh
+# Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3, see /usr/share/doc/freex-media-server/copyright.
+# Post-install script of freex-media-server: service user, data directory, systemd service.
+set -e
+
+USER_NAME=freex
+DATA_DIR=/var/lib/freex-media-server
+CACHE_DIR=/var/cache/freex-media-server
+CONFIG_DIR=/etc/freex-media-server
+CONFIG=$CONFIG_DIR/config.toml
+
+# Value of a key in the [server] section of config.toml, without quotes (empty if not set).
+server_setting() {
+    awk -v key="$1" '
+        /^\[server\]/ { s = 1; next }
+        /^\[/          { s = 0 }
+        s && $1 == key && $2 == "=" { v = $3; gsub(/["\047]/, "", v); print v; exit }
+    ' "$CONFIG" 2>/dev/null
+}
+
+# The address of the web interface: IP of the main network interface (the one of the
+# default route), the configured port, https if a keystore is set.
+web_address() {
+    port=$(server_setting port)
+    [ -n "$port" ] || port=32500
+    scheme=http
+    [ -n "$(server_setting tls_certificate)" ] && scheme=https
+    host=$(server_setting bind)
+    case "$host" in
+        ""|0.0.0.0|::|"[::]")
+            host=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "src") { print $(i + 1); exit } }')
+            [ -n "$host" ] || host=$(hostname -I 2>/dev/null | awk '{ print $1 }')
+            [ -n "$host" ] || host=$(hostname)
+            ;;
+    esac
+    echo "$scheme://$host:$port/"
+}
+
+if [ "$1" = "configure" ]; then
+    if ! getent passwd "$USER_NAME" >/dev/null; then
+        adduser --system --group --home "$DATA_DIR" --no-create-home \
+            --gecos "FreeX Media Server" "$USER_NAME" >/dev/null
+    fi
+    # GPU access for hardware transcoding (VAAPI / Quick Sync), if the groups exist.
+    for g in video render; do
+        if getent group "$g" >/dev/null; then
+            adduser "$USER_NAME" "$g" >/dev/null 2>&1 || true
+        fi
+    done
+
+    # systemd also creates these (StateDirectory/CacheDirectory); created here so they
+    # exist for manual starts and on systems without systemd.
+    for d in "$DATA_DIR" "$CACHE_DIR"; do
+        mkdir -p "$d"
+        chown "$USER_NAME:$USER_NAME" "$d"
+        chmod 750 "$d"
+    done
+
+    # An upgrade from the Java version (0.14 and earlier): its configuration and database have other
+    # formats and are not taken over. They are kept next to the data directory, so nothing is lost.
+    if [ -f "$CONFIG_DIR/config.yml" ] && [ ! -f "$CONFIG" ]; then
+        BACKUP="$DATA_DIR.java-backup"
+        mkdir -p "$BACKUP"
+        mv "$CONFIG_DIR/config.yml" "$BACKUP/config.yml"
+        for f in "$DATA_DIR"/* "$DATA_DIR"/.[!.]*; do
+            [ -e "$f" ] && mv "$f" "$BACKUP/"
+        done
+        chown -R "$USER_NAME:$USER_NAME" "$BACKUP"
+        chmod 750 "$BACKUP"
+        echo "The data of the Java version was moved to $BACKUP; the server starts fresh (see docs/installation.md)."
+    fi
+
+    # The configuration is written on the first install only and then belongs to the server,
+    # which changes it from its settings page. It can hold the TMDB key and the keystore
+    # password, so only the service user can read it.
+    mkdir -p "$CONFIG_DIR"
+    if [ ! -f "$CONFIG" ]; then
+        cp /usr/share/freex-media-server/config.toml.default "$CONFIG"
+    fi
+    chown "$USER_NAME:$USER_NAME" "$CONFIG_DIR" "$CONFIG"
+    chmod 750 "$CONFIG_DIR"
+    chmod 640 "$CONFIG"
+
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload >/dev/null || true
+        systemctl enable freex-media-server.service >/dev/null 2>&1 || true
+        if [ -z "$2" ]; then
+            systemctl start freex-media-server.service || true
+        else
+            systemctl try-restart freex-media-server.service || true
+        fi
+    fi
+
+    URL=$(web_address)
+    if [ -z "$2" ]; then
+        echo ""
+        echo "FreeX Media Server is running: $URL"
+        echo "Open it in a browser to create the admin account."
+        echo "Media folders must be readable by the user '$USER_NAME'."
+        echo ""
+    else
+        echo "FreeX Media Server updated and restarted: $URL"
+    fi
+fi
+
+exit 0

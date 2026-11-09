@@ -1,0 +1,49 @@
+[package]
+name = "freex-media-server"
+version = "0.20.0"
+edition = "2024"
+description = "FreeX Media Server: your media, your server, your freedom"
+license = "LGPL-3.0-only"
+repository = "https://github.com/LinzN/freex-media-server"
+rust-version = "1.89"
+
+[dependencies]
+argon2 = "0.5"
+axum = { version = "0.8.9", features = ["macros"] }
+axum-server = { version = "0.9", default-features = false, features = ["tls-rustls-no-provider"] }
+base64 = "0.22"
+fancy-regex = "0.14"
+futures-core = "0.3"
+hex = "0.4.3"
+hmac = "0.12"
+httpdate = "1"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "bmp", "webp"] }
+mime_guess = "2.0.5"
+rand = "0.8"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots", "json", "gzip"] }
+rusqlite = { version = "0.41.1", features = ["bundled"] }
+rust-embed = { version = "8.13.0", features = ["include-exclude"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+rustls-pemfile = "2"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha1 = "0.10"
+sha2 = "0.10"
+tokio = { version = "1.54.1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io"] }
+toml = "1.2.1"
+toml_edit = "0.23"
+tower-http = { version = "0.7.1", features = ["limit"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+unicode-normalization = "0.1"
+url = "2.5.8"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+[target."cfg(unix)".dependencies]
+libc = "0.2"
