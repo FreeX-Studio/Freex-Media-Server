@@ -34,9 +34,28 @@
     --warn: #e2b35a;
     --sidebar: 220px;
     --poster: 156px;
-    --radius-s: 4px;
-    --radius-m: 6px;
-    --font: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --radius-s: 8px;
+    --radius-m: 12px;
+    /* The system's own UI face where there is one (SF Pro on Apple devices, Segoe UI Variable on
+       Windows), Manrope everywhere else. */
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "Manrope", system-ui, sans-serif;
+    --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", "Manrope", system-ui, sans-serif;
+    /* Corner radii grow with the size of the surface: controls, cards, panels, sheets. */
+    --r-control: 10px;
+    --r-card: 12px;
+    --r-panel: 18px;
+    --r-sheet: 22px;
+    /* Translucent materials over the ambient background, thin to thick. */
+    --mat-thin: rgba(36, 48, 66, .42);
+    --mat-regular: rgba(27, 36, 48, .62);
+    --mat-thick: rgba(24, 32, 43, .84);
+    --hairline: rgba(255, 255, 255, .08);
+    --hairline-strong: rgba(255, 255, 255, .14);
+    --highlight: inset 0 1px 0 rgba(255, 255, 255, .06);
+    --fill: rgba(255, 255, 255, .06);
+    --fill-hover: rgba(255, 255, 255, .1);
+    --blur: blur(28px) saturate(170%);
+    --ease: cubic-bezier(.2, .8, .2, 1);
     color-scheme: dark;
 }
 
@@ -3747,3 +3766,402 @@ select, .field input, .inline input, .filter-field input {
         display: none;
     }
 }
+
+/* ================================================================== materials
+   The look of FreeX Web: one calm ambient light from the brand colours behind everything, and
+   translucent glass surfaces on top of it (sidebar, panels, menus, dialogs, player controls),
+   each with a hairline edge and a faint top highlight. Radii grow with the surface; controls
+   are capsules. Kept in one place, after the layout rules it refines. */
+
+body {
+    background:
+        radial-gradient(1100px 620px at 12% -12%, rgba(240, 151, 74, .11), transparent 62%),
+        radial-gradient(900px 560px at 100% -8%, rgba(217, 59, 66, .08), transparent 60%),
+        var(--ink);
+    background-attachment: fixed;
+    font-feature-settings: "ss01", "cv11";
+}
+
+h1, h2, h3, .brand, .detail-info h1 {
+    font-family: var(--font-display);
+}
+
+h1 {
+    letter-spacing: -0.025em;
+}
+
+h2, h3 {
+    letter-spacing: -0.015em;
+}
+
+:focus-visible {
+    outline: 2px solid var(--glass);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 5px rgba(240, 151, 74, .18);
+}
+
+/* ---- shell: a transparent title bar, a floating glass sidebar */
+
+.topbar {
+    background: transparent;
+    border-bottom: 0;
+}
+
+.search input {
+    background: var(--fill);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--highlight);
+    transition: background .2s var(--ease), border-color .2s var(--ease);
+}
+
+.search input:focus {
+    background: var(--mat-regular);
+    border-color: rgba(240, 151, 74, .55);
+    box-shadow: 0 0 0 4px rgba(240, 151, 74, .16);
+}
+
+.icon-btn:hover {
+    background: var(--fill-hover);
+}
+
+@media (min-width: 861px) {
+    .sidebar {
+        margin: 4px 0 12px 12px;
+        padding: 10px 8px;
+        border-radius: var(--r-panel);
+        background: var(--mat-regular);
+        border: 1px solid var(--hairline);
+        box-shadow: var(--highlight), 0 20px 50px rgba(0, 0, 0, .25);
+        backdrop-filter: var(--blur);
+        -webkit-backdrop-filter: var(--blur);
+    }
+
+    .shell {
+        grid-template-columns: calc(var(--sidebar) + 12px) 1fr;
+    }
+}
+
+.nav-link {
+    border-radius: var(--r-control);
+    transition: background .2s var(--ease), color .2s var(--ease);
+}
+
+.nav-link:hover {
+    background: var(--fill);
+}
+
+.nav-link.active {
+    background: rgba(240, 151, 74, .14);
+}
+
+.nav-link.active .ico {
+    color: var(--glass);
+}
+
+/* The selection mark sits inside the highlighted row. */
+.nav-link.active::before {
+    left: 3px;
+    top: 50%;
+    bottom: auto;
+    height: 16px;
+    margin-top: -8px;
+    border-radius: 3px;
+}
+
+.shell.nav-collapsed .nav-link.active::before, .shell:not(.nav-open) .nav-link.active::before {
+    left: 3px;
+}
+
+/* ---- controls: capsules */
+
+.btn {
+    border-radius: 999px;
+    border-color: var(--hairline);
+    background: var(--fill);
+    box-shadow: var(--highlight);
+    transition: background .2s var(--ease), transform .2s var(--ease);
+}
+
+.btn:hover {
+    background: var(--fill-hover);
+}
+
+.btn:active, .round-btn:active {
+    transform: scale(.97);
+}
+
+.btn.primary {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 6px 18px rgba(240, 151, 74, .25);
+}
+
+.btn.primary.play {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 10px 28px rgba(226, 96, 63, .3);
+}
+
+.round-btn, .row-arrow {
+    border-color: var(--hairline);
+    background: var(--mat-thin);
+    box-shadow: var(--highlight);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+    transition: background .2s var(--ease), transform .2s var(--ease);
+}
+
+.round-btn:hover, .row-arrow:hover:not([disabled]) {
+    background: var(--fill-hover);
+}
+
+select, .field input, .inline input, .filter-field input, textarea {
+    border-radius: var(--r-control);
+    border: 1px solid var(--hairline);
+    background-color: var(--fill);
+    box-shadow: var(--highlight);
+    transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+
+select:focus, .field input:focus, .inline input:focus, .filter-field input:focus, textarea:focus {
+    outline: none;
+    border-color: rgba(240, 151, 74, .6);
+    box-shadow: 0 0 0 4px rgba(240, 151, 74, .16);
+}
+
+select option {
+    background: var(--surface);
+}
+
+/* Library tabs as a segmented control. */
+.lib-tabs {
+    gap: 2px;
+    align-self: center;
+    padding: 3px;
+    margin: 4px 0 12px;
+    border-radius: 999px;
+    background: var(--fill);
+    border: 1px solid var(--hairline);
+}
+
+.lib-tabs a {
+    padding: 6px 16px;
+    margin: 0;
+    border: 0;
+    border-radius: 999px;
+    font-weight: 600;
+    transition: background .25s var(--ease), color .25s var(--ease);
+}
+
+.lib-tabs a.active {
+    background: var(--raised);
+    box-shadow: var(--highlight), 0 2px 8px rgba(0, 0, 0, .3);
+}
+
+.lib-head {
+    border-bottom: 0;
+}
+
+/* ---- cards: rounded artwork that lifts towards the viewer on hover, like a focused tile */
+
+.card .art, .mirror .poster, .activity-art, .episode .art {
+    border-radius: var(--r-card);
+}
+
+.card .art {
+    box-shadow: 0 1px 0 rgba(255, 255, 255, .04), 0 8px 20px rgba(0, 0, 0, .28);
+    transition: transform .35s var(--ease), box-shadow .35s var(--ease);
+}
+
+@media (hover: hover) {
+    .card:hover .art {
+        transform: translateY(-3px) scale(1.035);
+        box-shadow: 0 18px 38px rgba(0, 0, 0, .5);
+    }
+}
+
+.hub-head h2 {
+    font-size: 21px;
+    font-weight: 700;
+}
+
+.card .title {
+    font-weight: 600;
+}
+
+/* ---- surfaces: panels, menus, dialogs */
+
+.panel, .dash-tile, .filter-panel {
+    background: var(--mat-thin);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--highlight);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+}
+
+.panel {
+    border-radius: var(--r-panel);
+}
+
+.dash-tile, .filter-panel {
+    border-radius: var(--r-card);
+}
+
+.popup, .player-menu, .modal, .activity-panel {
+    background: var(--mat-thick);
+    border: 1px solid var(--hairline-strong);
+    box-shadow: var(--highlight), 0 24px 60px rgba(0, 0, 0, .55);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+}
+
+.popup {
+    border-radius: 14px;
+    padding: 6px;
+}
+
+.popup button {
+    border-radius: 8px;
+}
+
+.popup button:hover, .popup button:focus-visible {
+    background: var(--fill-hover);
+}
+
+.modal {
+    border-radius: var(--r-sheet);
+    padding: 26px;
+}
+
+.modal-back {
+    background: rgba(8, 11, 16, .45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+.player-menu {
+    border-radius: var(--r-panel);
+    bottom: 132px;
+}
+
+.player:not(.idle) .subs {
+    bottom: calc(9% + 120px);
+}
+
+@media (max-width: 860px) {
+    .player-menu {
+        bottom: 124px;
+    }
+
+    .controls {
+        left: 8px;
+        right: 8px;
+        bottom: 8px;
+    }
+}
+
+.pm-option {
+    border-radius: 9px;
+}
+
+.list-row {
+    border-radius: var(--r-card);
+}
+
+/* ---- the item page: a larger, calmer backdrop */
+
+.backdrop {
+    height: min(78vh, 760px);
+}
+
+.backdrop img {
+    opacity: .5;
+}
+
+.backdrop::after {
+    background: linear-gradient(to bottom, rgba(18, 24, 33, .1), var(--ink) 96%),
+    linear-gradient(to right, rgba(18, 24, 33, .88) 0, rgba(18, 24, 33, .2) 65%);
+}
+
+.mirror .poster {
+    box-shadow: 0 0 0 1px var(--hairline), 0 30px 60px rgba(0, 0, 0, .55);
+}
+
+.detail-info h1 {
+    font-size: clamp(30px, 3.4vw, 46px);
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+}
+
+/* ---- the player: controls in a floating glass capsule */
+
+.controls {
+    left: 20px;
+    right: 20px;
+    bottom: 18px;
+    padding: 12px 18px 10px;
+    border-radius: var(--r-sheet);
+    background: rgba(18, 24, 33, .5);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--highlight), 0 20px 50px rgba(0, 0, 0, .4);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+}
+
+.ctl {
+    transition: background .2s var(--ease), transform .2s var(--ease);
+}
+
+.ctl:active {
+    transform: scale(.94);
+}
+
+/* The seek bar grows a little under the pointer. */
+.seek::-webkit-slider-runnable-track {
+    transition: height .2s var(--ease);
+}
+
+.seek-wrap:hover .seek::-webkit-slider-runnable-track {
+    height: 6px;
+}
+
+.seek-wrap:hover .seek::-webkit-slider-thumb {
+    margin-top: -4px;
+}
+
+.skip-btn, .up-next {
+    border-radius: var(--r-card);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+}
+
+/* ---- sign-in */
+
+.auth-card {
+    background: var(--mat-regular);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-sheet);
+    box-shadow: var(--highlight), 0 30px 70px rgba(0, 0, 0, .45);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+}
+
+/* ---- without translucency (setting of the system, or no support): solid surfaces */
+
+@media (prefers-reduced-transparency: reduce) {
+    .sidebar, .panel, .dash-tile, .filter-panel, .popup, .player-menu, .modal, .activity-panel, .round-btn,
+    .row-arrow, .controls, .auth-card {
+        background: var(--surface);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .sidebar, .panel, .popup, .player-menu, .modal, .activity-panel, .controls, .auth-card {
+        background: var(--surface);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .card:hover .art {
+        transform: none;
+    }
+}
+
