@@ -181,6 +181,28 @@ fn clean_caches(app: &AppState) -> (usize, u64) {
             }
         }
     }
+    // Keyframe lists of files that are gone or changed.
+    let keys: std::collections::HashSet<String> = idx
+        .all()
+        .flat_map(|it| it.file.iter().chain(it.versions.iter().map(|v| &v.file)))
+        .map(|f| crate::transcode::keyframe_key(f).replace('\n', " "))
+        .collect();
+    if let Ok(entries) = std::fs::read_dir(cache.join("keyframes")) {
+        for e in entries.flatten() {
+            let Ok(meta) = e.metadata() else { continue };
+            if e.file_name().to_string_lossy().ends_with(".tmp") {
+                continue;
+            }
+            let Ok(text) = std::fs::read_to_string(e.path()) else { continue };
+            if !meta.is_file() || crate::transcode::stored_key(&text).is_some_and(|k| keys.contains(k)) {
+                continue;
+            }
+            if std::fs::remove_file(e.path()).is_ok() {
+                removed.0 += 1;
+                removed.1 += meta.len();
+            }
+        }
+    }
     removed
 }
 

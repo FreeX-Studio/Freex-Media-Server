@@ -52,6 +52,13 @@
   sidebar that runs as a tinted column from the top of the window, over a soft light from the brand colours, rounder corners that grow with the surface, capsule
   buttons, a segmented control for the library tabs, artwork that lifts on hover, and the system's own typeface
   (SF Pro on Apple devices, Segoe UI Variable on Windows); without translucency on systems that ask for less
+- **Smoother playback while the server is busy:** scans, intro detection and seek previews no longer hold the
+  database or the library index while they write, run their ffmpeg and ffprobe at low priority and pause while
+  someone is watching; reading requests use their own database connections, so pages and the player answer during a
+  scan. Seek previews and the intro detection use several cores (a quarter of them, at most three)
+- **Faster start:** converted video is cut into two-second segments, so the picture appears after two seconds of
+  encoding instead of four; the keyframes a copied video is cut at are read when its page is opened and kept on disk
+  (`cache/keyframes/`), so pressing play does not wait for them, also after a restart
 - A library opens in the view last used on the device (Recommended, Library with its sorting and filters, or
   Collections)
 - FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; *Automatic* quality and the quality defaults under Account; the subtitle look and burning in text subtitles; the server dashboard with the maintenance; webhooks; editing metadata in the item menu; theme music; a switch for the previews in the server settings

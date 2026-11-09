@@ -110,9 +110,10 @@ episodes and `media::previews` makes the seek preview sheets of new files, all i
 3. For direct play the client loads `/api/items/{id}/stream`, which supports range requests. Otherwise
    `transcode::Transcoder` creates a session with a `Worker`, and the client plays
    `/api/transcode/{session}/index.m3u8`.
-4. That playlist covers the whole title from the start (`Segments`): segments of four seconds when the video is
+4. That playlist covers the whole title from the start (`Segments`): segments of two seconds when the video is
    converted, from keyframe to keyframe (at least four seconds) when it is copied; the keyframes are read with
-   ffprobe through the file's index. The player seeks like in any other video and asks for whatever segment it
+   ffprobe through the file's index, already when the title's page is opened, and kept in memory and in
+   `cache/keyframes/`. The player seeks like in any other video and asks for whatever segment it
    needs.
 5. The worker runs ffmpeg from the segment asked for. ffmpeg writes one fragment per keyframe with the timestamps
    of the source (`-copyts`, no MP4 edit lists, a fixed offset of one second), so fragments of different runs fit
@@ -135,12 +136,22 @@ unlocks only that title for a limited time, because the Chromecast cannot sign i
 |---|---|
 | Periodic rescans | `media::scanner` (every `interval_minutes`) |
 | TMDB matching and refresh | `metadata::Service` (one library at a time, at most four requests in parallel) |
-| Intro and credits detection | `markers::Service` (one season at a time, once per file version) |
-| Seek preview sheets | `media::previews` (one file at a time, low priority, once per file version) |
+| Intro and credits detection | `markers::Service` (one season at a time, its episodes in parallel, once per file version) |
+| Seek preview sheets | `media::previews` (several files at a time, once per file version) |
 | Converting, one per playback | `transcode::Worker` (an ffmpeg process at a time, restarted where the player asks) |
 | Pausing and stopping conversions | `transcode::Transcoder` (every 5 seconds) |
 | Expired sessions | `main` (every hour) |
 | Cleaning up Watch Together rooms | `together::Together` (loading members every 2 seconds, rooms every minute) |
+
+Background work must not get in the way of someone watching:
+
+- ffprobe and ffmpeg of scans, intro detection and previews run at low CPU and I/O priority.
+- Intro detection and previews use a quarter of the cores (one to three jobs) and wait while a playback is running
+  (`activity::yield_to_playback`), before each file or season.
+- `db::Db` has one connection for writing and a few read-only connections (SQLite WAL), so reading requests do not
+  queue behind a scan's writes. A scan writes only the entries that changed.
+- `media::catalog::Catalog` prepares a new index and writes it to the database without holding the index lock; the
+  lock is only taken for swapping in the finished index, so requests keep reading the old one meanwhile.
 
 All of them live on the server's tokio runtime, which is shut down as a whole on a stop or restart; running
 conversions are ended explicitly, so no ffmpeg outlives the server.

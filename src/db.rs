@@ -211,8 +211,16 @@ const MIGRATIONS: &[&str] = &[
 const LOGIN_EVENTS_KEPT: i64 = 50;
 
 pub struct Db {
+    /// The one connection that writes.
     conn: Mutex<Connection>,
+    /// Connections that only read. With WAL they run next to a write, so a long write (a scan
+    /// storing a library) does not hold up the sign-in check and the pages of everyone else.
+    readers: Vec<Mutex<Connection>>,
+    next_reader: std::sync::atomic::AtomicUsize,
 }
+
+/// Read connections; few, since SQLite reads are short.
+const READERS: usize = 4;
 
 #[derive(Clone, Debug, Default)]
 pub struct User {
@@ -495,13 +503,21 @@ impl Db {
             tracing::info!("Database schema updated to version {}", i + 1);
         }
         restrict_permissions(path);
-        Ok(Db { conn: Mutex::new(conn) })
+        let mut readers = Vec::new();
+        for _ in 0..READERS {
+            let r =
+                Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX)
+                    .map_err(|e| format!("cannot open {}: {e}", path.display()))?;
+            r.execute_batch("PRAGMA busy_timeout = 5000;").map_err(|e| e.to_string())?;
+            readers.push(Mutex::new(r));
+        }
+        Ok(Db { conn: Mutex::new(conn), readers, next_reader: std::sync::atomic::AtomicUsize::new(0) })
     }
 
     // ------------------------------------------------------------------ webhooks
 
     pub fn webhooks(&self) -> Vec<crate::webhooks::Hook> {
-        let c = self.c();
+        let c = self.r();
         let mut st = c.prepare_cached("SELECT id, url, events, secret, created_at FROM webhooks ORDER BY created_at").unwrap();
         st.query_map([], |r| {
             let events: String = r.get(2)?;
@@ -529,7 +545,7 @@ impl Db {
     // ------------------------------------------------------------------ edited metadata
 
     pub fn item_edits(&self) -> Vec<(String, String)> {
-        let c = self.c();
+        let c = self.r();
         let mut st = c.prepare_cached("SELECT item_id, data FROM item_edits").unwrap();
         st.query_map([], |r| Ok((r.get(0)?, r.get(1)?))).unwrap().filter_map(Result::ok).collect()
     }
@@ -560,10 +576,24 @@ impl Db {
         self.conn.lock().unwrap_or_else(|e| e.into_inner())
     }
 
+    /// A connection for reading: a free reader if there is one, otherwise the next in turn.
+    fn r(&self) -> MutexGuard<'_, Connection> {
+        if self.readers.is_empty() {
+            return self.c();
+        }
+        let start = self.next_reader.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        for i in 0..self.readers.len() {
+            if let Ok(g) = self.readers[(start + i) % self.readers.len()].try_lock() {
+                return g;
+            }
+        }
+        self.readers[start % self.readers.len()].lock().unwrap_or_else(|e| e.into_inner())
+    }
+
     // ------------------------------------------------------------------ users
 
     pub fn has_users(&self) -> bool {
-        self.c().query_row("SELECT EXISTS(SELECT 1 FROM users)", [], |r| r.get(0)).unwrap_or(false)
+        self.r().query_row("SELECT EXISTS(SELECT 1 FROM users)", [], |r| r.get(0)).unwrap_or(false)
     }
 
     fn load_libraries_of(c: &Connection, mut u: User) -> User {
@@ -575,20 +605,20 @@ impl Db {
     }
 
     pub fn users(&self) -> Vec<User> {
-        let c = self.c();
+        let c = self.r();
         let mut st = c.prepare_cached(&format!("SELECT {USER_COLUMNS} FROM users ORDER BY username COLLATE NOCASE")).unwrap();
         let users: Vec<User> = st.query_map([], user_from_row).unwrap().filter_map(Result::ok).collect();
         users.into_iter().map(|u| Self::load_libraries_of(&c, u)).collect()
     }
 
     pub fn user(&self, id: &str) -> Option<User> {
-        let c = self.c();
+        let c = self.r();
         let u = c.query_row(&format!("SELECT {USER_COLUMNS} FROM users WHERE id = ?1"), [id], user_from_row).optional().ok().flatten()?;
         Some(Self::load_libraries_of(&c, u))
     }
 
     pub fn user_by_name(&self, username: &str) -> Option<User> {
-        let c = self.c();
+        let c = self.r();
         let u = c
             .query_row(&format!("SELECT {USER_COLUMNS} FROM users WHERE username = ?1"), [username], user_from_row)
             .optional()
@@ -660,7 +690,7 @@ impl Db {
     }
 
     pub fn admin_count(&self) -> i64 {
-        self.c().query_row("SELECT COUNT(*) FROM users WHERE admin = 1", [], |r| r.get(0)).unwrap_or(0)
+        self.r().query_row("SELECT COUNT(*) FROM users WHERE admin = 1", [], |r| r.get(0)).unwrap_or(0)
     }
 
     // ------------------------------------------------------------------ sessions
@@ -682,27 +712,25 @@ impl Db {
     pub fn user_for_token(&self, token: &str, max_idle_ms: i64, ip: &str) -> Option<User> {
         let hash = sha256(token);
         let now = now_ms();
-        let user_id: String = {
-            let c = self.c();
-            let (user_id, last_seen): (String, i64) = c
-                .query_row("SELECT user_id, last_seen FROM sessions WHERE token_hash = ?1", [&hash], |r| Ok((r.get(0)?, r.get(1)?)))
-                .optional()
-                .ok()
-                .flatten()?;
-            if now - last_seen > max_idle_ms {
-                let _ = c.execute("DELETE FROM sessions WHERE token_hash = ?1", [&hash]);
-                return None;
-            }
-            if now - last_seen > 60_000 {
-                let _ = c.execute("UPDATE sessions SET last_seen = ?2, ip = ?3 WHERE token_hash = ?1", params![hash, now, ip]);
-            }
-            user_id
-        };
+        // Every request comes here: read on a reader, write (rarely) on the writer.
+        let (user_id, last_seen): (String, i64) = self
+            .r()
+            .query_row("SELECT user_id, last_seen FROM sessions WHERE token_hash = ?1", [&hash], |r| Ok((r.get(0)?, r.get(1)?)))
+            .optional()
+            .ok()
+            .flatten()?;
+        if now - last_seen > max_idle_ms {
+            let _ = self.c().execute("DELETE FROM sessions WHERE token_hash = ?1", [&hash]);
+            return None;
+        }
+        if now - last_seen > 60_000 {
+            let _ = self.c().execute("UPDATE sessions SET last_seen = ?2, ip = ?3 WHERE token_hash = ?1", params![hash, now, ip]);
+        }
         self.user(&user_id)
     }
 
     pub fn sessions_of(&self, user_id: &str) -> Vec<Session> {
-        let c = self.c();
+        let c = self.r();
         let mut st = c
             .prepare_cached("SELECT id, created_at, last_seen, ip, user_agent FROM sessions WHERE user_id = ?1 ORDER BY last_seen DESC")
             .unwrap();
@@ -749,7 +777,7 @@ impl Db {
     }
 
     pub fn login_events(&self, user_id: &str) -> Vec<LoginEvent> {
-        let c = self.c();
+        let c = self.r();
         let mut st = c
             .prepare_cached("SELECT time, ip, user_agent, success, detail FROM login_events WHERE user_id = ?1 ORDER BY time DESC")
             .unwrap();
@@ -764,14 +792,14 @@ impl Db {
     // ------------------------------------------------------------------ libraries
 
     pub fn libraries(&self) -> Vec<Library> {
-        let c = self.c();
+        let c = self.r();
         let mut st =
             c.prepare_cached("SELECT id, name, type, paths, created_at, last_scan FROM libraries ORDER BY name COLLATE NOCASE").unwrap();
         st.query_map([], library_from_row).unwrap().filter_map(Result::ok).collect()
     }
 
     pub fn library(&self, id: &str) -> Option<Library> {
-        self.c()
+        self.r()
             .query_row("SELECT id, name, type, paths, created_at, last_scan FROM libraries WHERE id = ?1", [id], library_from_row)
             .optional()
             .ok()
@@ -813,7 +841,7 @@ impl Db {
 
     /// All stored items as JSON.
     pub fn items(&self) -> Vec<String> {
-        let c = self.c();
+        let c = self.r();
         let mut st = c.prepare("SELECT data FROM items").unwrap();
         st.query_map([], |r| r.get(0)).unwrap().filter_map(Result::ok).collect()
     }
@@ -823,9 +851,22 @@ impl Db {
         let mut c = self.c();
         let result = (|| -> rusqlite::Result<()> {
             let tx = c.transaction()?;
-            tx.execute("DELETE FROM items WHERE library_id = ?1", [library_id])?;
+            // Only what changed is written: a rescan of a large, unchanged library touches nothing.
+            let keep: std::collections::HashSet<&str> = items.iter().map(|(id, _)| id.as_str()).collect();
+            let old: Vec<String> = {
+                let mut st = tx.prepare("SELECT id FROM items WHERE library_id = ?1")?;
+                st.query_map([library_id], |r| r.get(0))?.filter_map(Result::ok).collect()
+            };
             {
-                let mut st = tx.prepare("INSERT INTO items (id, library_id, data) VALUES (?1, ?2, ?3)")?;
+                let mut del = tx.prepare("DELETE FROM items WHERE id = ?1")?;
+                for id in old.iter().filter(|id| !keep.contains(id.as_str())) {
+                    del.execute([id])?;
+                }
+                let mut st = tx.prepare(
+                    "INSERT INTO items (id, library_id, data) VALUES (?1, ?2, ?3) \
+                     ON CONFLICT(id) DO UPDATE SET library_id = excluded.library_id, data = excluded.data \
+                     WHERE items.data IS NOT excluded.data OR items.library_id IS NOT excluded.library_id",
+                )?;
                 for (id, data) in items {
                     st.execute(params![id, library_id, data])?;
                 }
@@ -841,7 +882,7 @@ impl Db {
     // ------------------------------------------------------------------ watch state
 
     pub fn progress(&self, user_id: &str, item_id: &str) -> Progress {
-        self.c()
+        self.r()
             .query_row(
                 "SELECT offset_ms, watched, view_count, updated_at FROM progress WHERE user_id = ?1 AND item_id = ?2",
                 [user_id, item_id],
@@ -866,7 +907,7 @@ impl Db {
 
     /// Watch state of a user by item id.
     pub fn progress_of(&self, user_id: &str) -> HashMap<String, Progress> {
-        let c = self.c();
+        let c = self.r();
         let mut st =
             c.prepare_cached("SELECT item_id, offset_ms, watched, view_count, updated_at FROM progress WHERE user_id = ?1").unwrap();
         st.query_map([user_id], |r| {
@@ -890,7 +931,7 @@ impl Db {
 
     /// Newest first; `user_id` None = all users.
     pub fn history(&self, user_id: Option<&str>, offset: i64, limit: i64) -> Vec<HistoryEntry> {
-        let c = self.c();
+        let c = self.r();
         let mut st = c
             .prepare_cached(
                 "SELECT id, user_id, item_id, watched_at, title, parent_title FROM watch_history \
@@ -914,7 +955,7 @@ impl Db {
 
     /// All entries since a time (ms), oldest first, for the statistics of the dashboard.
     pub fn history_since(&self, since: i64) -> Vec<HistoryEntry> {
-        let c = self.c();
+        let c = self.r();
         let mut st = c
             .prepare_cached(
                 "SELECT id, user_id, item_id, watched_at, title, parent_title FROM watch_history \
@@ -949,7 +990,7 @@ impl Db {
 
     /// `(item id, json)` of all stored metadata.
     pub fn metadata(&self) -> Vec<(String, String)> {
-        let c = self.c();
+        let c = self.r();
         let mut st = c.prepare("SELECT item_id, data FROM metadata").unwrap();
         st.query_map([], |r| Ok((r.get(0)?, r.get(1)?))).unwrap().filter_map(Result::ok).collect()
     }
@@ -965,7 +1006,7 @@ impl Db {
     }
 
     pub fn tmdb_collections(&self) -> Vec<(i64, String)> {
-        let c = self.c();
+        let c = self.r();
         let mut st = c.prepare("SELECT id, data FROM tmdb_collections").unwrap();
         st.query_map([], |r| Ok((r.get(0)?, r.get(1)?))).unwrap().filter_map(Result::ok).collect()
     }
@@ -1001,7 +1042,7 @@ impl Db {
     }
 
     fn collection_rows(&self, filter: &str, arg: &str) -> Vec<OwnCollection> {
-        let c = self.c();
+        let c = self.r();
         let sql = format!("SELECT id, library_id, name, summary, created_at, filter FROM collections WHERE {filter} = ?1");
         let rows: Vec<OwnCollection> = {
             let mut st = c.prepare_cached(&sql).unwrap();
@@ -1079,7 +1120,7 @@ impl Db {
 
     /// `(id, name)` of the own collections that contain an item.
     pub fn collections_with(&self, item_id: &str) -> Vec<(String, String)> {
-        let c = self.c();
+        let c = self.r();
         let mut st = c
             .prepare_cached(
                 "SELECT DISTINCT c.id, c.name FROM collections c JOIN collection_items i ON i.collection_id = c.id \
@@ -1092,7 +1133,7 @@ impl Db {
     // ------------------------------------------------------------------ playlists
 
     fn playlist_rows(&self, sql: &str, args: &[&str]) -> Vec<Playlist> {
-        let c = self.c();
+        let c = self.r();
         let rows: Vec<Playlist> = {
             let mut st = c.prepare_cached(sql).unwrap();
             st.query_map(rusqlite::params_from_iter(args.iter()), |r| {
@@ -1173,7 +1214,7 @@ impl Db {
 
     /// Item ids on the user's watchlist, last added first.
     pub fn watchlist(&self, user_id: &str) -> Vec<String> {
-        let c = self.c();
+        let c = self.r();
         let mut st = c.prepare_cached("SELECT item_id FROM watchlist WHERE user_id = ?1 ORDER BY added_at DESC, rowid DESC").unwrap();
         st.query_map([user_id], |r| r.get(0)).unwrap().filter_map(Result::ok).collect()
     }
@@ -1197,7 +1238,7 @@ impl Db {
 
     pub fn markers(&self) -> HashMap<String, crate::markers::Markers> {
         use crate::markers::{Markers, Segment};
-        let c = self.c();
+        let c = self.r();
         let mut st = c
             .prepare("SELECT item_id, file_modified, intro_start, intro_end, credits_start, credits_end, analyzed_at FROM markers")
             .unwrap();

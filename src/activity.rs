@@ -141,6 +141,12 @@ impl Activity {
         }
     }
 
+    /// Whether someone is watching right now (playing or buffering, not paused).
+    pub fn watching(&self) -> bool {
+        let cutoff = now_ms() - TIMEOUT_MS;
+        self.playbacks.lock().unwrap().values().any(|p| p.last_seen >= cutoff && p.state != "paused")
+    }
+
     /// Running playbacks, oldest first.
     pub fn list(&self) -> Vec<Playback> {
         let cutoff = now_ms() - TIMEOUT_MS;
@@ -154,6 +160,26 @@ impl Activity {
     pub fn count(&self) -> usize {
         self.list().len()
     }
+}
+
+/// Background media work (seek previews, intro detection) waits here while someone watches, so
+/// that playback gets the processor and the disks; it goes on as soon as nobody does. What is
+/// left over runs in the nightly maintenance at the latest.
+pub async fn yield_to_playback(app: &crate::AppState) {
+    if !app.activity.watching() {
+        return;
+    }
+    tracing::debug!("Background work paused while a title plays");
+    while app.activity.watching() {
+        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    }
+}
+
+/// How many background media jobs may run at once when nobody watches: one per four cores,
+/// at most three.
+pub fn background_jobs() -> usize {
+    let cores = std::thread::available_parallelism().map_or(1, |n| n.get());
+    (cores / 4).clamp(1, 3)
 }
 
 #[cfg(test)]

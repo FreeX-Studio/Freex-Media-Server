@@ -183,7 +183,14 @@ fn run(config_path: PathBuf) -> Result<Outcome, String> {
             } else {
                 let ffprobe = tools.ffprobe_ok.then(|| tools.ffprobe.clone());
                 let dir = config.transcode_dir();
-                match transcode::Transcoder::new(tools.ffmpeg.clone(), ffprobe, dir.clone(), config.transcoder.clone(), tools.tonemap) {
+                match transcode::Transcoder::new(
+                    tools.ffmpeg.clone(),
+                    ffprobe,
+                    dir.clone(),
+                    config.transcoder.clone(),
+                    tools.tonemap,
+                    Some(config.cache_dir().join("keyframes")),
+                ) {
                     Ok(t) => Some(t),
                     Err(e) => {
                         tracing::error!("Conversion is off: cannot use {}: {e}", dir.display());

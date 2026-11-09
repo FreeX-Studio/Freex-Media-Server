@@ -140,9 +140,9 @@ async fn works(program: &str) -> bool {
     matches!(tokio::time::timeout(Duration::from_secs(10), c.status()).await, Ok(Ok(s)) if s.success())
 }
 
-/// ffprobe's JSON for a file, or None if it cannot be read.
+/// ffprobe's JSON for a file, or None if it cannot be read. Runs during scans, so at low priority.
 pub async fn probe(ffprobe: &str, video: &Path) -> Option<Value> {
-    let mut c = command(ffprobe);
+    let mut c = background(ffprobe);
     c.args(["-v", "error", "-print_format", "json", "-show_format", "-show_streams", "-show_chapters"])
         .arg(video)
         .stdout(Stdio::piped())

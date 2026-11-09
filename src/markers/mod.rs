@@ -87,6 +87,7 @@ impl Service {
                     let mut seasons = 0;
                     for show in idx.top_level(&lib.id) {
                         for season in idx.children(&show.id) {
+                            crate::activity::yield_to_playback(&app).await;
                             let episodes: Vec<Arc<Item>> = idx.children(&season.id).to_vec();
                             if service.analyze_season(&app.db, &episodes, force).await {
                                 seasons += 1;
@@ -110,18 +111,37 @@ impl Service {
         if eps.len() < 2 || !(force || eps.iter().any(|e| self.get(e).is_none())) {
             return false;
         }
+        // The episodes are read a few at a time on larger machines.
+        let workers = crate::activity::background_jobs();
+        let mut prints: Vec<Option<(Fingerprint, Fingerprint)>> = (0..eps.len()).map(|_| None).collect();
+        let mut running = tokio::task::JoinSet::new();
+        for (i, ep) in eps.iter().enumerate() {
+            while running.len() >= workers {
+                if let Some(Ok((j, r))) = running.join_next().await {
+                    prints[j] = r;
+                }
+            }
+            let f = ep.file.as_ref().expect("filtered").clone();
+            let ffmpeg = self.ffmpeg.clone();
+            running.spawn(async move {
+                let dur = f.duration_ms as f64 / 1000.0;
+                let head = INTRO_WINDOW.min(dur * 0.4);
+                let tail = CREDITS_WINDOW.min(dur * 0.3);
+                let path = Path::new(&f.path);
+                let (h, t) = tokio::join!(Fingerprint::of(&ffmpeg, path, 0.0, head), Fingerprint::of(&ffmpeg, path, dur - tail, tail));
+                (i, h.zip(t))
+            });
+        }
+        while let Some(r) = running.join_next().await {
+            if let Ok((j, p)) = r {
+                prints[j] = p;
+            }
+        }
         let mut heads = Vec::new();
         let mut tails = Vec::new();
-        for ep in &eps {
-            let f = ep.file.as_ref().expect("filtered");
-            let dur = f.duration_ms as f64 / 1000.0;
-            let head = INTRO_WINDOW.min(dur * 0.4);
-            let tail = CREDITS_WINDOW.min(dur * 0.3);
-            let path = Path::new(&f.path);
-            let (h, t) =
-                tokio::join!(Fingerprint::of(&self.ffmpeg, path, 0.0, head), Fingerprint::of(&self.ffmpeg, path, dur - tail, tail));
-            let (Some(h), Some(t)) = (h, t) else {
-                tracing::debug!("Cannot read the sound of {}", f.path);
+        for (ep, p) in eps.iter().zip(prints) {
+            let Some((h, t)) = p else {
+                tracing::debug!("Cannot read the sound of {}", ep.file.as_ref().map_or("", |f| f.path.as_str()));
                 return false;
             };
             heads.push(h);

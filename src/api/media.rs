@@ -351,12 +351,21 @@ pub async fn item(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ct
             && let Some(next) = view.next_episode(&it)
         {
             m["onDeck"] = view.decorate(&next, false);
+            prefetch(&app, &next);
         }
     }
+    prefetch(&app, &it);
     if let Some(next) = view.following_episode(&it) {
         m["next"] = view.decorate(&next, false);
     }
     ok(m)
+}
+
+/// Prepares a title to be played: its keyframes are read while the user looks at its page.
+fn prefetch(app: &AppState, it: &crate::media::Item) {
+    if let (Some(t), Some(f)) = (&app.transcoder, &it.file) {
+        t.prefetch(f);
+    }
 }
 
 pub async fn children(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ctx>, Path(id): Path<String>) -> ApiResult {

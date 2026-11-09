@@ -217,7 +217,9 @@ async fn scan_now(app: &Arc<AppState>, lib: Library) {
     } else {
         Vec::new()
     };
-    app.catalog.replace_library(&app.db, &lib.id, items);
+    // Writing the index is blocking work; it must not hold up a thread that serves requests.
+    let (a, id) = (app.clone(), lib.id.clone());
+    let _ = tokio::task::spawn_blocking(move || a.catalog.replace_library(&a.db, &id, items)).await;
     app.db.set_last_scan(&lib.id, now_ms());
     if !added.is_empty() {
         let idx = app.catalog.snapshot();

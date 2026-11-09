@@ -17,7 +17,7 @@
 use super::{Item, Kind};
 use crate::db::Db;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 /// One consistent state of all libraries.
 #[derive(Default)]
@@ -136,6 +136,9 @@ fn extra_order(t: &str) -> usize {
 
 pub struct Catalog {
     current: RwLock<Arc<Index>>,
+    /// One change at a time. Changes are prepared and written to the database while readers keep
+    /// using the current snapshot; the swap at the end is the only moment they wait for.
+    writing: Mutex<()>,
 }
 
 impl Catalog {
@@ -154,7 +157,7 @@ impl Catalog {
         if broken > 0 {
             tracing::warn!("{broken} entries of the library index could not be read; the next scan restores them");
         }
-        Catalog { current: RwLock::new(Arc::new(Index::build(items))) }
+        Catalog { current: RwLock::new(Arc::new(Index::build(items))), writing: Mutex::new(()) }
     }
 
     /// The current state; stays valid and unchanged while it is used.
@@ -162,39 +165,45 @@ impl Catalog {
         self.current.read().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
+    fn swap(&self, index: Index) {
+        *self.current.write().unwrap_or_else(|e| e.into_inner()) = Arc::new(index);
+    }
+
     /// Replaces the entries of one library, in memory and in the database.
     pub fn replace_library(&self, db: &Db, library_id: &str, scanned: Vec<Item>) {
+        let _turn = self.writing.lock().unwrap_or_else(|e| e.into_inner());
         let rows: Vec<(String, String)> =
             scanned.iter().map(|it| (it.id.clone(), serde_json::to_string(it).expect("serializable"))).collect();
-        let mut current = self.current.write().unwrap_or_else(|e| e.into_inner());
         // A library deleted during its scan stays deleted.
         if !db.replace_items(library_id, &rows) {
             return;
         }
         let mut items: HashMap<String, Arc<Item>> =
-            current.items.iter().filter(|(_, it)| it.library_id != library_id).map(|(k, v)| (k.clone(), v.clone())).collect();
+            self.snapshot().items.iter().filter(|(_, it)| it.library_id != library_id).map(|(k, v)| (k.clone(), v.clone())).collect();
         for it in scanned {
             items.insert(it.id.clone(), Arc::new(it));
         }
-        *current = Arc::new(Index::build(items));
+        self.swap(Index::build(items));
     }
 
     /// Replaces one entry (same id, same parent), in memory and in the database.
     pub fn update_item(&self, db: &Db, item: Item) {
-        let mut current = self.current.write().unwrap_or_else(|e| e.into_inner());
+        let _turn = self.writing.lock().unwrap_or_else(|e| e.into_inner());
+        let current = self.snapshot();
         if !current.items.contains_key(&item.id) {
             return;
         }
         db.save_item(&item.id, &serde_json::to_string(&item).expect("serializable"));
         let mut items = current.items.clone();
         items.insert(item.id.clone(), Arc::new(item));
-        *current = Arc::new(Index::build(items));
+        self.swap(Index::build(items));
     }
 
     /// Changes the entries of one library in place (in memory and in the database), atomically
     /// with respect to scans.
     pub fn update_library(&self, db: &Db, library_id: &str, change: impl FnOnce(&mut Vec<Item>)) {
-        let mut current = self.current.write().unwrap_or_else(|e| e.into_inner());
+        let _turn = self.writing.lock().unwrap_or_else(|e| e.into_inner());
+        let current = self.snapshot();
         let mut items: Vec<Item> = current.of_library(library_id).map(|it| Item::clone(it)).collect();
         if items.is_empty() {
             return;
@@ -210,13 +219,14 @@ impl Catalog {
         for it in items {
             all.insert(it.id.clone(), Arc::new(it));
         }
-        *current = Arc::new(Index::build(all));
+        self.swap(Index::build(all));
     }
 
     /// Forgets a deleted library (the database removes its rows itself).
     pub fn remove_library(&self, library_id: &str) {
-        let mut current = self.current.write().unwrap_or_else(|e| e.into_inner());
-        let items = current.items.iter().filter(|(_, it)| it.library_id != library_id).map(|(k, v)| (k.clone(), v.clone())).collect();
-        *current = Arc::new(Index::build(items));
+        let _turn = self.writing.lock().unwrap_or_else(|e| e.into_inner());
+        let items =
+            self.snapshot().items.iter().filter(|(_, it)| it.library_id != library_id).map(|(k, v)| (k.clone(), v.clone())).collect();
+        self.swap(Index::build(items));
     }
 }

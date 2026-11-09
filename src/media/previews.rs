@@ -141,18 +141,33 @@ impl Previews {
                 let mut made = 0;
                 // Movies with several versions: the main entry has the best version's file, the
                 // other versions get their own sheets.
-                let mut todo: Vec<&Arc<Item>> = Vec::new();
+                let mut todo: Vec<Arc<Item>> = Vec::new();
                 for it in idx.of_library(&id).filter(|it| Self::wanted(it)) {
-                    todo.push(it);
-                    todo.extend(idx.versions_of(it).into_iter().skip(1));
+                    todo.push(it.clone());
+                    todo.extend(idx.versions_of(it).into_iter().skip(1).cloned());
                 }
+                // Several sheets at once on larger machines; none while someone watches.
+                let workers = crate::activity::background_jobs();
+                let mut running = tokio::task::JoinSet::new();
                 for it in todo {
-                    if !force && (service.get(it).is_some() || service.failed(it)) {
+                    if !force && (service.get(&it).is_some() || service.failed(&it)) {
                         continue;
                     }
-                    // The item may have been changed or removed in the meantime.
-                    let Some(current) = app.catalog.snapshot().item(&it.id).cloned() else { continue };
-                    if service.make(&current).await {
+                    crate::activity::yield_to_playback(&app).await;
+                    while running.len() >= workers {
+                        if let Some(Ok(true)) = running.join_next().await {
+                            made += 1;
+                        }
+                    }
+                    let a = app.clone();
+                    running.spawn(async move {
+                        // The item may have been changed or removed in the meantime.
+                        let Some(current) = a.catalog.snapshot().item(&it.id).cloned() else { return false };
+                        a.previews.as_ref().expect("checked").make(&current).await
+                    });
+                }
+                while let Some(r) = running.join_next().await {
+                    if let Ok(true) = r {
                         made += 1;
                     }
                 }

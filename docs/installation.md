@@ -158,7 +158,7 @@ package). Caches go to the cache directory (`cache/`, `/var/cache/freex-media-se
 | `metadata/` | Downloaded artwork of titles, people and movie series |
 | `avatars/` | Profile pictures, re-encoded by the server |
 | `backups/` | Database backups of the nightly maintenance (`freex-YYYY-MM-DD-HHMM.db`, the newest seven by default) |
-| cache: `thumbs/`, `previews/`, `subtitles/`, `transcode/` | Preview frames, seek preview sheets, extracted subtitles, segments of running conversions; safe to delete while the server is stopped |
+| cache: `thumbs/`, `previews/`, `subtitles/`, `keyframes/`, `transcode/` | Preview frames, seek preview sheets, extracted subtitles, keyframe lists, segments of running conversions; safe to delete while the server is stopped |
 
 The nightly maintenance keeps copies of the database in `backups/` (see [Configuration](configuration.md)); to restore
 one, stop the server and copy it over `freex.db`. For a complete backup, stop the server and copy the data directory,

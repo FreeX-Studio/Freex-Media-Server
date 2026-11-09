@@ -15,7 +15,7 @@
 //! frame becomes a 32-bit hash of how the energy in 33 frequency bands changes against the frame
 //! before (the classic "Philips" fingerprint). Two frames count as equal when few bits differ.
 
-use crate::media::probe::command;
+use crate::media::probe::background;
 use std::path::Path;
 use std::process::Stdio;
 use std::time::Duration;
@@ -48,7 +48,8 @@ impl Fingerprint {
 
     /// Decodes `seconds` of the first audio track from `start` with ffmpeg and fingerprints it.
     pub async fn of(ffmpeg: &str, file: &Path, start: f64, seconds: f64) -> Option<Fingerprint> {
-        let mut c = command(ffmpeg);
+        // Background work: below normal CPU and disk priority, so playback comes first.
+        let mut c = background(ffmpeg);
         c.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-ss", &format!("{start:.3}"), "-t", &format!("{seconds:.3}"), "-i"])
             .arg(file)
             .args(["-map", "0:a:0", "-ac", "1", "-ar", &SAMPLE_RATE.to_string(), "-f", "s16le", "-"])

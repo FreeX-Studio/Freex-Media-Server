@@ -26,8 +26,11 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use worker::{Step, TS_OFFSET_MS, Worker};
 
-/// Length of converted segments; for copied video the minimum, as it is cut at keyframes.
+/// Minimum length of segments of copied video, which is cut at keyframes.
 pub const SEGMENT_MS: i64 = 4000;
+/// Length of converted segments. Short, so that playback starts as soon as the first two seconds
+/// are encoded instead of four.
+pub const TRANSCODE_SEGMENT_MS: i64 = 2000;
 const IDLE_TIMEOUT_MS: i64 = 60_000;
 /// Keyframe lists of recently played files kept in memory.
 const KEYFRAME_CACHE: usize = 32;
@@ -200,6 +203,8 @@ pub struct Transcoder {
     tonemap: probe::Tonemap,
     sessions: Mutex<HashMap<String, Arc<Session>>>,
     keyframes: Mutex<Vec<(String, Arc<Vec<i64>>)>>,
+    /// Keyframe lists on disk, so that a film starts fast also after a restart.
+    keyframe_dir: Option<PathBuf>,
 }
 
 impl Transcoder {
@@ -209,6 +214,7 @@ impl Transcoder {
         root: PathBuf,
         config: Config,
         tonemap: probe::Tonemap,
+        keyframe_dir: Option<PathBuf>,
     ) -> std::io::Result<Arc<Transcoder>> {
         std::fs::create_dir_all(&root)?;
         clean_directory(&root); // leftovers from a crash
@@ -224,6 +230,7 @@ impl Transcoder {
             tonemap,
             sessions: Mutex::default(),
             keyframes: Mutex::default(),
+            keyframe_dir: keyframe_dir.filter(|d| std::fs::create_dir_all(d).is_ok()),
         });
         let reaper = Arc::downgrade(&t);
         tokio::spawn(async move {
@@ -274,7 +281,7 @@ impl Transcoder {
             }
             Segments::from_keyframes(&keys, f.duration_ms, SEGMENT_MS)
         } else {
-            Segments::uniform(f.duration_ms, SEGMENT_MS)
+            Segments::uniform(f.duration_ms, TRANSCODE_SEGMENT_MS)
         };
         let transcode = plan.mode == Mode::Transcode;
         let hw = &self.config.hardware_acceleration;
@@ -362,20 +369,89 @@ impl Transcoder {
         }
     }
 
+    /// Reads the keyframes of a file ahead of time (when its page is opened), so that pressing
+    /// play does not wait for it.
+    pub fn prefetch(self: &Arc<Self>, f: &MediaFile) {
+        if self.ffprobe.is_none() || f.duration_ms <= 0 || f.video_codec.is_empty() {
+            return;
+        }
+        if self.keyframes.lock().unwrap().iter().any(|(k, _)| *k == keyframe_key(f)) {
+            return;
+        }
+        let (t, f) = (self.clone(), f.clone());
+        tokio::spawn(async move {
+            t.keyframes_of(&f).await;
+        });
+    }
+
     async fn keyframes_of(&self, f: &MediaFile) -> Arc<Vec<i64>> {
         let Some(ffprobe) = &self.ffprobe else { return Arc::default() };
-        let key = format!("{}|{}|{}", f.path, f.size, f.modified);
+        let key = keyframe_key(f);
         if let Some((_, k)) = self.keyframes.lock().unwrap().iter().find(|(k, _)| *k == key) {
             return k.clone();
         }
-        let keys = Arc::new(probe::keyframes(ffprobe, Path::new(&f.path), f.video_stream_index, f.duration_ms).await);
+        let file = self.keyframe_dir.as_ref().map(|d| d.join(format!("{}.txt", short_hash(&key))));
+        let stored = match &file {
+            Some(p) => tokio::fs::read_to_string(p).await.ok().map(|s| parse_keyframes(&s, &key)).unwrap_or_default(),
+            None => Vec::new(),
+        };
+        let keys = if stored.is_empty() {
+            let keys = probe::keyframes(ffprobe, Path::new(&f.path), f.video_stream_index, f.duration_ms).await;
+            if let (Some(p), false) = (&file, keys.is_empty()) {
+                let tmp = p.with_extension("tmp");
+                if tokio::fs::write(&tmp, format_keyframes(&keys, &key)).await.is_ok() {
+                    let _ = tokio::fs::rename(&tmp, p).await;
+                }
+            }
+            keys
+        } else {
+            stored
+        };
+        let keys = Arc::new(keys);
         if !keys.is_empty() {
             let mut cache = self.keyframes.lock().unwrap();
+            cache.retain(|(k, _)| *k != key);
             cache.insert(0, (key, keys.clone()));
             cache.truncate(KEYFRAME_CACHE);
         }
         keys
     }
+}
+
+/// Identifies a file's keyframe list: another size or date means another list.
+pub fn keyframe_key(f: &MediaFile) -> String {
+    format!("{}|{}|{}|{}", f.path, f.size, f.modified, f.video_stream_index)
+}
+
+/// FNV-1a of the key, as a file name.
+fn short_hash(s: &str) -> String {
+    let h = s.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3));
+    format!("{h:016x}")
+}
+
+/// The first line holds the key (a hash collision or a changed file is noticed), then one
+/// keyframe time in ms per line.
+fn format_keyframes(keys: &[i64], key: &str) -> String {
+    let mut s = format!("{}\n", key.replace('\n', " "));
+    for k in keys {
+        s.push_str(&k.to_string());
+        s.push('\n');
+    }
+    s
+}
+
+/// The key a stored keyframe list was made for.
+pub fn stored_key(s: &str) -> Option<&str> {
+    s.lines().next()
+}
+
+fn parse_keyframes(s: &str, key: &str) -> Vec<i64> {
+    let mut lines = s.lines();
+    if lines.next() != Some(&key.replace('\n', " ")) {
+        return Vec::new();
+    }
+    // Written to a temporary file and renamed, so never cut short.
+    lines.map_while(|l| l.parse().ok()).collect()
 }
 
 /// Removes leftover session folders. Only folders named like a session id are touched, so a
@@ -455,7 +531,7 @@ fn command(j: &Job, start_ms: i64) -> Vec<String> {
         let br = j.video_bitrate.to_string();
         // Keyframes exactly on the segment grid. t counts from the start of this run (also with
         // -copyts), and every run starts on the grid.
-        let gop = format!("expr:gte(t,n_forced*{})", seconds(SEGMENT_MS));
+        let gop = format!("expr:gte(t,n_forced*{})", seconds(TRANSCODE_SEGMENT_MS));
         match j.hw.as_str() {
             // Forced keyframes must be IDR frames, or a segment does not start with a picture the
             // browser can decode and the image freezes until the next one.
@@ -540,6 +616,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn keyframe_file_roundtrip() {
+        let key = "/m/a.mkv|10|20|0";
+        let s = format_keyframes(&[0, 2002, 4004], key);
+        assert_eq!(parse_keyframes(&s, key), vec![0, 2002, 4004]);
+        // Another file (or a changed one) with the same hash is not taken.
+        assert!(parse_keyframes(&s, "/m/a.mkv|10|21|0").is_empty());
+        assert_eq!(short_hash(key).len(), 16);
+    }
+
+    #[test]
     fn segments() {
         let u = Segments::uniform(10_000, 4000);
         assert_eq!((u.count(), u.start(2), u.end(2)), (3, 8000, 10_000));
@@ -578,7 +664,7 @@ mod tests {
         let t = Job { mode: Mode::Transcode, video_bitrate: 4_000_000, max_height: 720, burn_subtitle: 3, ..job };
         let c = command(&t, 0).join(" ");
         assert!(c.contains("[0:0][0:3]overlay=eof_action=pass,scale=-2:'min(720,ih)',format=yuv420p[v]"));
-        assert!(c.contains("-force_key_frames expr:gte(t,n_forced*4.000)"));
+        assert!(c.contains("-force_key_frames expr:gte(t,n_forced*2.000)"));
         assert!(!c.contains("-ss"));
         // HDR: tone mapped after scaling, and tagged as BT.709.
         let hdr = Job { burn_subtitle: -1, tonemap: ToneMapping::Software, ..t };
