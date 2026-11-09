@@ -14,7 +14,7 @@
 //! everything), depending on what the browser can decode, the chosen quality, the audio track
 //! and subtitles that have to be burned in.
 
-use super::MediaFile;
+use super::{AudioStream, MediaFile};
 use crate::i18n::Text;
 use serde_json::Value;
 use std::collections::HashSet;
@@ -131,12 +131,57 @@ impl Capabilities {
     }
 }
 
+/// What happens to the sound when the server streams the file (not in direct play).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AudioOut {
+    /// Copied as it is: the player decodes it (AAC, AC3, E-AC3, FLAC, Opus, MP3).
+    Copy,
+    /// Converted to AAC stereo.
+    AacStereo,
+    /// Multi-channel sound converted to Dolby Digital (5.1), for players that decode it.
+    Ac3,
+    /// Multi-channel sound converted to Dolby Digital Plus (5.1).
+    Eac3,
+}
+
+impl AudioOut {
+    pub fn label(self) -> &'static str {
+        match self {
+            AudioOut::Copy => "copy",
+            AudioOut::AacStereo => "AAC",
+            AudioOut::Ac3 => "AC3 5.1",
+            AudioOut::Eac3 => "E-AC3 5.1",
+        }
+    }
+}
+
+/// Codecs a player may get unchanged inside HLS/fMP4, if its MediaSource says it can decode them.
+const COPYABLE_AUDIO: [&str; 6] = ["aac", "mp3", "ac3", "eac3", "flac", "opus"];
+
+/// The sound for a stream: copied if the player can decode it; multi-channel sound as E-AC3 or
+/// AC3 when the player decodes that (5.1 stays 5.1); otherwise AAC stereo.
+pub fn audio_out(a: Option<&AudioStream>, caps: &Capabilities) -> AudioOut {
+    let Some(a) = a else { return AudioOut::Copy };
+    let c = codec_kind(&a.codec);
+    if caps.mse_audio.contains(&c) && COPYABLE_AUDIO.contains(&c.as_str()) {
+        AudioOut::Copy
+    } else if a.channels > 2 && caps.mse_audio.contains("eac3") {
+        AudioOut::Eac3
+    } else if a.channels > 2 && caps.mse_audio.contains("ac3") {
+        AudioOut::Ac3
+    } else {
+        AudioOut::AacStereo
+    }
+}
+
 /// The decision.
 #[derive(Debug)]
 pub struct Plan {
     pub mode: Mode,
     /// Position in the file's audio streams, -1 if the file has no audio.
     pub audio_index: i32,
+    /// The sound when streaming (ignored for direct play).
+    pub audio_out: AudioOut,
     /// Stream index of a bitmap subtitle to burn in, or -1.
     pub burn_subtitle: i32,
     /// Target bitrate and height when transcoding (height 0 = keep).
@@ -148,7 +193,7 @@ pub struct Plan {
 
 impl Plan {
     fn new(mode: Mode, audio_index: i32, reason: Text) -> Plan {
-        Plan { mode, audio_index, burn_subtitle: -1, video_bitrate: 0, max_height: 0, reason }
+        Plan { mode, audio_index, audio_out: AudioOut::Copy, burn_subtitle: -1, video_bitrate: 0, max_height: 0, reason }
     }
 }
 
@@ -208,16 +253,15 @@ pub fn plan(f: &MediaFile, caps: &Capabilities, q: Quality, requested_audio: i32
     }
     // Video can be copied into HLS if the browser's MediaSource accepts it and nothing forces a re-encode.
     let video_copyable = burn < 0 && bitrate_ok && caps.mse_video.contains(&video) && !(video == "h264" && hbd);
+    let audio_out = audio_out(audio, caps);
     if video_copyable {
-        let audio_copyable = audio.is_none_or(|a| {
-            let c = codec_kind(&a.codec);
-            caps.mse_audio.contains(&c) && ["aac", "mp3", "ac3", "eac3", "flac", "opus"].contains(&c.as_str())
-        });
-        if audio_copyable {
+        if audio_out == AudioOut::Copy {
             return Plan::new(Mode::Remux, audio_index, Text::new("playback.remux").arg(container_kind(f)));
         }
         let codec = audio.map(|a| a.codec.to_uppercase()).unwrap_or_default();
-        return Plan::new(Mode::Audio, audio_index, Text::new("playback.audio").arg(codec));
+        let mut p = Plan::new(Mode::Audio, audio_index, Text::new("playback.audio").arg(codec).arg(audio_out.label()));
+        p.audio_out = audio_out;
+        return p;
     }
     let source = if f.bitrate > 0 { f.bitrate } else { 8_000_000 };
     let target = if q.video_bitrate == 0 { source.min(20_000_000) } else { q.video_bitrate }.max(500_000);
@@ -230,7 +274,7 @@ pub fn plan(f: &MediaFile, caps: &Capabilities, q: Quality, requested_audio: i32
     } else {
         Text::new("playback.quality")
     };
-    Plan { mode: Mode::Transcode, audio_index, burn_subtitle: burn, video_bitrate: target, max_height: height, reason }
+    Plan { mode: Mode::Transcode, audio_index, audio_out, burn_subtitle: burn, video_bitrate: target, max_height: height, reason }
 }
 
 /// Direct play for a native player that decodes every format itself (mpv in FreeX Desktop).
@@ -252,7 +296,7 @@ pub fn choose_audio(f: &MediaFile, requested: i32) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::media::{AudioStream, SubtitleStream};
+    use crate::media::SubtitleStream;
     use serde_json::json;
 
     fn file() -> MediaFile {
@@ -306,5 +350,26 @@ mod tests {
         assert_eq!(plan(&hevc, &c, quality("original"), 0, None, true).reason.key, "playback.video");
         assert_eq!(choose_audio(&f, 7), 1);
         assert_eq!(external(&f, 0).mode, Mode::Direct);
+    }
+
+    #[test]
+    fn keeps_surround_sound() {
+        let a = |codec: &str, channels| AudioStream { codec: codec.into(), channels, ..AudioStream::default() };
+        let chrome = chrome();
+        let edge = Capabilities::parse(&json!({"mseVideo": ["h264"], "mseAudio": ["aac", "ac3", "eac3"]}));
+        let ac3_only = Capabilities::parse(&json!({"mseVideo": ["h264"], "mseAudio": ["aac", "ac3"]}));
+        // Copied whenever the player can decode it, also when the video is converted.
+        assert_eq!(audio_out(Some(&a("eac3", 6)), &edge), AudioOut::Copy);
+        assert_eq!(audio_out(Some(&a("aac", 6)), &chrome), AudioOut::Copy);
+        // DTS 5.1: E-AC3 or AC3 if the player has it, otherwise AAC stereo; stereo stays AAC.
+        assert_eq!(audio_out(Some(&a("dts", 6)), &edge), AudioOut::Eac3);
+        assert_eq!(audio_out(Some(&a("truehd", 8)), &ac3_only), AudioOut::Ac3);
+        assert_eq!(audio_out(Some(&a("dts", 6)), &chrome), AudioOut::AacStereo);
+        assert_eq!(audio_out(Some(&a("dts", 2)), &edge), AudioOut::AacStereo);
+        // A converted video keeps the AC3 track for a player that decodes AC3.
+        let mut f = file();
+        f.video_codec = "hevc".into();
+        let p = plan(&f, &edge, quality("original"), 1, None, true);
+        assert_eq!((p.mode, p.audio_out), (Mode::Transcode, AudioOut::Copy));
     }
 }

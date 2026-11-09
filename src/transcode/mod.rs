@@ -17,7 +17,7 @@ pub mod worker;
 
 use crate::auth::now_ms;
 use crate::config::Transcoder as Config;
-use crate::media::playback::{Mode, Plan, codec_kind};
+use crate::media::playback::{AudioOut, Mode, Plan, codec_kind};
 use crate::media::{Item, MediaFile, probe};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -169,6 +169,7 @@ struct Job {
     file: MediaFile,
     mode: Mode,
     audio_stream: Option<i32>,
+    audio_out: AudioOut,
     burn_subtitle: i32,
     video_bitrate: i64,
     max_height: i32,
@@ -282,6 +283,7 @@ impl Transcoder {
             file: f,
             mode: plan.mode,
             audio_stream,
+            audio_out: if plan.mode == Mode::Remux { AudioOut::Copy } else { plan.audio_out },
             burn_subtitle: plan.burn_subtitle,
             video_bitrate: plan.video_bitrate,
             max_height: plan.max_height,
@@ -450,12 +452,21 @@ fn command(j: &Job, start_ms: i64) -> Vec<String> {
         }
     }
     if j.audio_stream.is_some() {
-        if j.mode == Mode::Remux {
-            add(&mut c, &["-c:a", "copy"]);
-        } else {
-            // Keep the converted sound on the timestamps of the source: fills gaps and absorbs drift
-            // (common in TV recordings), which would otherwise move sound and picture apart over time.
-            add(&mut c, &["-af", "aresample=async=1:min_hard_comp=0.100000", "-c:a", "aac", "-b:a", "192k", "-ac", "2"]);
+        // Keep converted sound on the timestamps of the source: fills gaps and absorbs drift
+        // (common in TV recordings), which would otherwise move sound and picture apart over time.
+        let resample = ["-af", "aresample=async=1:min_hard_comp=0.100000"];
+        match j.audio_out {
+            AudioOut::Copy => add(&mut c, &["-c:a", "copy"]),
+            AudioOut::AacStereo => {
+                add(&mut c, &resample);
+                add(&mut c, &["-c:a", "aac", "-b:a", "192k", "-ac", "2"]);
+            }
+            // 5.1 stays 5.1 (7.1 is folded down to 5.1, as both encoders go up to six channels).
+            AudioOut::Ac3 | AudioOut::Eac3 => {
+                add(&mut c, &resample);
+                let codec = if j.audio_out == AudioOut::Eac3 { "eac3" } else { "ac3" };
+                add(&mut c, &["-c:a", codec, "-b:a", "640k", "-ac", "6"]);
+            }
         }
     }
     add(
@@ -525,6 +536,7 @@ mod tests {
             file: MediaFile { path: "/m/a.mkv".into(), video_stream_index: 0, video_codec: "hevc".into(), ..MediaFile::default() },
             mode: Mode::Audio,
             audio_stream: Some(1),
+            audio_out: AudioOut::AacStereo,
             burn_subtitle: -1,
             video_bitrate: 0,
             max_height: 0,
@@ -537,6 +549,8 @@ mod tests {
         assert!(c.contains("-noaccurate_seek -ss 8.001 -copyts"));
         assert!(c.contains("-c:v copy -tag:v hvc1"));
         assert!(c.contains("-c:a aac"));
+        let surround = Job { audio_out: AudioOut::Eac3, ..job.clone() };
+        assert!(command(&surround, 0).join(" ").contains("-c:a eac3 -b:a 640k -ac 6"));
         let t = Job { mode: Mode::Transcode, video_bitrate: 4_000_000, max_height: 720, burn_subtitle: 3, ..job };
         let c = command(&t, 0).join(" ");
         assert!(c.contains("[0:0][0:3]overlay=eof_action=pass,scale=-2:'min(720,ih)',format=yuv420p[v]"));

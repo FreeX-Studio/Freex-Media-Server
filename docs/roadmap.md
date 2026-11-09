@@ -19,7 +19,7 @@ The gaps that show in daily use. All of them fit the current architecture.
 | ~~**Parental controls**~~ | **Delivered in 0.21.0** – age limit per user and switching users with a PIN, see [Security](security.md#parental-controls); hidden libraries are the library sharing per user. |
 | ~~**Per-user quality defaults**~~ | **Delivered in 0.21.0** – see [Playback](playback.md#how-a-file-is-played). |
 | ~~**HDR tone mapping**~~ | **Delivered in 0.21.0** – see [Playback](playback.md#hdr). |
-| **Audio passthrough and multi-channel** | Keep 5.1/7.1 (AC3/EAC3) when the player can decode it; today conversion always makes stereo AAC. |
+| ~~**Audio passthrough and multi-channel**~~ | **Delivered in 0.21.0** – see [Playback](playback.md#how-a-file-is-played). |
 | **Subtitle styling and burn-in options** | Font size and position for text subtitles in FreeX Web; the option to burn text subtitles into the picture. |
 | **Server dashboard** | Current bandwidth and CPU per playback, play statistics per user and title, library statistics. Today: the activity view. |
 | **Scheduled maintenance** | A nightly window for rescans, metadata refresh, marker detection, cache clean-up and a database backup. Today: periodic scans only. |

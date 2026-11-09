@@ -31,6 +31,9 @@
 - **HDR tone mapping:** converted HDR10, HLG and Dolby Vision (profiles 7 and 8) videos are tone mapped to SDR, in
   software or with VAAPI, and keep their colours; thumbnails and seek previews too. The item page shows HDR
   (see [Playback](docs/playback.md#hdr)). Files are probed once more on the next scan
+- **Audio passthrough:** the sound is copied whenever the player decodes it, also when the video is converted, so
+  AC3, E-AC3 and other surround tracks stay 5.1/7.1; DTS and TrueHD become E-AC3 or AC3 5.1 for players that decode
+  those, AAC stereo otherwise
 - FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; *Automatic* quality and the quality defaults under Account; a switch for the previews in the server settings
 
 ## FreeX Media Server 0.20.0 · FreeX Web 1.5.0.0

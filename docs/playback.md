@@ -21,8 +21,13 @@ way:
 | Mode | When | What ffmpeg does |
 |---|---|---|
 | Direct play | Container, video and audio are supported and the bitrate fits the chosen quality | nothing, the file is sent as it is |
-| Direct stream | Video is supported, but not the container (e.g. MKV in Safari) or the audio (DTS, TrueHD) | copies the video into HLS and converts the audio to AAC if needed |
-| Transcode | Video codec not supported (e.g. HEVC in Firefox), a lower quality is chosen, or bitmap subtitles are burned in | converts video to H.264 and audio to AAC stereo |
+| Direct stream | Video is supported, but not the container (e.g. MKV in Safari) or the audio (DTS, TrueHD) | copies the video into HLS and converts the audio if needed |
+| Transcode | Video codec not supported (e.g. HEVC in Firefox), a lower quality is chosen, or bitmap subtitles are burned in | converts video to H.264, the audio only if needed |
+
+The sound is copied unchanged whenever the player can decode it (AAC, MP3, AC3, E-AC3, FLAC, Opus), also when the
+video is converted, so 5.1 and 7.1 tracks stay as they are. Sound the player cannot decode (DTS, TrueHD) becomes
+E-AC3 5.1 or AC3 5.1 if the player decodes those (Safari, Edge, most TVs) and the track has more than two channels,
+otherwise AAC stereo.
 
 Converted streams are HLS with fragmented MP4 segments (hls.js in Chrome, Firefox and Edge, native in Safari and on
 iOS). The playlist covers the whole title from the start, so the player seeks as in any video and keeps what it
