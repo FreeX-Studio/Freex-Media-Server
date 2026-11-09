@@ -20,7 +20,7 @@ use serde_json::{Value, json};
 
 /// Version of the probe data. Files probed with an older version are probed again on the next
 /// scan, so new fields get filled for existing libraries.
-pub const PROBE_VERSION: i32 = 2;
+pub const PROBE_VERSION: i32 = 3;
 
 /// Subtitle codecs that can be converted to WebVTT; everything else is a bitmap format.
 const TEXT_SUBTITLE_CODECS: [&str; 16] = [
@@ -182,6 +182,16 @@ impl SubtitleStream {
     }
 }
 
+/// A chapter of the file, as the container lists it.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Chapter {
+    pub start_ms: i64,
+    pub end_ms: i64,
+    /// Empty when the file has no name for it.
+    pub title: String,
+}
+
 /// The video file of a movie or episode.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -209,6 +219,7 @@ pub struct MediaFile {
     pub subtitles: Vec<Subtitle>,
     pub audio_streams: Vec<AudioStream>,
     pub subtitle_streams: Vec<SubtitleStream>,
+    pub chapters: Vec<Chapter>,
 }
 
 impl Default for MediaFile {
@@ -234,6 +245,7 @@ impl Default for MediaFile {
             subtitles: Vec::new(),
             audio_streams: Vec::new(),
             subtitle_streams: Vec::new(),
+            chapters: Vec::new(),
         }
     }
 }
@@ -306,6 +318,7 @@ impl MediaFile {
             "fileName": self.file_name(),
             "audio": audio,
             "subtitles": subs,
+            "chapters": self.chapters.iter().map(|c| json!({"startMs": c.start_ms, "endMs": c.end_ms, "title": c.title})).collect::<Vec<_>>(),
         })
     }
 }

@@ -12,7 +12,7 @@
 
 //! ffprobe and ffmpeg: finding them, and reading the technical data of a video file.
 
-use super::{AudioStream, MediaFile, PROBE_VERSION, SubtitleStream};
+use super::{AudioStream, Chapter, MediaFile, PROBE_VERSION, SubtitleStream};
 use serde_json::Value;
 use std::path::Path;
 use std::process::Stdio;
@@ -111,7 +111,7 @@ async fn works(program: &str) -> bool {
 /// ffprobe's JSON for a file, or None if it cannot be read.
 pub async fn probe(ffprobe: &str, video: &Path) -> Option<Value> {
     let mut c = command(ffprobe);
-    c.args(["-v", "error", "-print_format", "json", "-show_format", "-show_streams"])
+    c.args(["-v", "error", "-print_format", "json", "-show_format", "-show_streams", "-show_chapters"])
         .arg(video)
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
@@ -270,14 +270,58 @@ pub fn apply(json: &Value, f: &mut MediaFile) {
         // Some containers only carry the duration on the stream.
         f.duration_ms = streams.iter().map(|st| seconds_ms(st, "duration")).find(|d| *d > 0).unwrap_or(0);
     }
+    f.chapters = chapters(json["chapters"].as_array().unwrap_or(&empty), f.duration_ms);
     f.probe_version = PROBE_VERSION;
     f.probed = true;
+}
+
+/// The chapters of a file in order. Chapters past the end are dropped, gaps and overlaps are
+/// closed (a chapter runs until the next one starts), and a single chapter over the whole file
+/// says nothing, so it is dropped as well.
+fn chapters(list: &[Value], duration_ms: i64) -> Vec<Chapter> {
+    let mut out: Vec<Chapter> = list
+        .iter()
+        .map(|c| Chapter {
+            start_ms: seconds_ms(c, "start_time").max(0),
+            end_ms: seconds_ms(c, "end_time"),
+            title: s(&c["tags"], "title").trim().to_string(),
+        })
+        .filter(|c| duration_ms <= 0 || c.start_ms < duration_ms - 1000)
+        .collect();
+    out.sort_by_key(|c| c.start_ms);
+    out.dedup_by_key(|c| c.start_ms);
+    let starts: Vec<i64> = out.iter().skip(1).map(|c| c.start_ms).collect();
+    for (i, c) in out.iter_mut().enumerate() {
+        let end = starts.get(i).copied().unwrap_or(if duration_ms > 0 { duration_ms } else { c.end_ms });
+        c.end_ms = end.max(c.start_ms);
+    }
+    if out.len() == 1 {
+        out.clear();
+    }
+    out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn reads_chapters() {
+        let list = vec![
+            json!({"start_time": "600.5", "end_time": "1300", "tags": {"title": "Zwei "}}),
+            json!({"start_time": "0.000000", "end_time": "590", "tags": {"title": "Eins"}}),
+            json!({"start_time": "1300", "end_time": "1800"}),
+            json!({"start_time": "1799.5", "end_time": "1800", "tags": {"title": "Past the end"}}),
+        ];
+        let c = chapters(&list, 1_800_000);
+        assert_eq!(c.len(), 3);
+        assert_eq!((c[0].start_ms, c[0].end_ms, c[0].title.as_str()), (0, 600_500, "Eins"));
+        assert_eq!((c[1].start_ms, c[1].end_ms, c[1].title.as_str()), (600_500, 1_300_000, "Zwei"));
+        assert_eq!((c[2].end_ms, c[2].title.as_str()), (1_800_000, ""));
+        // One chapter for the whole file is no help.
+        assert!(chapters(&list[1..2], 1_800_000).is_empty());
+    }
 
     #[test]
     fn applies_streams() {

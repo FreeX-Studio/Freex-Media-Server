@@ -1527,6 +1527,51 @@ select, .field input, .inline input {
     box-shadow: 0 0 0 1px rgba(255, 255, 255, .22), 0 8px 28px rgba(0, 0, 0, .55);
 }
 
+.seek-preview .chapter {
+    max-width: 260px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, .8);
+}
+
+.seek-chapters {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.seek-chapters span {
+    position: absolute;
+    top: 7px;
+    width: 3px;
+    height: 4px;
+    margin-left: -1px;
+    background: rgba(0, 0, 0, .75);
+}
+
+.chapter-menu .pm-option {
+    display: flex;
+    align-items: center;
+}
+
+.chapter-menu .pm-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+}
+
+.chapter-menu .pm-time {
+    margin-left: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
 .seek-preview .at {
     font-size: 13px;
     font-variant-numeric: tabular-nums;

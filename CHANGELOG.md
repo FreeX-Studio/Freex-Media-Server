@@ -7,7 +7,11 @@
 - **Seek previews:** hovering over or dragging the seek bar shows a frame of that point with its time. The server
   makes one sprite sheet per movie and episode after scans, in the background and at low priority, from the
   keyframes only (see [Playback](docs/playback.md#seek-previews)); `[previews] enabled` switches it off
-- FreeX Web 1.6.0.0: seek previews in the player; a switch for them in the server settings
+- **Chapters** from the file: marks in the seek bar, the chapter name above it while scrubbing, a chapter menu in
+  the player and `Page Down` / `Page Up` to jump between chapters (see [Playback](docs/playback.md#chapters)). The
+  item details have `media.chapters` (`startMs`, `endMs`, `title`); files are probed once more on the next scan to
+  read them
+- FreeX Web 1.6.0.0: seek previews and chapters in the player; a switch for the previews in the server settings
 
 ## FreeX Media Server 0.20.0 · FreeX Web 1.5.0.0
 

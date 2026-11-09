@@ -163,13 +163,18 @@
         const produced = h("div", {class: "seek-produced"});
         const previewFrame = h("div", {class: "frame", hidden: true});
         const previewTime = h("div", {class: "at"});
-        const preview = h("div", {class: "seek-preview", hidden: true, "aria-hidden": "true"}, previewFrame, previewTime);
-        const seekWrap = h("div", {class: "seek-wrap"}, preview, produced, seek);
+        const previewChapter = h("div", {class: "chapter", hidden: true});
+        const preview = h("div", {class: "seek-preview", hidden: true, "aria-hidden": "true"}, previewFrame, previewChapter, previewTime);
+        // Small gaps in the seek bar where a chapter starts.
+        const chapterMarks = h("div", {class: "seek-chapters"});
+        const seekWrap = h("div", {class: "seek-wrap"}, preview, produced, seek, chapterMarks);
         const timeNow = h("span", {class: "time"}, "0:00");
         const timeTotal = h("span", {class: "time muted"}, M.fmtClock(durationMs));
         const playBtn = h("button", {class: "ctl big", "aria-label": t("Play")}, icon("play"));
         const muteBtn = h("button", {class: "ctl", "aria-label": t("Mute")}, icon(video.muted ? "mute" : "volume"));
         const vol = h("input", {type: "range", class: "volume", min: 0, max: 1, step: 0.05, value: video.muted ? 0 : video.volume, "aria-label": t("Volume")});
+        const chapters = (media.chapters || []).filter((c) => c.endMs > c.startMs);
+        const chaptersBtn = h("button", {class: "ctl", "aria-label": t("Chapters"), title: t("Chapters"), hidden: chapters.length < 2}, icon("chapters"));
         const settingsBtn = h("button", {class: "ctl", "aria-label": t("Playback settings"), "data-menu": true}, icon("gear"));
         const castBtn = h("button", {class: "ctl cast-btn", "aria-label": t("Play on Chromecast"), title: t("Play on Chromecast"), hidden: true}, icon("cast"));
         const castInfo = h("div", {class: "cast-info", hidden: true});
@@ -184,7 +189,7 @@
                     h("button", {class: "ctl", "aria-label": t("Back 10 seconds"), onclick: () => seekTo(position() - 10000, true)}, icon("replay10")),
                     playBtn,
                     h("button", {class: "ctl", "aria-label": t("Forward 30 seconds"), onclick: () => seekTo(position() + 30000, true)}, icon("forward30"))),
-                h("div", {class: "ctl-right"}, timeNow, h("span", {class: "time muted"}, "/"), timeTotal, muteBtn, vol, castBtn, settingsBtn, fsBtn)));
+                h("div", {class: "ctl-right"}, timeNow, h("span", {class: "time muted"}, "/"), timeTotal, muteBtn, vol, castBtn, chaptersBtn, settingsBtn, fsBtn)));
         const members = h("div", {class: "room-members"});
         const waitInfo = h("div", {class: "room-wait", hidden: true, role: "status"});
         const top = h("div", {class: "player-top"},
@@ -601,6 +606,9 @@
             const f = Math.min(1, Math.max(0, fraction));
             const ms = f * durationMs;
             previewTime.textContent = M.fmtClock(ms);
+            const ch = chapterAt(ms);
+            previewChapter.hidden = !ch;
+            if (ch) previewChapter.textContent = chapterLabel(ch);
             preview.hidden = false;
             if (sheet && !previewFrame.hidden) {
                 const w = previewFrame.clientWidth || 200;
@@ -619,6 +627,62 @@
             const half = preview.offsetWidth / 2;
             preview.style.left = Math.min(track - half, Math.max(half, x)) + "px";
         }
+
+        // ---- chapters: marks in the seek bar, their name in the preview, a menu and PageUp/PageDown.
+        if (chapters.length >= 2 && durationMs) {
+            for (const c of chapters.slice(1)) {
+                const f = Math.min(1, c.startMs / durationMs);
+                chapterMarks.append(h("span", {style: {left: `calc(7px + ${f} * (100% - 14px))`}}));
+            }
+        }
+
+        function chapterAt(ms) {
+            if (chapters.length < 2) return null;
+            let found = null;
+            for (const c of chapters) if (c.startMs <= ms) found = c;
+            return found;
+        }
+
+        function chapterLabel(c) {
+            return c.title || t("Chapter {0}", chapters.indexOf(c) + 1);
+        }
+
+        /** Jumps to the next (+1) or previous (-1) chapter; back within the first seconds of a chapter goes to the one before. */
+        function jumpChapter(dir) {
+            if (chapters.length < 2) return;
+            const pos = position();
+            const i = chapters.indexOf(chapterAt(pos));
+            if (dir > 0) {
+                if (i + 1 < chapters.length) seekTo(chapters[i + 1].startMs, true);
+            } else {
+                const c = chapters[i];
+                const target = c && pos - c.startMs > 3000 ? c : chapters[Math.max(0, i - 1)];
+                seekTo(target.startMs, true);
+            }
+        }
+
+        chaptersBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const open = player.querySelector(".player-menu");
+            if (open) {
+                open.remove();
+                if (open.classList.contains("chapter-menu")) return;
+            }
+            const current = chapterAt(position());
+            const menu = h("div", {class: "player-menu chapter-menu popup-like", role: "dialog", "aria-label": t("Chapters")},
+                h("div", {class: "pm-section"},
+                    h("div", {class: "pm-title"}, t("Chapters")),
+                    chapters.map((c) => h("button", {class: "pm-option" + (c === current ? " on" : ""),
+                        onclick: () => {
+                            menu.remove();
+                            seekTo(c.startMs, true);
+                        }},
+                    h("span", {class: "pm-check", html: c === current ? M.ICONS.check : ""}),
+                    h("span", {class: "pm-label"}, chapterLabel(c)),
+                    h("span", {class: "pm-time"}, M.fmtClock(c.startMs))))));
+            player.append(menu);
+            menu.querySelector(".pm-option.on")?.scrollIntoView({block: "nearest"});
+        });
 
         seekWrap.addEventListener("pointermove", (e) => {
             if (e.pointerType !== "mouse" && !dragging) return;
@@ -649,7 +713,11 @@
         // ---- settings menu
         settingsBtn.addEventListener("click", (e) => {
             e.stopPropagation();
-            if (player.querySelector(".player-menu")) return player.querySelector(".player-menu").remove();
+            const open = player.querySelector(".player-menu");
+            if (open) {
+                open.remove();
+                if (!open.classList.contains("chapter-menu")) return;
+            }
             const plan = state.plan || {};
             const section = (title, options, current, onPick) => h("div", {class: "pm-section"},
                 h("div", {class: "pm-title"}, title),
@@ -688,7 +756,7 @@
         });
         const closePlayerMenu = (e) => {
             const m = player.querySelector(".player-menu");
-            if (m && !m.contains(e.target) && !settingsBtn.contains(e.target)) m.remove();
+            if (m && !m.contains(e.target) && !settingsBtn.contains(e.target) && !chaptersBtn.contains(e.target)) m.remove();
         };
         document.addEventListener("click", closePlayerMenu);
 
@@ -733,6 +801,9 @@
                 seekTo(position() - 10000, true);
             } else if (k === "ArrowRight" || k === "l") {
                 seekTo(position() + 30000, true);
+            } else if (k === "PageDown" || k === "PageUp") {
+                e.preventDefault();
+                jumpChapter(k === "PageDown" ? 1 : -1);
             } else if (k === "f") {
                 toggleFullscreen();
             } else if (k === "m") {

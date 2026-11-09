@@ -7,6 +7,7 @@
 - [Audio tracks and subtitles](#audio-tracks-and-subtitles)
 - [Skip intro and credits](#skip-intro-and-credits)
 - [Seek previews](#seek-previews)
+- [Chapters](#chapters)
 - [Watch Together](#watch-together)
 - [Chromecast](#chromecast)
 - [Keyboard shortcuts](#keyboard-shortcuts)
@@ -78,6 +79,15 @@ removed titles are deleted.
 
 Titles that have no previews yet show only the time. Switch them off with `[previews] enabled = false`.
 
+## Chapters
+
+Chapters stored in the file (Matroska, MP4; Blu-ray rips usually have them) are read with ffprobe during the scan.
+FreeX Web marks where each chapter starts in the seek bar, shows the chapter's name above the bar together with the
+seek preview, and lists all chapters behind the chapter button next to the settings; `Page Down` jumps to the next
+chapter, `Page Up` to the start of the current one or, within its first three seconds, to the previous one.
+Chapters without a name are numbered. A file with only one chapter shows none. In FreeX Desktop, mpv shows the
+chapters itself.
+
 ## Watch Together
 
 *Watch together* on a movie or episode opens a room. Everyone who opens the invite link (with an account on the same
@@ -123,6 +133,7 @@ so all tracks can be switched in mpv. Watch Together always uses the built-in pl
 | `←` / `J` | 10 seconds back |
 | `→` / `L` | 30 seconds forward |
 | `F` | Fullscreen |
+| `Page Down` / `Page Up` | Next / previous chapter |
 | `M` | Mute |
 | `↑` / `↓`, mouse wheel over the picture | Volume |
 | `Esc` | Close the player (the × at the top right does the same) |

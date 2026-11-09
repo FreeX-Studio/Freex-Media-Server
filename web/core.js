@@ -101,6 +101,7 @@ window.FreeX = (() => {
         activity: svg('<path d="M3 12h4l3-8 4 16 3-8h4"/>'),
         history: svg('<path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>'),
         bookmarked: '<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
+        chapters: svg('<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 5v2M4 11v2M4 17v2"/>'),
         playlist: svg('<path d="M4 6h12M4 12h12M4 18h7"/><path d="M17 15v6l4-3z"/>'),
         collection: svg('<rect x="3" y="7" width="14" height="14" rx="2"/><path d="M7 3h14v14"/>'),
         trailer: svg('<rect x="2" y="5" width="20" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/>'),

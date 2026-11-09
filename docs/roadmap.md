@@ -12,7 +12,7 @@ The gaps that show in daily use. All of them fit the current architecture.
 | Feature | Notes |
 |---|---|
 | ~~**Seek preview thumbnails**~~ | **Delivered in 0.21.0** – see [Playback](playback.md#seek-previews). |
-| **Chapters** | Chapter markers from the file (`ffprobe -show_chapters`) in the player timeline, with a chapter menu. |
+| ~~**Chapters**~~ | **Delivered in 0.21.0** – see [Playback](playback.md#chapters). |
 | **Trailers and extras from disk** | `Trailers/`, `Featurettes/`, `Behind The Scenes/` folders and `-trailer` files are skipped today; show them on the item page and play them. |
 | **Subtitle download** | Search and download from OpenSubtitles per title and language, stored next to the video or in the data directory. |
 | **Multiple versions of a title** | Several files for one movie (4K and 1080p, Director's Cut) as one entry with a version picker instead of duplicates. |

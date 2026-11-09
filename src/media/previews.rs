@@ -148,7 +148,7 @@ impl Previews {
                     }
                 }
                 if made > 0 {
-                    tracing::info!("Seek previews made for {made} titles");
+                    tracing::info!("Seek previews: {made} new sheets");
                 }
                 service.clean(&app);
             }

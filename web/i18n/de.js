@@ -61,6 +61,8 @@ FreeXI18n.add("de", {
     "Automatic (browser language)": "Automatisch (Sprache des Browsers)",
     "Back": "Zurück",
     "Back 10 seconds": "10 Sekunden zurück",
+    "Chapters": "Kapitel",
+    "Chapter {0}": "Kapitel {0}",
     "Cache folder": "Cache-Ordner",
     "Cancel": "Abbrechen",
     "Cannot play": "Wiedergabe nicht möglich",
