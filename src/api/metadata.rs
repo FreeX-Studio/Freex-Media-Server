@@ -184,7 +184,7 @@ pub async fn person(State(app): State<Arc<AppState>>, Extension(ctx): Extension<
     let idx = app.catalog.snapshot();
     let mut found: Vec<Arc<Item>> = Vec::new();
     for id in app.metadata.items_with_person(pid) {
-        let Some(it) = idx.item(&id).filter(|it| u.may_access(&it.library_id)) else { continue };
+        let Some(it) = idx.item(&id).filter(|it| super::media::may_see(&idx, u, it)) else { continue };
         // Guest roles in episodes link to the show.
         let top = idx.show_of(it).unwrap_or(it).clone();
         if !found.iter().any(|f| f.id == top.id) {

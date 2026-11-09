@@ -173,6 +173,12 @@ const MIGRATIONS: &[&str] = &[
     r#"
     ALTER TABLE collections ADD COLUMN filter TEXT NOT NULL DEFAULT '';
     "#,
+    // 8: parental controls and switching users with a PIN
+    r#"
+    ALTER TABLE users ADD COLUMN max_age INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE users ADD COLUMN allow_unrated INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE users ADD COLUMN pin_hash TEXT;
+    "#,
 ];
 
 /// Login events kept per user.
@@ -202,6 +208,12 @@ pub struct User {
     pub subtitle_language: String,
     pub ui_language: String,
     pub unpinned: Vec<String>,
+    /// Highest age rating the user may see; 0 = no limit. Not applied to admins.
+    pub max_age: i32,
+    /// With an age limit: whether titles without an age rating are shown.
+    pub allow_unrated: bool,
+    /// Hash of the PIN for switching to this account on a shared screen.
+    pub pin_hash: Option<String>,
 }
 
 impl User {
@@ -216,6 +228,9 @@ impl User {
             "recoveryCodesLeft": if self.totp_enabled { self.recovery_codes.len() } else { 0 },
             "passwordChangedAt": self.password_changed_at,
             "avatar": self.avatar_version,
+            "maxAge": self.max_age,
+            "allowUnrated": self.allow_unrated,
+            "pin": self.pin_hash.is_some(),
             "libraries": if self.admin || self.all_libraries { json!("all") } else { json!(self.library_ids) },
             "preferences": {
                 "audioLanguage": self.audio_language,
@@ -230,6 +245,11 @@ impl User {
     /// Whether the user may see a library: admins and users with all libraries see every one.
     pub fn may_access(&self, library_id: &str) -> bool {
         self.admin || self.all_libraries || self.library_ids.iter().any(|l| l == library_id)
+    }
+
+    /// The age limit that applies: none for admins.
+    pub fn age_limit(&self) -> Option<i32> {
+        (!self.admin && self.max_age > 0).then_some(self.max_age)
     }
 }
 
@@ -337,7 +357,7 @@ impl Library {
 
 const USER_COLUMNS: &str = "id, username, password_hash, admin, created_at, password_changed_at, totp_secret, \
     totp_enabled, totp_last_step, recovery_codes, avatar_version, all_libraries, audio_language, subtitle_mode, \
-    subtitle_language, ui_language, unpinned";
+    subtitle_language, ui_language, unpinned, max_age, allow_unrated, pin_hash";
 
 fn json_list(s: String) -> Vec<String> {
     serde_json::from_str(&s).unwrap_or_default()
@@ -363,6 +383,9 @@ fn user_from_row(r: &Row) -> rusqlite::Result<User> {
         subtitle_language: r.get(14)?,
         ui_language: r.get(15)?,
         unpinned: json_list(r.get(16)?),
+        max_age: r.get(17)?,
+        allow_unrated: r.get(18)?,
+        pin_hash: r.get(19)?,
     })
 }
 
@@ -478,7 +501,8 @@ impl Db {
         tx.execute(
             "UPDATE users SET username = ?2, password_hash = ?3, admin = ?4, password_changed_at = ?5, totp_secret = ?6, \
              totp_enabled = ?7, totp_last_step = ?8, recovery_codes = ?9, avatar_version = ?10, all_libraries = ?11, \
-             audio_language = ?12, subtitle_mode = ?13, subtitle_language = ?14, ui_language = ?15, unpinned = ?16 WHERE id = ?1",
+             audio_language = ?12, subtitle_mode = ?13, subtitle_language = ?14, ui_language = ?15, unpinned = ?16, \
+             max_age = ?17, allow_unrated = ?18, pin_hash = ?19 WHERE id = ?1",
             params![
                 u.id,
                 u.username,
@@ -496,6 +520,9 @@ impl Db {
                 u.subtitle_language,
                 u.ui_language,
                 serde_json::to_string(&u.unpinned).unwrap(),
+                u.max_age,
+                u.allow_unrated,
+                u.pin_hash,
             ],
         )
         .unwrap();

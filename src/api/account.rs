@@ -193,6 +193,69 @@ pub async fn change_password(State(app): State<Arc<AppState>>, Extension(ctx): E
     ok(json!({"endedSessions": ended}))
 }
 
+// ====================================================================== switching users with a PIN
+
+/// Sets (`pin`: 4 to 8 digits) or removes (empty) the PIN of the own account. Admins sign in with
+/// their password only, so a PIN cannot open the administration.
+pub async fn set_pin(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ctx>, body: JsonBody) -> ApiResult {
+    require_password(&app, &ctx, &body)?;
+    let mut u = ctx.user()?.clone();
+    let pin = body.string("pin").trim().to_string();
+    if pin.is_empty() {
+        u.pin_hash = None;
+    } else {
+        if u.admin {
+            return Err(ApiError::bad_request("error.pinAdmin"));
+        }
+        if !(4..=8).contains(&pin.len()) || !pin.bytes().all(|b| b.is_ascii_digit()) {
+            return Err(ApiError::bad_request("error.pinFormat"));
+        }
+        u.pin_hash = Some(auth::hash_password(&pin));
+    }
+    app.db.update_user(&u);
+    ok(u.to_public())
+}
+
+/// The accounts one can switch to from a signed-in device: those with a PIN (never admins).
+pub async fn switch_targets(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ctx>) -> ApiResult {
+    let me = ctx.user()?;
+    let list: Vec<Value> = app
+        .db
+        .users()
+        .into_iter()
+        .filter(|u| u.pin_hash.is_some() && !u.admin && u.id != me.id)
+        .map(|u| json!({"id": u.id, "username": u.username, "avatar": u.avatar_version}))
+        .collect();
+    ok(json!(list))
+}
+
+/// Switches this device to another account with its PIN: the current session ends, a new one
+/// starts. Only from a signed-in device, and brute-force protected like the sign-in. A wrong PIN
+/// is 403, not 401: the device stays signed in as before.
+pub async fn switch_user(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ctx>, body: JsonBody) -> ApiResult {
+    ctx.user()?;
+    let target = app.db.user(body.str("userId").unwrap_or("")).filter(|u| !u.admin);
+    let Some(u) = target else { return Err(ApiError::new(StatusCode::FORBIDDEN, "error.wrongPin")) };
+    throttle(&app, &ctx, &u.username)?;
+    let pin = body.string("pin");
+    let hash = u.pin_hash.clone();
+    let ok_pin = match hash {
+        Some(h) => tokio::task::spawn_blocking(move || auth::verify_password(&pin, &h)).await.unwrap_or(false),
+        None => false,
+    };
+    if !ok_pin {
+        app.guard.failure(&ctx.ip, &u.username);
+        app.db.add_login_event(&u.id, &event(&ctx, false, "wrong-pin"));
+        tracing::warn!("Wrong PIN for '{}' from {}", u.username, ctx.ip);
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "error.wrongPin"));
+    }
+    app.guard.success(&ctx.ip, &u.username);
+    if let Some(t) = &ctx.token {
+        app.db.remove_session(t);
+    }
+    start_session(&app, &ctx, &u, "pin")
+}
+
 pub async fn sessions(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ctx>) -> ApiResult {
     let u = ctx.user()?;
     let current = ctx.token.as_deref().map(session_id).unwrap_or_default();
@@ -218,7 +281,7 @@ pub async fn logout_others(State(app): State<Arc<AppState>>, Extension(ctx): Ext
 }
 
 pub async fn logins(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ctx>) -> ApiResult {
-    const KNOWN: [&str; 5] = ["password", "password+totp", "password+recovery", "wrong-password", "wrong-code"];
+    const KNOWN: [&str; 7] = ["password", "password+totp", "password+recovery", "wrong-password", "wrong-code", "pin", "wrong-pin"];
     let list: Vec<Value> = app
         .db
         .login_events(&ctx.user()?.id)

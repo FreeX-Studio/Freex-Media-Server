@@ -218,6 +218,7 @@ fn run(config_path: PathBuf) -> Result<Outcome, String> {
                 if app.tls { "https" } else { "http" }
             );
             spawn_housekeeping(app.clone());
+            fill_age_ratings(&app);
             media::scanner::Scanner::spawn_timer(app.clone(), app.config.scanner.interval_minutes);
             let handle = axum_server::Handle::new();
             let stopper = handle.clone();
@@ -253,6 +254,21 @@ fn run(config_path: PathBuf) -> Result<Outcome, String> {
                 tracing::info!("Stopped");
             }
         })
+}
+
+/// Indexes written by 0.20 have no age ratings on their entries yet; they are taken from the
+/// stored metadata at once instead of waiting for the next scan, so age limits work right away.
+fn fill_age_ratings(app: &AppState) {
+    let idx = app.catalog.snapshot();
+    for lib in app.db.libraries() {
+        let missing = idx
+            .top_level(&lib.id)
+            .iter()
+            .any(|it| it.content_rating.is_empty() && app.metadata.get(&it.id).is_some_and(|m| !m.content_rating.is_empty()));
+        if missing {
+            app.catalog.update_library(&app.db, &lib.id, |items| app.metadata.apply_all(items));
+        }
+    }
 }
 
 /// Removes expired sessions once an hour.

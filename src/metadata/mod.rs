@@ -815,6 +815,9 @@ pub fn apply(it: &mut Item, md: &Metadata) {
     if md.rating > 0.0 && (!fill_only || it.rating == 0.0) {
         it.rating = md.rating;
     }
+    if !md.content_rating.is_empty() && (!fill_only || it.content_rating.is_empty()) {
+        it.content_rating = md.content_rating.clone();
+    }
     let exists = |p: &Option<String>| p.as_deref().is_some_and(|p| Path::new(p).is_file());
     // Own artwork next to the files wins; online artwork replaces only missing or online artwork.
     let online = |p: &Option<String>| p.as_deref().is_some_and(|p| p.contains(&format!("{0}metadata{0}", std::path::MAIN_SEPARATOR)));

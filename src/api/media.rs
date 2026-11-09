@@ -42,13 +42,19 @@ type Params = Query<HashMap<String, String>>;
 pub(super) struct View<'a> {
     app: &'a AppState,
     idx: &'a Index,
+    user: &'a User,
     progress: HashMap<String, Progress>,
     watchlist: HashSet<String>,
 }
 
 impl<'a> View<'a> {
-    pub(super) fn new(app: &'a AppState, idx: &'a Index, user: &User) -> View<'a> {
-        View { app, idx, progress: app.db.progress_of(&user.id), watchlist: app.db.watchlist(&user.id).into_iter().collect() }
+    pub(super) fn new(app: &'a AppState, idx: &'a Index, user: &'a User) -> View<'a> {
+        View { app, idx, user, progress: app.db.progress_of(&user.id), watchlist: app.db.watchlist(&user.id).into_iter().collect() }
+    }
+
+    /// Whether the viewer may see an entry (library shared, age limit).
+    pub(super) fn sees(&self, it: &Item) -> bool {
+        may_see(self.idx, self.user, it)
     }
 
     pub(super) fn progress(&self, id: &str) -> Progress {
@@ -208,13 +214,13 @@ impl<'a> View<'a> {
     }
 
     /// Started, unfinished items (newest first), optionally of one library.
-    fn started(&self, user: &User, library: Option<&str>) -> Vec<Arc<Item>> {
+    fn started(&self, library: Option<&str>) -> Vec<Arc<Item>> {
         let mut list: Vec<(&Arc<Item>, i64)> = self
             .progress
             .iter()
             .filter(|(_, p)| !p.watched && p.offset_ms > 0)
             .filter_map(|(id, p)| self.idx.item(id).map(|it| (it, p.updated_at)))
-            .filter(|(it, _)| user.may_access(&it.library_id) && library.is_none_or(|l| it.library_id == l))
+            .filter(|(it, _)| self.sees(it) && library.is_none_or(|l| it.library_id == l))
             .collect();
         list.sort_by_key(|e| std::cmp::Reverse(e.1));
         list.into_iter().map(|(it, _)| it.clone()).collect()
@@ -241,7 +247,29 @@ pub(super) fn visible_library_of(app: &AppState, user: &User, id: &str) -> Resul
 }
 
 pub(super) fn visible_item(idx: &Index, user: &User, id: &str) -> Result<Arc<Item>, ApiError> {
-    idx.item(id).filter(|it| user.may_access(&it.library_id)).cloned().ok_or_else(ApiError::not_found)
+    idx.item(id).filter(|it| user.may_access(&it.library_id) && age_ok(idx, user, it)).cloned().ok_or_else(ApiError::not_found)
+}
+
+/// Whether a user may see an entry: its library is shared with them and its age rating is within
+/// their limit.
+pub(super) fn may_see(idx: &Index, user: &User, it: &Item) -> bool {
+    user.may_access(&it.library_id) && age_ok(idx, user, it)
+}
+
+/// The age limit of the user against the rating of the entry; seasons, episodes and extras
+/// count with their show or movie.
+fn age_ok(idx: &Index, user: &User, it: &Item) -> bool {
+    let Some(limit) = user.age_limit() else { return true };
+    let top = match it.kind {
+        Kind::Season | Kind::Episode => idx.show_of(it).map(|s| s.as_ref()),
+        Kind::Extra => idx.parent(it).map(|p| p.as_ref()),
+        _ => None,
+    }
+    .unwrap_or(it);
+    match crate::media::ratings::age_of(&top.content_rating) {
+        Some(age) => age <= limit,
+        None => user.allow_unrated,
+    }
 }
 
 pub fn library_view(app: &AppState, l: &Library, with_paths: bool) -> Value {
@@ -265,7 +293,7 @@ pub async fn library_items(
     let filter = super::filter::Filter::from_params(&q);
     let now = now_ms();
 
-    let mut items: Vec<Arc<Item>> = idx.top_level(&l.id).to_vec();
+    let mut items: Vec<Arc<Item>> = idx.top_level(&l.id).iter().filter(|it| view.sees(it)).cloned().collect();
     let cmp = |a: &Arc<Item>, b: &Arc<Item>| -> Ordering {
         match sort {
             "added" => a.added_at.cmp(&b.added_at),
@@ -347,7 +375,7 @@ pub async fn hubs(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ct
     let view = View::new(&app, &idx, u);
     let mut hubs = Vec::new();
 
-    let started = view.started(u, None);
+    let started = view.started(None);
     let shows_in_progress: HashSet<&str> = started.iter().take(HUB_SIZE).filter_map(|it| idx.show_of(it)).map(|s| s.id.as_str()).collect();
     let cont = view.decorate_all(started.iter().take(HUB_SIZE));
     if !cont.is_empty() {
@@ -357,7 +385,7 @@ pub async fn hubs(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ct
     // Up next: shows with watched episodes, ordered by the last activity.
     let mut activity: HashMap<&str, i64> = HashMap::new();
     for (id, p) in view.progress.iter().filter(|(_, p)| p.watched) {
-        let Some(it) = idx.item(id).filter(|it| it.kind == Kind::Episode && u.may_access(&it.library_id)) else { continue };
+        let Some(it) = idx.item(id).filter(|it| it.kind == Kind::Episode && view.sees(it)) else { continue };
         if let Some(show) = idx.show_of(it) {
             let e = activity.entry(show.id.as_str()).or_insert(p.updated_at);
             *e = (*e).max(p.updated_at);
@@ -389,7 +417,7 @@ pub async fn hubs(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ct
     }
 
     for l in app.db.libraries().iter().filter(|l| u.may_access(&l.id)) {
-        let mut top: Vec<&Arc<Item>> = idx.top_level(&l.id).iter().collect();
+        let mut top: Vec<&Arc<Item>> = idx.top_level(&l.id).iter().filter(|it| view.sees(it)).collect();
         top.sort_by_key(|it| std::cmp::Reverse(it.added_at));
         let recent = view.decorate_all(top.into_iter().take(HUB_SIZE));
         if !recent.is_empty() {
@@ -406,10 +434,11 @@ pub async fn library_hubs(State(app): State<Arc<AppState>>, Extension(ctx): Exte
     let l = visible_library(&app, u, &id)?;
     let idx = app.catalog.snapshot();
     let view = View::new(&app, &idx, u);
-    let top = idx.top_level(&l.id);
+    let visible: Vec<Arc<Item>> = idx.top_level(&l.id).iter().filter(|it| view.sees(it)).cloned().collect();
+    let top = visible.as_slice();
     let mut hubs = Vec::new();
 
-    let cont = view.decorate_all(view.started(u, Some(&l.id)).iter().take(HUB_SIZE));
+    let cont = view.decorate_all(view.started(Some(&l.id)).iter().take(HUB_SIZE));
     if !cont.is_empty() {
         hubs.push(hub("continue", ctx.t(&Text::new("hub.continue")), Some(&l.id), "landscape", cont));
     }
@@ -489,7 +518,7 @@ pub async fn search(State(app): State<Arc<AppState>>, Extension(ctx): Extension<
         let view = View::new(&app, &idx, u);
         let mut hits: Vec<&Arc<Item>> = idx
             .all()
-            .filter(|it| u.may_access(&it.library_id))
+            .filter(|it| view.sees(it))
             .filter(|it| it.title.to_lowercase().contains(&query) || it.original_title.to_lowercase().contains(&query))
             .collect();
         hits.sort_by(|a, b| by_title(a, b));

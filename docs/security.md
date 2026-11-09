@@ -24,6 +24,23 @@ selected ones. The server enforces this on every request, not only in the interf
 subtitles, search, home screen, collections, playlists, watchlist, watch history, Watch Together and Chromecast all
 behave as if libraries that are not shared did not exist. Admins always see everything.
 
+## Parental controls
+
+Admins can give a user an age limit (*Edit → Parental controls*: up to 6, 12, 16 or 18 years). Titles rated above it
+are treated like titles of a library that is not shared, in every place listed above. The rating comes from the
+online metadata (FSK in Germany, MPAA and TV ratings in the US, the plain ages of other countries) or from the
+`<mpaa>`/`<certification>` of a `.nfo` file; seasons, episodes and extras count with their show or movie. Titles
+without a rating are hidden unless the admin allows them for that user (useful for home videos). Admins have no
+age limit.
+
+## Switching users with a PIN
+
+On a screen that is shared (the living-room TV), *Switch user* in the account menu changes the account without
+typing a password: every user except admins can set a PIN of 4 to 8 digits under *Account* (with their password).
+Switching only works from a device on which someone is already signed in, so a PIN never opens the server from
+outside; wrong PINs count towards the same lockout as wrong passwords and show in the login history. Admins sign in
+with their password only, and an account that becomes admin loses its PIN.
+
 ## Requests
 
 - Session tokens are 256-bit random values; only their SHA-256 hash is stored. The cookie is `HttpOnly`,

@@ -16,7 +16,7 @@ The gaps that show in daily use. All of them fit the current architecture.
 | ~~**Trailers and extras from disk**~~ | **Delivered in 0.21.0** – see [Media library](media-library.md#trailers-and-extras). |
 | ~~**Multiple versions of a title**~~ | **Delivered in 0.21.0** – see [Media library](media-library.md#several-versions-of-a-movie). |
 | ~~**Library filters and saved filters**~~ | **Delivered in 0.21.0** (smart collections) – see [Media library](media-library.md#filters-and-smart-collections). |
-| **Parental controls** | Maximum age rating per user (FSK/MPAA from the metadata), hidden libraries, a PIN to switch users on a shared screen. |
+| ~~**Parental controls**~~ | **Delivered in 0.21.0** – age limit per user and switching users with a PIN, see [Security](security.md#parental-controls); hidden libraries are the library sharing per user. |
 | **Per-user quality defaults** | Remember the chosen quality per user and network (at home vs. away), with "automatic" from the measured bandwidth. Today the quality is chosen per playback. |
 | **HDR tone mapping** | HDR10 and Dolby Vision sources converted for SDR displays with ffmpeg's tone mapping (software or hardware). Today a transcoded HDR file looks washed out. |
 | **Audio passthrough and multi-channel** | Keep 5.1/7.1 (AC3/EAC3) when the player can decode it; today conversion always makes stereo AAC. |

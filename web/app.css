@@ -1024,6 +1024,55 @@ select, .field input, .inline input, .filter-field input {
     height: 34px;
 }
 
+.switch-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    justify-content: center;
+    padding: 8px 0 4px;
+}
+
+.switch-user {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    padding: 10px;
+    border-radius: var(--radius-m);
+    background: none;
+    border: 1px solid transparent;
+    color: var(--text);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.switch-user:hover, .switch-user:focus-visible {
+    border-color: var(--glass);
+}
+
+.switch-user .avatar, .switch-pin .avatar {
+    width: 72px;
+    height: 72px;
+    font-size: 28px;
+}
+
+.switch-pin {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+}
+
+.pin-input {
+    width: 180px;
+    height: 46px;
+    text-align: center;
+    font-size: 24px;
+    letter-spacing: 8px;
+    border-radius: var(--radius-m);
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text);
+}
+
 .filter-btn {
     display: inline-flex;
     align-items: center;

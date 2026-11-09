@@ -95,6 +95,9 @@ pub struct Item {
     pub imdb_hint: String,
     /// TVDB id of a show from the `.nfo` or the name, 0 if unknown.
     pub tvdb_hint: i64,
+    /// Age rating ("FSK 12", "PG-13") from the `.nfo` or the online metadata; empty if unknown.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub content_rating: String,
     /// For extras: `trailer`, `featurette`, `behindTheScenes`, `deletedScene`, `interview`,
     /// `scene`, `short` or `other`.
     #[serde(skip_serializing_if = "String::is_empty")]

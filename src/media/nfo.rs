@@ -23,7 +23,7 @@ use std::sync::LazyLock;
 
 const MAX_SIZE: u64 = 2 * 1024 * 1024;
 
-const ELEMENTS: [&str; 15] = [
+const ELEMENTS: [&str; 17] = [
     "tmdbid",
     "imdbid",
     "tvdbid",
@@ -39,6 +39,8 @@ const ELEMENTS: [&str; 15] = [
     "genre",
     "value",
     "rating",
+    "mpaa",
+    "certification",
 ];
 
 static PATTERNS: LazyLock<HashMap<&'static str, Regex>> = LazyLock::new(|| {
@@ -135,6 +137,16 @@ pub fn apply_text(xml: &str, item: &mut Item) {
     }
     if let Ok(r) = rating.replace(',', ".").trim().parse::<f64>() {
         item.rating = (r * 10.0).round() / 10.0;
+    }
+    // Age rating: "Rated PG-13", "FSK 12", "DE:12" (several, separated by " / ").
+    let mut cert = element(xml, "mpaa");
+    if cert.is_empty() {
+        cert = element(xml, "certification");
+    }
+    let cert = cert.split(" / ").next().unwrap_or("").trim();
+    let cert = cert.strip_prefix("Rated ").unwrap_or(cert).trim();
+    if !cert.is_empty() {
+        item.content_rating = cert.to_string();
     }
 }
 

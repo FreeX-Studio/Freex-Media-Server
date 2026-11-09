@@ -22,7 +22,10 @@
   and title, in a filter panel on the *Library* tab; a filter can be saved as a **smart collection** that fills
   itself and shows every user their own watch state (see
   [Media library](docs/media-library.md#filters-and-smart-collections))
-- FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; a switch for the previews in the server settings
+- **Parental controls:** an age limit per user (with or without titles that have no rating) hides everything rated
+  above it in every list, the search and playback; age ratings also come from `.nfo` files. **Switching users with a
+  PIN** on a shared screen, for every account except admins (see [Security](docs/security.md#parental-controls))
+- FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; a switch for the previews in the server settings
 
 ## FreeX Media Server 0.20.0 · FreeX Web 1.5.0.0
 

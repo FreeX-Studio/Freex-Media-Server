@@ -40,6 +40,8 @@ every language, so apps can react to it:
 | `POST` | `/api/login` | `{username, password}` → `{token, user}` or `{twoFactorRequired, challenge}` |
 | `POST` | `/api/login/verify` | `{challenge, code}` → `{token, user}` |
 | `GET` | `/api/me` | The signed-in user with preferences |
+| `PUT` | `/api/me/pin` | `{currentPassword, pin}` sets the PIN for switching users (4–8 digits, not for admins); an empty `pin` removes it |
+| `GET` / `POST` | `/api/switch` | From a signed-in device: the accounts with a PIN / `{userId, pin}` switches to one (new session and cookie, like a sign-in; a wrong PIN is 403) |
 | `PUT` | `/api/me/preferences` | `{audioLanguage, subtitleMode: off\|forced\|foreign\|always, subtitleLanguage, uiLanguage: ""\|en\|de, unpinned: ["history", "library:<id>", …]}`; send only the fields to change |
 | `PUT` / `DELETE` | `/api/me/avatar` | Upload the profile picture as raw request body (JPEG/PNG/GIF, max. 10 MB) / remove it |
 | `GET` | `/api/users/{id}/avatar?v=` | Profile picture |
@@ -50,7 +52,7 @@ every language, so apps can react to it:
 |---|---|---|
 | `GET` | `/api/users` | All users; `libraries` is `"all"` or the list of shared library ids |
 | `POST` | `/api/users` | `{username, password, admin, libraries: "all" \| [libraryId, …]}` |
-| `PUT` | `/api/users/{id}` | Change `admin`, `password`, `resetTwoFactor` or `libraries` |
+| `PUT` | `/api/users/{id}` | Change `admin`, `password`, `resetTwoFactor`, `libraries`, `maxAge` (0 = no limit), `allowUnrated` or `removePin` |
 | `DELETE` | `/api/users/{id}` | Delete a user |
 
 ### Library and playback

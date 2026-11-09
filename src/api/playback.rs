@@ -352,7 +352,7 @@ fn history(app: &AppState, viewer: &User, user_id: Option<&str>, q: &HashMap<Str
         .iter()
         .map(|e| {
             // The item as it is now (title, artwork); null once it left the library.
-            let item = idx.item(&e.item_id).filter(|it| viewer.may_access(&it.library_id)).map(|it| view.decorate(it, false));
+            let item = idx.item(&e.item_id).filter(|it| view.sees(it)).map(|it| view.decorate(it, false));
             let mut m = json!({"id": e.id, "itemId": e.item_id, "watchedAt": e.watched_at, "title": e.title,
                                "parentTitle": e.parent_title, "item": item});
             if user_id != Some(viewer.id.as_str()) {

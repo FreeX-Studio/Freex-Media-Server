@@ -39,8 +39,9 @@ pub async fn create(State(app): State<Arc<AppState>>, Extension(ctx): Extension<
         .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "error.usernameTaken").arg(username.clone()))?;
     if let Some(v) = body.get("libraries") {
         apply_libraries(&app, &mut u, v)?;
-        app.db.update_user(&u);
     }
+    apply_age_limit(&mut u, &body)?;
+    app.db.update_user(&u);
     tracing::info!("User '{}' created by '{}'", username, admin.username);
     created(u.to_public())
 }
@@ -54,6 +55,9 @@ pub async fn update(State(app): State<Arc<AppState>>, Extension(ctx): Extension<
             return Err(ApiError::bad_request("error.lastAdmin"));
         }
         u.admin = admin;
+        if admin {
+            u.pin_hash = None; // admins sign in with their password only
+        }
     }
     if let Some(v) = body.get("libraries") {
         apply_libraries(&app, &mut u, v)?;
@@ -63,6 +67,10 @@ pub async fn update(State(app): State<Arc<AppState>>, Extension(ctx): Extension<
             me.username,
             if u.all_libraries { "all".to_string() } else { u.library_ids.join(", ") }
         );
+    }
+    apply_age_limit(&mut u, &body)?;
+    if body.bool("removePin") == Some(true) {
+        u.pin_hash = None;
     }
     let password = body.string("password");
     if !password.is_empty() {
@@ -84,6 +92,21 @@ pub async fn update(State(app): State<Arc<AppState>>, Extension(ctx): Extension<
     }
     tracing::info!("User '{}' changed by '{}'", u.username, me.username);
     ok(u.to_public())
+}
+
+/// `maxAge` (0 = no limit, otherwise 0–21) and `allowUnrated` from an admin's request.
+fn apply_age_limit(u: &mut crate::db::User, body: &JsonBody) -> Result<(), ApiError> {
+    if body.has("maxAge") {
+        let age = body.get("maxAge").and_then(serde_json::Value::as_i64).unwrap_or(-1);
+        if !(0..=21).contains(&age) {
+            return Err(ApiError::bad_request("error.invalidAge"));
+        }
+        u.max_age = age as i32;
+    }
+    if let Some(b) = body.bool("allowUnrated") {
+        u.allow_unrated = b;
+    }
+    Ok(())
 }
 
 pub async fn delete(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ctx>, Path(id): Path<String>) -> ApiResult {

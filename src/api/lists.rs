@@ -52,14 +52,14 @@ fn smart_items(app: &AppState, idx: &Index, user: &User, library_id: &str, filte
     let f = super::filter::Filter::parse(filter);
     let view = View::new(app, idx, user);
     let now = crate::auth::now_ms();
-    idx.top_level(library_id).iter().filter(|it| f.matches(app, idx, &view, it, now)).cloned().collect()
+    idx.top_level(library_id).iter().filter(|it| view.sees(it) && f.matches(app, idx, &view, it, now)).cloned().collect()
 }
 
 /// Collections of a library as row entries: movie series with at least two movies there, and
 /// the hand-made ones (counting the entries the user may see).
 pub(super) fn collections_of(app: &AppState, idx: &Index, user: &User, library_id: &str) -> Vec<Value> {
     let mut by_series: BTreeMap<i64, (Arc<Metadata>, usize)> = BTreeMap::new();
-    for it in idx.top_level(library_id) {
+    for it in idx.top_level(library_id).iter().filter(|it| super::media::may_see(idx, user, it)) {
         if let Some(md) = app.metadata.get(&it.id).filter(|m| m.collection_id > 0) {
             by_series.entry(md.collection_id).or_insert((md, 0)).1 += 1;
         }
@@ -74,7 +74,7 @@ pub(super) fn collections_of(app: &AppState, idx: &Index, user: &User, library_i
         let visible = if smart {
             smart_items(app, idx, user, library_id, &c.filter).len()
         } else {
-            c.item_ids.iter().filter(|id| idx.item(id).is_some_and(|it| user.may_access(&it.library_id))).count()
+            c.item_ids.iter().filter(|id| idx.item(id).is_some_and(|it| super::media::may_see(idx, user, it))).count()
         };
         out.push(collection_view(&c.id, library_id, &c.name, visible, false, smart));
     }
@@ -150,7 +150,7 @@ fn resolve(app: &AppState, idx: &Index, user: &User, cid: &str) -> Result<Resolv
     if !user.may_access(&r.library_id) {
         return Err(ApiError::not_found());
     }
-    let items = r.items.into_iter().filter(|it| user.may_access(&it.library_id)).collect();
+    let items = r.items.into_iter().filter(|it| super::media::may_see(idx, user, it)).collect();
     Ok(Resolved { items, ..r })
 }
 
@@ -290,7 +290,7 @@ fn playlist_view(app: &AppState, p: &crate::db::Playlist, u: &User, with_items: 
     let idx = app.catalog.snapshot();
     // Entries of libraries that are no longer shared are left out.
     let visible: Vec<Arc<Item>> =
-        p.item_ids.iter().filter_map(|id| idx.item(id)).filter(|it| u.may_access(&it.library_id)).cloned().collect();
+        p.item_ids.iter().filter_map(|id| idx.item(id)).filter(|it| super::media::may_see(&idx, u, it)).cloned().collect();
     let mut m = json!({
         "id": p.id,
         "type": "playlist",
@@ -425,7 +425,7 @@ pub(super) fn watchlist_items(app: &AppState, idx: &Index, u: &User, limit: usiz
         .watchlist(&u.id)
         .iter()
         .filter_map(|id| idx.item(id))
-        .filter(|it| u.may_access(&it.library_id))
+        .filter(|it| super::media::may_see(idx, u, it))
         .take(limit)
         .map(|it| view.decorate(it, false))
         .collect()

@@ -20,6 +20,7 @@ pub mod nfo;
 pub mod playback;
 pub mod previews;
 pub mod probe;
+pub mod ratings;
 pub mod scanner;
 pub mod subtitles;
 pub mod thumbs;

@@ -613,6 +613,7 @@ window.FreeX = (() => {
                     null,
                     {label: t("Account and security"), onclick: () => navigate("/settings/security")},
                     S.user.admin ? {label: t("Server settings"), onclick: () => navigate("/settings/libraries")} : undefined,
+                    {label: t("Switch user"), onclick: () => window.FreeX.switchUser()},
                     window.FreeX.desktop ? {label: t("Switch server"), onclick: () => window.FreeX.desktop.switchServer()} : undefined,
                     null,
                     {label: t("Sign out"), onclick: logout},

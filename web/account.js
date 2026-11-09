@@ -198,8 +198,76 @@
                             error.textContent = e.message;
                         }
                     }}, t("Change password"))),
+            S.user.admin ? null : pinPanel(),
             panel(t("Sign out"), h("p", {class: "muted"}, t("Signs out this device.")), h("button", {class: "btn", onclick: M.logout}, t("Sign out"))));
     }
+
+    /** The PIN with which others on a shared screen switch to this account. */
+    function pinPanel() {
+        const cur = h("input", {id: "pin-cur", type: "password", autocomplete: "current-password"});
+        const pin = h("input", {id: "pin-new", type: "password", inputmode: "numeric", autocomplete: "off", maxlength: 8, pattern: "[0-9]*"});
+        const error = h("div", {class: "error-text", role: "alert"});
+        const save = async (value) => {
+            error.textContent = "";
+            try {
+                S.user = await api("PUT", "/api/me/pin", {currentPassword: cur.value, pin: value});
+                M.toast(value ? t("PIN saved") : t("PIN removed"));
+                M.render();
+            } catch (e) {
+                error.textContent = e.message;
+            }
+        };
+        return panel(t("PIN for switching users"),
+            h("p", {class: "muted"}, t("On a screen someone is already signed in on, \u201cSwitch user\u201d in the account menu opens this account with the PIN instead of the password.")),
+            h("p", null, S.user.pin ? t("A PIN is set.") : t("No PIN set.")),
+            field("pin-cur", t("Current password"), cur),
+            field("pin-new", t("New PIN"), pin, t("4 to 8 digits")),
+            error,
+            h("div", {class: "btn-row"},
+                h("button", {class: "btn primary", onclick: () => save(pin.value.trim())}, t("Save PIN")),
+                S.user.pin ? h("button", {class: "btn", onclick: () => save("")}, t("Remove PIN")) : null));
+    }
+
+    /** "Switch user": the accounts with a PIN, as on a shared TV screen. */
+    async function switchUser() {
+        const list = await api("GET", "/api/switch");
+        const error = h("div", {class: "error-text", role: "alert"});
+        const body = h("div", {class: "switch-users"});
+        const close = M.modal(t("Switch user"), body, error,
+            h("div", {class: "btn-row"}, h("button", {class: "btn", onclick: () => {
+                close();
+                M.logout();
+            }}, t("Sign in with a password"))));
+        const showList = () => body.replaceChildren(
+            list.length ? h("div", {class: "switch-list"}, list.map((u) => h("button", {class: "switch-user", onclick: () => askPin(u)},
+                M.avatar(u), h("span", null, u.username))))
+                : h("p", {class: "muted"}, t("No other account has a PIN yet. Each user can set one under Account.")));
+        const askPin = (u) => {
+            error.textContent = "";
+            const pin = h("input", {type: "password", inputmode: "numeric", autocomplete: "off", maxlength: 8, class: "pin-input",
+                "aria-label": t("PIN of {0}", u.username)});
+            const go = async () => {
+                try {
+                    const res = await api("POST", "/api/switch", {userId: u.id, pin: pin.value});
+                    close();
+                    afterLogin(res, "/");
+                } catch (e) {
+                    error.textContent = e.message;
+                    pin.value = "";
+                    pin.focus();
+                }
+            };
+            pin.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") go();
+            });
+            body.replaceChildren(h("div", {class: "switch-pin"}, M.avatar(u), h("strong", null, u.username), pin,
+                h("div", {class: "btn-row"}, h("button", {class: "btn primary", onclick: go}, t("Switch")),
+                    h("button", {class: "btn", onclick: showList}, t("Back")))));
+            pin.focus();
+        };
+        showList();
+    }
+    M.switchUser = switchUser;
 
     function avatarPanel() {
         const box = panel(t("Profile picture"));
@@ -595,6 +663,40 @@
         document.body.append(dialog);
     }
 
+    const AGES = [6, 12, 16, 18];
+    const ageLabel = (a) => t("{0} years", a);
+
+    /** Age limit, titles without rating and the PIN of a user. */
+    function editParental(u) {
+        const limit = h("select", {id: "pc-age"}, h("option", {value: ""}, t("No limit")),
+            AGES.map((a) => h("option", {value: a, selected: u.maxAge > 0 && u.maxAge === a}, t("Up to {0}", ageLabel(a)))));
+        const unrated = h("input", {type: "checkbox", checked: u.allowUnrated});
+        const error = h("div", {class: "error-text", role: "alert"});
+        const close = M.modal(t("Parental controls for {0}", u.username),
+            h("p", {class: "muted"}, t("Titles above the age limit do not appear for this user anywhere: not in the libraries, the search, collections, playlists or Watch Together. The age rating comes from the online metadata or the .nfo file; for episodes the show's rating counts.")),
+            field("pc-age", t("Age limit"), limit),
+            h("label", {class: "check"}, unrated, t("Also show titles without an age rating (home videos, unmatched titles)")),
+            u.pin ? h("p", {class: "muted"}, t("{0} can switch to this account with a PIN.", u.username), " ",
+                h("button", {class: "btn small", onclick: async () => {
+                    await api("PUT", `/api/users/${u.id}`, {removePin: true});
+                    close();
+                    M.toast(t("PIN removed"));
+                    M.render();
+                }}, t("Remove PIN"))) : null,
+            error,
+            h("div", {class: "btn-row"},
+                h("button", {class: "btn primary", onclick: async () => {
+                    try {
+                        await api("PUT", `/api/users/${u.id}`, {maxAge: Number(limit.value || 0), allowUnrated: unrated.checked});
+                        close();
+                        M.toast(t("Parental controls for {0} saved", u.username));
+                        M.render();
+                    } catch (e) {
+                        error.textContent = e.message;
+                    }
+                }}, t("Save"))));
+    }
+
     async function users(c) {
         const [list, libraries] = await Promise.all([api("GET", "/api/users"), api("GET", "/api/libraries")]);
         const rows = h("div", {class: "list"}, list.map((u) => {
@@ -603,9 +705,12 @@
                 h("div", {class: "grow"},
                     h("div", {class: "name"}, u.username, u.id === S.user.id ? h("span", {class: "pill"}, t("You")) : null),
                     h("div", {class: "detail-line"}, [u.admin ? t("Administrator") : t("User"), u.twoFactor ? t("two-factor on") : t("without two-factor")].join(", ")),
-                    h("div", {class: "detail-line"}, t("Sees: {0}", librarySummary(u, libraries)))),
+                    h("div", {class: "detail-line"}, t("Sees: {0}", librarySummary(u, libraries))),
+                    !u.admin && (u.maxAge || u.pin) ? h("div", {class: "detail-line"}, [u.maxAge ? t("Age limit: {0}", ageLabel(u.maxAge)) : "",
+                        u.pin ? t("PIN for switching") : ""].filter(Boolean).join(", ")) : null),
                 h("button", {class: "btn small", "data-menu": true, onclick: (e) => M.popup(e.currentTarget, [
                         u.admin ? undefined : {label: t("Share libraries"), onclick: () => editLibraries(u, libraries)},
+                        u.admin ? undefined : {label: t("Parental controls"), onclick: () => editParental(u)},
                         {label: t("Reset password"), onclick: () => resetPassword(u)},
                         u.twoFactor ? {label: t("Reset two-factor"), onclick: async () => {
                                 await api("PUT", `/api/users/${u.id}`, {resetTwoFactor: true});

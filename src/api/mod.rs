@@ -46,6 +46,8 @@ pub fn router(app: Arc<AppState>) -> Router {
         .route("/api/logout", post(account::logout))
         .route("/api/me", get(account::me))
         .route("/api/me/password", put(account::change_password))
+        .route("/api/me/pin", put(account::set_pin))
+        .route("/api/switch", get(account::switch_targets).post(account::switch_user))
         .route("/api/me/preferences", put(account::preferences))
         .route("/api/me/sessions", get(account::sessions))
         .route("/api/me/sessions/logout-others", post(account::logout_others))
