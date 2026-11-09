@@ -64,7 +64,7 @@ every language, so apps can react to it:
 | `GET` | `/api/libraries/{id}/collections` | Collections of a library (`auto` for movie series, `smart` for smart collections) |
 | `POST` / `PUT` | `/api/collections`, `/api/collections/{id}` | Admins: `{libraryId, name, itemId}` makes a collection; with `filter` (a query string of the filters above) a smart collection, whose entries are the matching titles for each user. `PUT` changes `name`, `summary` and, for smart collections, `filter` |
 | `GET` | `/api/hubs` | Rows of the home screen |
-| `GET` | `/api/search?q=` | Search |
+| `GET` | `/api/search?q=&limit=` | Search in titles and original titles (at least two characters): `movies`, `shows` and `episodes`, at most 40 each, or `limit` (1–40) each |
 | `GET` | `/api/items/{id}` | Details, with seasons and episodes; for movies and episodes `media` (tracks, subtitles, `chapters`), `markers` and `previews`; for movies in several versions `versions` (`id`, `label`, `resolution`, `videoCodec`, `size`, `primary`, `current`; a version id works wherever an item id does, e.g. `/api/items/{versionId}/playback`, and its progress is the movie's); for movies and shows `extras` (entries of type `extra` with `extraType`; they play like movies, keep no progress and do not appear in lists or search) |
 | `GET` | `/api/items/{id}/image/{poster\|backdrop\|thumb}` | Artwork |
 | `GET` | `/api/items/{id}/previews` | Seek preview sprite sheet (JPEG). The grid is `previews` in the item details: `{intervalMs, width, height, columns, rows, count, version}`; frame `n` shows `n × intervalMs` and sits in column `n % columns`, row `n / columns`. Missing while it is not made yet |

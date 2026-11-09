@@ -592,21 +592,153 @@ window.FreeX = (() => {
         store.set("freex.navCollapsed", collapsed ? "1" : null);
     }
 
+    // ------------------------------------------------------------------ search field
+
+    const PREVIEW_LIMIT = 5;
+
+    /** Text with the first occurrence of the search term marked. */
+    function markMatch(text, q) {
+        const lower = text.toLowerCase();
+        const i = lower.indexOf(q.toLowerCase());
+        // Lower-casing can change the length of some characters; then the positions do not fit.
+        if (i < 0 || lower.length !== text.length) return text;
+        return [text.slice(0, i), h("mark", null, text.slice(i, i + q.length)), text.slice(i + q.length)];
+    }
+
+    /**
+     * The search field of the top bar. While typing, a preview below it shows the first hits of
+     * each kind; arrow keys pick one, Enter opens it, or the search page when none is picked. On
+     * the search page itself the page follows the input instead.
+     */
+    function searchBox() {
+        const input = h("input", {type: "search", placeholder: t("Search"), "aria-label": t("Search movies and shows"),
+            role: "combobox", autocomplete: "off", "aria-autocomplete": "list", "aria-controls": "search-preview", "aria-expanded": "false"});
+        let timer = null;
+        let seq = 0; // only the answer to the latest input may fill the preview
+        let pop = null;
+        let hits = []; // [{el, item}] in display order
+        let active = -1;
+
+        const isOpen = () => !!pop && pop.isConnected; // closeMenus() and Escape remove it from outside
+        const close = () => {
+            if (isOpen()) pop.remove();
+            pop = null;
+            hits = [];
+            active = -1;
+            input.setAttribute("aria-expanded", "false");
+            input.removeAttribute("aria-activedescendant");
+        };
+        const openPage = (q) => {
+            close();
+            navigate("/search?q=" + encodeURIComponent(q));
+        };
+        const openItem = (item) => {
+            close();
+            input.value = "";
+            input.blur();
+            navigate(`/item/${item.id}`);
+        };
+        const setActive = (i) => {
+            active = i;
+            hits.forEach((x, j) => x.el.classList.toggle("active", j === i));
+            if (i < 0) return input.removeAttribute("aria-activedescendant");
+            input.setAttribute("aria-activedescendant", hits[i].el.id);
+            hits[i].el.scrollIntoView({block: "nearest"});
+        };
+        const place = () => {
+            const r = input.getBoundingClientRect();
+            const width = Math.min(window.innerWidth - 16, Math.max(r.width, 420));
+            const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+            const top = r.bottom + 8;
+            Object.assign(pop.style, {left: left + "px", top: top + "px", width: width + "px", maxHeight: window.innerHeight - top - 16 + "px"});
+        };
+
+        const hitRow = (item, q) => {
+            const episode = item.type === "episode";
+            const el = h("a", {class: "search-hit", href: `/item/${item.id}`, id: "search-hit-" + hits.length, role: "option", tabindex: "-1",
+                onclick: (e) => {
+                    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return; // new tab or window
+                    e.preventDefault();
+                    openItem(item);
+                }},
+                h("div", {class: "search-art" + (episode ? " landscape" : "")}, art(item, episode ? "thumb" : "poster", item.title)),
+                h("div", {class: "search-info"},
+                    h("div", {class: "search-title"}, markMatch(item.title, q)),
+                    h("div", {class: "search-meta"}, episode ? `${item.showTitle || ""} · ${episodeCode(item)}` : cardMeta(item))));
+            hits.push({el, item});
+            return el;
+        };
+
+        const show = (res, q) => {
+            hits = [];
+            active = -1;
+            const groups = [[t("Movies"), res.movies], [t("Shows"), res.shows], [t("Episodes"), res.episodes]]
+                .filter(([, items]) => items.length)
+                .map(([title, items]) => h("div", {class: "search-group", role: "group", "aria-label": title},
+                    h("div", {class: "search-group-head"}, title), items.map((it) => hitRow(it, q))));
+            if (!isOpen()) {
+                pop = h("div", {class: "popup search-preview", id: "search-preview", role: "listbox", "aria-label": t("Search results")});
+                document.body.append(pop);
+            }
+            pop.replaceChildren(
+                h("div", {class: "search-scroll"}, groups.length ? groups : h("div", {class: "search-empty"}, t("Nothing found"))),
+                groups.length ? h("button", {class: "search-all", onclick: () => openPage(q)}, t("Show all results for “{0}”", q)) : null);
+            input.setAttribute("aria-expanded", "true");
+            input.removeAttribute("aria-activedescendant");
+            place();
+        };
+
+        const update = (q) => {
+            const mine = ++seq;
+            api("GET", `/api/search?limit=${PREVIEW_LIMIT}&q=${encodeURIComponent(q)}`).then((res) => {
+                // Stale, or the user has left the field in the meantime.
+                if (mine === seq && document.activeElement === input && location.pathname !== "/search") show(res, q);
+            }).catch(() => {
+                // offline or signed out: no preview; Enter still opens the search page
+            });
+        };
+
+        input.addEventListener("input", () => {
+            clearTimeout(timer);
+            const q = input.value.trim();
+            if (q.length < 2) {
+                seq++;
+                close();
+                return;
+            }
+            if (location.pathname === "/search") {
+                timer = setTimeout(() => navigate("/search?q=" + encodeURIComponent(q), true), 280);
+            } else {
+                timer = setTimeout(() => update(q), 150);
+            }
+        });
+        input.addEventListener("focus", () => {
+            const q = input.value.trim();
+            if (q.length >= 2 && !isOpen() && location.pathname !== "/search") update(q);
+        });
+        input.addEventListener("keydown", (e) => {
+            const q = input.value.trim();
+            if ((e.key === "ArrowDown" || e.key === "ArrowUp") && isOpen() && hits.length) {
+                e.preventDefault();
+                // The selection cycles through the hits and the input (-1): up from the input picks the last hit.
+                const n = hits.length + 1;
+                setActive((active + 1 + (e.key === "ArrowDown" ? 1 : -1) + n) % n - 1);
+            } else if (e.key === "Enter") {
+                clearTimeout(timer);
+                if (isOpen() && active >= 0) openItem(hits[active].item);
+                else if (q) openPage(q);
+            } else if (e.key === "Tab") {
+                close();
+            }
+        });
+        window.addEventListener("resize", () => isOpen() && place());
+        return input;
+    }
+
     function shell(path) {
         let root = document.querySelector(".shell");
         if (!root) {
-            const search = h("input", {type: "search", placeholder: t("Search"), "aria-label": t("Search movies and shows")});
-            let timer = null;
-            search.addEventListener("input", () => {
-                clearTimeout(timer);
-                timer = setTimeout(() => {
-                    const q = search.value.trim();
-                    if (q.length >= 2) navigate("/search?q=" + encodeURIComponent(q), location.pathname === "/search");
-                }, 280);
-            });
-            search.addEventListener("keydown", (e) => {
-                if (e.key === "Enter" && search.value.trim()) navigate("/search?q=" + encodeURIComponent(search.value.trim()));
-            });
+            const search = searchBox();
 
             const userBtn = h("button", {class: "user-button", "data-menu": true, "aria-haspopup": "menu", "aria-label": t("Account"),
                 onclick: (e) => popup(e.currentTarget, [
@@ -624,7 +756,8 @@ window.FreeX = (() => {
                 h("header", {class: "topbar"},
                     h("button", {class: "icon-btn menu-toggle", "aria-label": t("Expand or collapse the menu"), title: t("Menu"), onclick: toggleNav}, icon("menu")),
                     link("/", {class: "brand", "aria-label": t("Home")}, h("img", {src: "/icon.svg", alt: ""}), h("span", null, "Free", h("b", null, "X"))),
-                    h("div", {class: "search"}, icon("search"), search),
+                    // data-menu: a click into the field does not close the search preview
+                    h("div", {class: "search", "data-menu": true}, icon("search"), search),
                     h("div", {class: "spacer"}),
                     S.user.admin ? activityButton() : null,
                     link("/settings", {class: "icon-btn", title: t("Settings"), "aria-label": t("Settings")}, icon("wrench")),
@@ -647,7 +780,10 @@ window.FreeX = (() => {
             refreshLibraries();
         }
         const search = root.querySelector(".search input");
-        if (path !== "/search" && document.activeElement !== search) search.value = "";
+        if (document.activeElement !== search) {
+            if (path !== "/search") search.value = "";
+            document.getElementById("search-preview")?.remove();
+        }
         renderSidebar(path);
         return root.querySelector(".main");
     }

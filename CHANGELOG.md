@@ -61,6 +61,9 @@
   (`cache/keyframes/`), so pressing play does not wait for them, also after a restart
 - A library opens in the view last used on the device (Recommended, Library with its sorting and filters, or
   Collections)
+- **Search preview:** typing in the search field shows the first movies, shows and episodes in a list below it,
+  with the matching part of the title marked; arrow keys and Enter open a hit, Enter without a pick or *Show all
+  results* the search page. `GET /api/search` takes an optional `limit` per kind
 - FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; *Automatic* quality and the quality defaults under Account; the subtitle look and burning in text subtitles; the server dashboard with the maintenance; webhooks; editing metadata in the item menu; theme music; a switch for the previews in the server settings
 
 ## FreeX Media Server 0.20.0 · FreeX Web 1.5.0.0

@@ -522,6 +522,8 @@ pub async fn library_hubs(State(app): State<Arc<AppState>>, Extension(ctx): Exte
 pub async fn search(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ctx>, Query(q): Params) -> ApiResult {
     let u = ctx.user()?;
     let query = q.get("q").map(|s| s.trim().to_lowercase()).unwrap_or_default();
+    // `limit` caps the hits per kind, e.g. for the search preview below the search field.
+    let limit = q.get("limit").and_then(|s| s.parse::<usize>().ok()).map_or(SEARCH_LIMIT, |n| n.clamp(1, SEARCH_LIMIT));
     let (mut movies, mut shows, mut episodes) = (Vec::new(), Vec::new(), Vec::new());
     if query.chars().count() >= 2 {
         let idx = app.catalog.snapshot();
@@ -539,7 +541,7 @@ pub async fn search(State(app): State<Arc<AppState>>, Extension(ctx): Extension<
                 Kind::Episode => &mut episodes,
                 Kind::Season | Kind::Extra => continue,
             };
-            if list.len() < SEARCH_LIMIT {
+            if list.len() < limit {
                 list.push(view.decorate(it, false));
             }
         }
