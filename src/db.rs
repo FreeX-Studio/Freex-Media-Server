@@ -184,6 +184,10 @@ const MIGRATIONS: &[&str] = &[
     ALTER TABLE users ADD COLUMN quality_home TEXT NOT NULL DEFAULT 'auto';
     ALTER TABLE users ADD COLUMN quality_away TEXT NOT NULL DEFAULT 'auto';
     "#,
+    // 10: how FreeX Web shows text subtitles
+    r#"
+    ALTER TABLE users ADD COLUMN subtitle_style TEXT NOT NULL DEFAULT '';
+    "#,
 ];
 
 /// Login events kept per user.
@@ -222,6 +226,30 @@ pub struct User {
     /// Quality for playback in the home network and from outside: `auto` or a quality id.
     pub quality_home: String,
     pub quality_away: String,
+    /// Subtitle look as `size=l&background=box&position=bottom&color=white` (see [`SUBTITLE_STYLE`]).
+    pub subtitle_style: String,
+}
+
+/// The settings of the subtitle look and their values; the first value is the default.
+pub const SUBTITLE_STYLE: [(&str, &[&str]); 4] = [
+    ("size", &["m", "s", "l", "xl"]),
+    ("background", &["box", "outline"]),
+    ("position", &["bottom", "high"]),
+    ("color", &["white", "yellow"]),
+];
+
+impl User {
+    /// The subtitle look with every setting filled in.
+    pub fn subtitle_style_json(&self) -> Value {
+        let set: std::collections::HashMap<String, String> =
+            url::form_urlencoded::parse(self.subtitle_style.as_bytes()).into_owned().collect();
+        let mut m = serde_json::Map::new();
+        for (key, values) in SUBTITLE_STYLE {
+            let v = set.get(key).map(String::as_str).filter(|v| values.contains(v)).unwrap_or(values[0]);
+            m.insert(key.to_string(), json!(v));
+        }
+        Value::Object(m)
+    }
 }
 
 impl User {
@@ -248,6 +276,7 @@ impl User {
                 "unpinned": self.unpinned,
                 "qualityHome": self.quality_home,
                 "qualityAway": self.quality_away,
+                "subtitleStyle": self.subtitle_style_json(),
             },
         })
     }
@@ -367,7 +396,7 @@ impl Library {
 
 const USER_COLUMNS: &str = "id, username, password_hash, admin, created_at, password_changed_at, totp_secret, \
     totp_enabled, totp_last_step, recovery_codes, avatar_version, all_libraries, audio_language, subtitle_mode, \
-    subtitle_language, ui_language, unpinned, max_age, allow_unrated, pin_hash, quality_home, quality_away";
+    subtitle_language, ui_language, unpinned, max_age, allow_unrated, pin_hash, quality_home, quality_away, subtitle_style";
 
 fn json_list(s: String) -> Vec<String> {
     serde_json::from_str(&s).unwrap_or_default()
@@ -398,6 +427,7 @@ fn user_from_row(r: &Row) -> rusqlite::Result<User> {
         pin_hash: r.get(19)?,
         quality_home: r.get(20)?,
         quality_away: r.get(21)?,
+        subtitle_style: r.get(22)?,
     })
 }
 
@@ -514,7 +544,7 @@ impl Db {
             "UPDATE users SET username = ?2, password_hash = ?3, admin = ?4, password_changed_at = ?5, totp_secret = ?6, \
              totp_enabled = ?7, totp_last_step = ?8, recovery_codes = ?9, avatar_version = ?10, all_libraries = ?11, \
              audio_language = ?12, subtitle_mode = ?13, subtitle_language = ?14, ui_language = ?15, unpinned = ?16, \
-             max_age = ?17, allow_unrated = ?18, pin_hash = ?19, quality_home = ?20, quality_away = ?21 WHERE id = ?1",
+             max_age = ?17, allow_unrated = ?18, pin_hash = ?19, quality_home = ?20, quality_away = ?21, subtitle_style = ?22 WHERE id = ?1",
             params![
                 u.id,
                 u.username,
@@ -537,6 +567,7 @@ impl Db {
                 u.pin_hash,
                 u.quality_home,
                 u.quality_away,
+                u.subtitle_style,
             ],
         )
         .unwrap();

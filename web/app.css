@@ -1785,6 +1785,65 @@ select, .field input, .inline input, .filter-field input {
     white-space: pre-wrap;
 }
 
+/* The user's subtitle look (Account → Playback, or the player menu). */
+.subs[data-size="s"] {
+    font-size: clamp(14px, 2.3vw, 30px);
+}
+
+.subs[data-size="l"] {
+    font-size: clamp(22px, 4vw, 54px);
+}
+
+.subs[data-size="xl"] {
+    font-size: clamp(26px, 5vw, 68px);
+}
+
+.subs[data-background="outline"] span {
+    background: none;
+    text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0 0 6px #000;
+}
+
+.subs[data-color="yellow"] span {
+    color: #ffe14d;
+}
+
+.subs[data-position="high"] {
+    bottom: 18%;
+}
+
+.player:not(.idle) .subs[data-position="high"] {
+    bottom: calc(18% + 90px);
+}
+
+.sub-preview {
+    position: relative;
+    height: 140px;
+    border-radius: var(--radius-m);
+    background: linear-gradient(135deg, #3b4b5f, #18202b 60%, #42352a);
+    overflow: hidden;
+}
+
+.sub-preview .subs {
+    font-size: 22px;
+    bottom: 14px;
+}
+
+.sub-preview .subs[data-size="s"] {
+    font-size: 17px;
+}
+
+.sub-preview .subs[data-size="l"] {
+    font-size: 28px;
+}
+
+.sub-preview .subs[data-size="xl"] {
+    font-size: 34px;
+}
+
+.sub-preview .subs[data-position="high"] {
+    bottom: 40px;
+}
+
 .player-spinner {
     position: absolute;
     inset: 0;

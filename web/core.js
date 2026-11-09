@@ -860,6 +860,15 @@ window.FreeX = (() => {
         return Object.values(EXTRA_LABELS).includes(item.title) ? t(item.title) : item.title;
     }
 
+    /** Puts the user's subtitle look (size, background, position, colour) on a subtitle box. */
+    function applySubtitleStyle(el) {
+        const st = (S.user && S.user.preferences && S.user.preferences.subtitleStyle) || {};
+        el.dataset.size = st.size || "m";
+        el.dataset.background = st.background || "box";
+        el.dataset.position = st.position || "bottom";
+        el.dataset.color = st.color || "white";
+    }
+
     /** "4K · 2160p HEVC · 18.2 GB": what tells the versions of a movie apart. */
     function versionLabel(v) {
         const parts = [v.label, v.resolution, codecName(v.videoCodec), v.size ? fmtSize(v.size) : ""].filter(Boolean);
@@ -928,7 +937,7 @@ window.FreeX = (() => {
             row);
     }
 
-    return {S, store, noteBuild, extraTitle, versionLabel, t, tn, tParts, num, locale, h, ICONS, icon, fmtDuration, fmtClock, fmtDate, fmtSize, fmtBitrate, language, codecName, channels,
+    return {S, store, noteBuild, extraTitle, versionLabel, applySubtitleStyle, t, tn, tParts, num, locale, h, ICONS, icon, fmtDuration, fmtClock, fmtDate, fmtSize, fmtBitrate, language, codecName, channels,
         audioLabel, subtitleLabel, episodeCode, deviceName, toast, img, art, api, ApiError, logoutLocal, logout, route,
         navigate, link, render, emptyState, popup, closeMenus, refreshLibraries, renderSidebar, card, hubRow, isWatched,
         setWatched, playHref, itemMenu, progressBar, unwatchedBadge, menuExtensions, PREF_LANGS, defaultTracks, avatar,

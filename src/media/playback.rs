@@ -187,13 +187,15 @@ pub struct Plan {
     /// Target bitrate and height when transcoding (height 0 = keep).
     pub video_bitrate: i64,
     pub max_height: i32,
+    /// A text subtitle (WebVTT) to burn into the picture, see [`burn_text`].
+    pub burn_text: Option<String>,
     /// Explanation for the player info.
     pub reason: Text,
 }
 
 impl Plan {
     fn new(mode: Mode, audio_index: i32, reason: Text) -> Plan {
-        Plan { mode, audio_index, audio_out: AudioOut::Copy, burn_subtitle: -1, video_bitrate: 0, max_height: 0, reason }
+        Plan { mode, audio_index, audio_out: AudioOut::Copy, burn_subtitle: -1, video_bitrate: 0, max_height: 0, burn_text: None, reason }
     }
 }
 
@@ -263,9 +265,7 @@ pub fn plan(f: &MediaFile, caps: &Capabilities, q: Quality, requested_audio: i32
         p.audio_out = audio_out;
         return p;
     }
-    let source = if f.bitrate > 0 { f.bitrate } else { 8_000_000 };
-    let target = if q.video_bitrate == 0 { source.min(20_000_000) } else { q.video_bitrate }.max(500_000);
-    let height = if q.max_height == 0 { SOFTWARE_MAX_HEIGHT } else { q.max_height };
+    let (target, height) = transcode_targets(f, q);
     let reason = if burn >= 0 {
         Text::new("playback.burnSubtitles")
     } else if !video_decodable {
@@ -274,7 +274,36 @@ pub fn plan(f: &MediaFile, caps: &Capabilities, q: Quality, requested_audio: i32
     } else {
         Text::new("playback.quality")
     };
-    Plan { mode: Mode::Transcode, audio_index, audio_out, burn_subtitle: burn, video_bitrate: target, max_height: height, reason }
+    Plan {
+        mode: Mode::Transcode,
+        audio_index,
+        audio_out,
+        burn_subtitle: burn,
+        video_bitrate: target,
+        max_height: height,
+        burn_text: None,
+        reason,
+    }
+}
+
+/// Bitrate and frame height of a conversion at quality `q`.
+fn transcode_targets(f: &MediaFile, q: Quality) -> (i64, i32) {
+    let source = if f.bitrate > 0 { f.bitrate } else { 8_000_000 };
+    let target = if q.video_bitrate == 0 { source.min(20_000_000) } else { q.video_bitrate }.max(500_000);
+    (target, if q.max_height == 0 { SOFTWARE_MAX_HEIGHT } else { q.max_height })
+}
+
+/// Turns a plan into a conversion that burns the text subtitle `vtt` into the picture (for
+/// players that cannot show subtitles themselves, or styled the way the file has them).
+pub fn burn_text(f: &MediaFile, mut plan: Plan, q: Quality, vtt: String) -> Plan {
+    if plan.mode != Mode::Transcode {
+        (plan.video_bitrate, plan.max_height) = transcode_targets(f, q);
+        plan.mode = Mode::Transcode;
+    }
+    plan.burn_subtitle = -1;
+    plan.burn_text = Some(vtt);
+    plan.reason = Text::new("playback.burnSubtitles");
+    plan
 }
 
 /// Direct play for a native player that decodes every format itself (mpv in FreeX Desktop).

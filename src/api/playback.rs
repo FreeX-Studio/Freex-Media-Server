@@ -50,6 +50,17 @@ pub(super) fn num(body: &JsonBody, key: &str) -> Option<i64> {
     body.get(key).and_then(|v| v.as_i64().or_else(|| v.as_f64().map(|f| f as i64)))
 }
 
+/// Whether a subtitle id (`x0` for a file next to the video, `e3` for a stream inside it) names
+/// a text subtitle.
+fn is_text_subtitle(f: &crate::media::MediaFile, sid: &str) -> bool {
+    if let Some(n) = sid.strip_prefix('x') {
+        return n.parse::<usize>().is_ok_and(|i| i < f.subtitles.len());
+    }
+    sid.strip_prefix('e')
+        .and_then(|n| n.parse::<i32>().ok())
+        .is_some_and(|n| f.subtitle_streams.iter().any(|s| s.stream_index == n && s.text_based()))
+}
+
 /// Decides how to play an item in this player. Body: `{caps, quality, audio, subtitle, startMs}`;
 /// with `"player": "external"` (mpv in FreeX Desktop, which decodes everything) the file is always
 /// played directly.
@@ -77,11 +88,25 @@ pub async fn start(State(app): State<Arc<AppState>>, Extension(ctx): Extension<C
     } else {
         playback::plan(f, &caps, quality, audio, body.str("subtitle"), app.transcoder.is_some())
     };
+    // Text subtitles burned into the picture, on request.
+    let burnable = app.tools.burn_text && app.transcoder.is_some();
+    let plan = match body.str("subtitle").filter(|_| burnable && body.bool("burnSubtitle") == Some(true)) {
+        Some(sid) if is_text_subtitle(f, sid) => match app.subtitles.vtt(&it, sid).await {
+            Some(vtt) => playback::burn_text(f, plan, quality, vtt),
+            None => plan,
+        },
+        _ => plan,
+    };
     let mut m = json!({
         "mode": plan.mode.name(),
         "reason": ctx.t(&plan.reason),
         "audio": plan.audio_index,
-        "burnedSubtitle": (plan.burn_subtitle >= 0).then(|| format!("e{}", plan.burn_subtitle)),
+        "burnedSubtitle": if plan.burn_text.is_some() {
+            body.str("subtitle").map(str::to_string)
+        } else {
+            (plan.burn_subtitle >= 0).then(|| format!("e{}", plan.burn_subtitle))
+        },
+        "textBurnIn": burnable,
         "durationMs": f.duration_ms,
         "qualities": QUALITIES.iter().map(|q| json!({"id": q.id, "label": q.label})).collect::<Vec<_>>(),
         "quality": quality.id,

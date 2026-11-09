@@ -377,6 +377,20 @@ pub async fn preferences(State(app): State<Arc<AppState>>, Extension(ctx): Exten
     if let Some(v) = body.get("unpinned") {
         u.unpinned = nav_entries(v)?;
     }
+    // {"subtitleStyle": {"size": "l", …}}: only known settings and values are kept.
+    if let Some(style) = body.get("subtitleStyle") {
+        let style = style.as_object().ok_or_else(|| ApiError::bad_request("error.subtitleStyle"))?;
+        let current = u.subtitle_style_json();
+        let mut out = url::form_urlencoded::Serializer::new(String::new());
+        for (key, values) in crate::db::SUBTITLE_STYLE {
+            let v = style.get(key).or_else(|| current.get(key)).and_then(Value::as_str).unwrap_or(values[0]);
+            if !values.contains(&v) {
+                return Err(ApiError::bad_request("error.subtitleStyle"));
+            }
+            out.append_pair(key, v);
+        }
+        u.subtitle_style = out.finish();
+    }
     for (key, slot) in [("qualityHome", &mut u.quality_home), ("qualityAway", &mut u.quality_away)] {
         if let Some(q) = body.str(key) {
             if !crate::media::playback::known_quality(q) {

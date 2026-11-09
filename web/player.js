@@ -110,6 +110,7 @@
             directPlay: true,
             plan: null,
             hls: null,
+            burnSubtitle: false,
             cues: [],
             pendingSeek: 0,
             starting: false,
@@ -151,6 +152,7 @@
         video.volume = Math.min(1, Math.max(0, Number(M.store.get("freex.volume") ?? 1)));
         video.muted = M.store.get("freex.muted") === "1";
         const subs = h("div", {class: "subs", "aria-live": "off"});
+        M.applySubtitleStyle(subs);
         const spinner = h("div", {class: "player-spinner"}, h("span", {class: "spin big"}));
         const notice = h("div", {class: "notice", hidden: true});
 
@@ -375,6 +377,7 @@
             try {
                 plan = await api("POST", `/api/items/${item.id}/playback`, {
                     caps: capabilities(state.directPlay), quality: state.quality, bandwidth: Math.round(knownBandwidth()), audio: state.audio,
+                    burnSubtitle: state.burnSubtitle,
                     subtitle: state.subtitle, startMs: Math.max(0, Math.round(atMs)),
                     client: clientId, device: M.deviceName ? M.deviceName(navigator.userAgent) : "",
                 });
@@ -793,6 +796,8 @@
             const modeText = plan.mode === "cast"
                 ? "Chromecast" + (casting && casting.plan && modes[casting.plan.mode] ? " · " + modes[casting.plan.mode] : "")
                 : modes[plan.mode] || "";
+            const textSub = media.subtitles.find((s) => s.id === state.subtitle && s.textBased);
+            const subtitleStyle = () => (S.user.preferences && S.user.preferences.subtitleStyle) || {};
             const menu = h("div", {class: "player-menu popup-like", role: "dialog", "aria-label": t("Playback settings")},
                 h("div", {class: "pm-info"}, h("strong", null, modeText), plan.reason && plan.mode !== "direct" ? h("span", null, plan.reason) : null),
                 section(t("Quality"), qualities, currentQuality, (v) => {
@@ -817,8 +822,24 @@
                     state.subtitle = v || null;
                     const s = media.subtitles.find((x) => x.id === v);
                     const needsRestart = (s && !s.textBased) || (state.plan && state.plan.burnedSubtitle && state.plan.burnedSubtitle === old);
-                    if (needsRestart || casting) restart(); else loadSubtitle();
-                }));
+                    if (!v) state.burnSubtitle = false;
+                    // A burned-in subtitle is part of the picture: changing it needs a new stream.
+                    if (needsRestart || casting || state.burnSubtitle || old && state.plan && state.plan.burnedSubtitle === old) restart(); else loadSubtitle();
+                }),
+                // Text subtitles: shown by the player in the user's look, or burned into the picture
+                // (for screens that show them too small, or to share one picture in a room).
+                textSub && plan.textBurnIn ? section(t("Subtitle display"),
+                    [["player", t("Shown by the player")], ["burn", t("Burned into the picture")]], state.burnSubtitle ? "burn" : "player", (v) => {
+                        state.burnSubtitle = v === "burn";
+                        restart();
+                    }) : null,
+                textSub && !state.burnSubtitle ? section(t("Subtitle size"),
+                    [["s", t("Small")], ["m", t("Medium")], ["l", t("Large")], ["xl", t("Extra large")]], subtitleStyle().size, (v) => {
+                        const style = Object.assign({}, subtitleStyle(), {size: v});
+                        S.user.preferences = Object.assign({}, S.user.preferences, {subtitleStyle: style});
+                        M.applySubtitleStyle(subs);
+                        api("PUT", "/api/me/preferences", {subtitleStyle: {size: v}}).catch(() => null);
+                    }) : null);
             player.append(menu);
         });
         const closePlayerMenu = (e) => {

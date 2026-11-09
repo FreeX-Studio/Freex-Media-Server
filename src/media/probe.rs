@@ -30,6 +30,8 @@ pub struct Tools {
     pub ffmpeg_ok: bool,
     /// Filters of this ffmpeg build that tone mapping needs.
     pub tonemap: Tonemap,
+    /// The `subtitles` filter (libass), for burning text subtitles into the picture.
+    pub burn_text: bool,
 }
 
 /// HDR (PQ or HLG, BT.2020) to SDR (BT.709) in software: to linear light, the primaries to
@@ -55,22 +57,23 @@ impl Tools {
         if !ffmpeg_ok {
             tracing::warn!("ffmpeg not found ('{ffmpeg}'): no generated thumbnails and no conversion");
         }
-        let tonemap = if ffmpeg_ok { tonemap_filters(&ffmpeg).await } else { Tonemap::default() };
+        let (tonemap, burn_text) = if ffmpeg_ok { tonemap_filters(&ffmpeg).await } else { (Tonemap::default(), false) };
         if ffmpeg_ok && !tonemap.software {
             tracing::info!("This ffmpeg has no zscale filter: converted HDR videos keep their washed-out colours");
         }
-        Tools { ffprobe, ffmpeg, ffprobe_ok, ffmpeg_ok, tonemap }
+        Tools { ffprobe, ffmpeg, ffprobe_ok, ffmpeg_ok, tonemap, burn_text }
     }
 }
 
-async fn tonemap_filters(ffmpeg: &str) -> Tonemap {
+/// The tone mapping filters, and whether the `subtitles` filter is there.
+async fn tonemap_filters(ffmpeg: &str) -> (Tonemap, bool) {
     let mut c = command(ffmpeg);
     c.args(["-hide_banner", "-filters"]).stdout(Stdio::piped()).stderr(Stdio::null());
-    let Ok(Ok(out)) = tokio::time::timeout(Duration::from_secs(10), c.output()).await else { return Tonemap::default() };
+    let Ok(Ok(out)) = tokio::time::timeout(Duration::from_secs(10), c.output()).await else { return (Tonemap::default(), false) };
     let names: Vec<String> =
         String::from_utf8_lossy(&out.stdout).lines().filter_map(|l| l.split_whitespace().nth(1).map(str::to_string)).collect();
     let has = |n: &str| names.iter().any(|x| x == n);
-    Tonemap { software: has("zscale") && has("tonemap"), vaapi: has("tonemap_vaapi") }
+    (Tonemap { software: has("zscale") && has("tonemap"), vaapi: has("tonemap_vaapi") }, has("subtitles"))
 }
 
 /// A bare program name is taken from the `ffmpeg` folder next to the server if there is one

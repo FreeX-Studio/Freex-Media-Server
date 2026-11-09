@@ -66,6 +66,12 @@ the player always wins. Language tags may be ISO 639-1 or 639-2 (`de`, `ger`, `d
 Subtitles next to the video (`.srt`, `.vtt`) and inside it are supported. Text subtitles (SRT, ASS, WebVTT, mov_text)
 are rendered by the player; bitmap subtitles (PGS, VobSub, DVB) are burned into the picture during conversion.
 
+How FreeX Web shows text subtitles is set per user under *Account → Playback* (size, a dark box or only an outline,
+at the bottom or a bit higher, white or yellow) and kept on the server; the size can also be changed in the player
+menu. For screens that cannot show them well, the player menu can **burn a text subtitle into the picture**
+instead: the server then converts the video and draws the subtitle with ffmpeg's `subtitles` filter (libass), in the
+same size at every quality. This needs an ffmpeg with libass; the option only appears when it is there.
+
 A playback that reaches 90 % marks the item as watched and adds it to the user's watch history.
 
 ## Skip intro and credits

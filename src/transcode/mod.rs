@@ -178,6 +178,8 @@ struct Job {
     preset: String,
     /// HDR to SDR: None, in software (zscale + tonemap) or with VAAPI (tonemap_vaapi).
     tonemap: ToneMapping,
+    /// A text subtitle to burn in, written to `burn.vtt` in the session folder.
+    burn_text: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -265,8 +267,9 @@ impl Transcoder {
         };
         let transcode = plan.mode == Mode::Transcode;
         let hw = &self.config.hardware_acceleration;
-        // VAAPI cannot overlay bitmap subtitles in this simple pipeline; burn-ins use the software path.
-        let hw = if !transcode || (plan.burn_subtitle >= 0 && hw == "vaapi") { "none".to_string() } else { hw.clone() };
+        // VAAPI cannot overlay subtitles in this simple pipeline; burn-ins use the software path.
+        let burning = plan.burn_subtitle >= 0 || plan.burn_text.is_some();
+        let hw = if !transcode || (burning && hw == "vaapi") { "none".to_string() } else { hw.clone() };
         let audio_stream = usize::try_from(plan.audio_index).ok().and_then(|i| f.audio_streams.get(i)).map(|a| a.stream_index);
         // HDR video converted for an ordinary (SDR) screen, or the colours look washed out.
         let tonemap = if !transcode || !f.tone_mappable() {
@@ -291,10 +294,14 @@ impl Transcoder {
             vaapi_device: self.config.vaapi_device.clone(),
             preset: self.config.preset.clone(),
             tonemap,
+            burn_text: plan.burn_text.is_some(),
         };
         let id = crate::auth::id();
         let dir = self.root.join(&id);
         std::fs::create_dir_all(&dir).map_err(|e| StartError::Failed(e.to_string()))?;
+        if let Some(vtt) = &plan.burn_text {
+            std::fs::write(dir.join("burn.vtt"), vtt).map_err(|e| StartError::Failed(e.to_string()))?;
+        }
         let count = segments.count();
         let mut worker = Worker::new(dir.clone(), segments, Box::new(move |at| command(&job, at)), self.priority.clone());
         worker.begin(start_ms).map_err(|e| StartError::Failed(format!("cannot start ffmpeg: {e}")))?;
@@ -407,7 +414,12 @@ fn command(j: &Job, start_ms: i64) -> Vec<String> {
         }
         let h = j.max_height;
         let software_scale = if h > 0 { format!("scale=-2:'min({h},ih)'") } else { "scale=-2:ih".into() };
-        let software_tonemap = if j.tonemap == ToneMapping::Software { format!("{SOFTWARE_TONEMAP},") } else { String::new() };
+        let mut software_tonemap = if j.tonemap == ToneMapping::Software { format!("{SOFTWARE_TONEMAP},") } else { String::new() };
+        if j.burn_text {
+            // ffmpeg runs in a folder of the session (run1, run2, …); the subtitle lies next to them.
+            // Rendered after scaling, so the letters have the same size at every quality.
+            software_tonemap.push_str("subtitles=../burn.vtt,");
+        }
         if j.hw == "vaapi" {
             let scale = if h > 0 { format!("scale_vaapi=w=-2:h='min({h},ih)'") } else { "null".into() };
             match j.tonemap {
@@ -544,6 +556,7 @@ mod tests {
             vaapi_device: String::new(),
             preset: "veryfast".into(),
             tonemap: ToneMapping::None,
+            burn_text: false,
         };
         let c = command(&job, 8000).join(" ");
         assert!(c.contains("-noaccurate_seek -ss 8.001 -copyts"));
@@ -561,6 +574,8 @@ mod tests {
         let c = command(&hdr, 0).join(" ");
         assert!(c.contains(&format!("[0:0]scale=-2:'min(720,ih)',{SOFTWARE_TONEMAP},format=yuv420p[v]")));
         assert!(c.contains("-color_trc bt709"));
+        let text = Job { burn_text: true, ..hdr.clone() };
+        assert!(command(&text, 0).join(" ").contains(&format!("{SOFTWARE_TONEMAP},subtitles=../burn.vtt,format=yuv420p[v]")));
         let vaapi = Job { hw: "vaapi".into(), tonemap: ToneMapping::Vaapi, ..hdr };
         assert!(
             command(&vaapi, 0).join(" ").contains("format=p010,hwupload,tonemap_vaapi=format=nv12:t=bt709:m=bt709:p=bt709,scale_vaapi")

@@ -350,6 +350,19 @@
             s.value = value || "auto";
             return s;
         };
+        const st = p.subtitleStyle || {};
+        const styleSel = (id, key, options) => {
+            const s = h("select", {id, onchange: () => previewStyle()}, options.map(([v, l]) => h("option", {value: v}, l)));
+            s.value = st[key] || options[0][0];
+            return s;
+        };
+        const sSize = styleSel("pref-ssize", "size", [["m", t("Medium")], ["s", t("Small")], ["l", t("Large")], ["xl", t("Extra large")]]);
+        const sBg = styleSel("pref-sbg", "background", [["box", t("Dark box")], ["outline", t("Outline only")]]);
+        const sPos = styleSel("pref-spos", "position", [["bottom", t("At the bottom")], ["high", t("A bit higher")]]);
+        const sColor = styleSel("pref-scolor", "color", [["white", t("White")], ["yellow", t("Yellow")]]);
+        const sample = h("div", {class: "subs"}, h("span", null, t("This is how subtitles look.")));
+        const previewStyle = () => Object.assign(sample.dataset, {size: sSize.value, background: sBg.value, position: sPos.value, color: sColor.value});
+        previewStyle();
         const qHome = qualitySel("pref-qhome", p.qualityHome);
         const qAway = qualitySel("pref-qaway", p.qualityAway);
         const sync = () => subLangField.hidden = mode.value === "off";
@@ -360,6 +373,11 @@
             field("pref-audio", t("Preferred audio language"), audio, t("If a file does not have this language, its default track is played.")),
             field("pref-submode", t("Switch on subtitles"), mode),
             subLangField,
+            h("h3", null, t("Subtitle look")),
+            h("div", {class: "sub-preview", "aria-hidden": "true"}, sample),
+            h("div", {class: "filter-fields"},
+                field("pref-ssize", t("Size"), sSize), field("pref-sbg", t("Background"), sBg),
+                field("pref-spos", t("Position"), sPos), field("pref-scolor", t("Colour"), sColor)),
             field("pref-qhome", t("Quality in the home network"), qHome, t("Automatic: the original file.")),
             field("pref-qaway", t("Quality on the go"), qAway,
                 t("Automatic: the best quality the connection allows, measured when playback starts. A quality chosen in the player is remembered here.")),
@@ -367,7 +385,8 @@
             h("button", {class: "btn primary", onclick: async () => {
                     const network = S.user.network;
                     S.user = await api("PUT", "/api/me/preferences",
-                        {audioLanguage: audio.value, subtitleMode: mode.value, subtitleLanguage: subLang.value, qualityHome: qHome.value, qualityAway: qAway.value});
+                        {audioLanguage: audio.value, subtitleMode: mode.value, subtitleLanguage: subLang.value, qualityHome: qHome.value, qualityAway: qAway.value,
+                            subtitleStyle: {size: sSize.value, background: sBg.value, position: sPos.value, color: sColor.value}});
                     S.user.network = network;
                     M.toast(t("Playback settings saved"));
                 }}, t("Save")));

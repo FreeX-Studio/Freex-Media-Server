@@ -34,7 +34,9 @@
 - **Audio passthrough:** the sound is copied whenever the player decodes it, also when the video is converted, so
   AC3, E-AC3 and other surround tracks stay 5.1/7.1; DTS and TrueHD become E-AC3 or AC3 5.1 for players that decode
   those, AAC stereo otherwise
-- FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; *Automatic* quality and the quality defaults under Account; a switch for the previews in the server settings
+- **Subtitle look:** size, background, position and colour of text subtitles per user (*Account → Playback*, the size
+  also in the player); text subtitles can be **burned into the picture** from the player menu
+- FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; *Automatic* quality and the quality defaults under Account; the subtitle look and burning in text subtitles; a switch for the previews in the server settings
 
 ## FreeX Media Server 0.20.0 · FreeX Web 1.5.0.0
 
