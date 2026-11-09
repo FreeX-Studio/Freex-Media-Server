@@ -95,3 +95,15 @@ To pin an item to a specific TMDB entry, put the id into the file or folder name
 be corrected with *Fix match* in the item's "…" menu.
 
 This product uses the TMDB API but is not endorsed or certified by TMDB.
+
+## Filters and smart collections
+
+The *Library* tab of a library has a filter panel: watch state (unwatched, in progress, watched), genre, years,
+minimum rating, resolution (of any version or episode), age rating, recently added, an actor or director (from the
+online metadata) and part of the title. The filters are part of the address, so a filtered view can be bookmarked.
+
+Admins can save a filter as a **smart collection**. It keeps the filter instead of a list of titles: titles added
+later that match appear in it by themselves, and every user sees it with their own watch state (an "Unwatched"
+collection shows each user what they have not seen). *Edit filter* on the collection page opens the library with
+the filter, *Update smart collection* saves the change.
+

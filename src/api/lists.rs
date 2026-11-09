@@ -43,8 +43,16 @@ fn valid_name(raw: &str, key: &str) -> Result<String, ApiError> {
 
 // ====================================================================== collections
 
-fn collection_view(id: &str, library_id: &str, name: &str, count: usize, auto: bool) -> Value {
-    json!({"id": id, "type": "collection", "libraryId": library_id, "title": name, "childCount": count, "auto": auto})
+fn collection_view(id: &str, library_id: &str, name: &str, count: usize, auto: bool, smart: bool) -> Value {
+    json!({"id": id, "type": "collection", "libraryId": library_id, "title": name, "childCount": count, "auto": auto, "smart": smart})
+}
+
+/// The movies or shows of a library that pass a smart collection's filter for this user, by title.
+fn smart_items(app: &AppState, idx: &Index, user: &User, library_id: &str, filter: &str) -> Vec<Arc<Item>> {
+    let f = super::filter::Filter::parse(filter);
+    let view = View::new(app, idx, user);
+    let now = crate::auth::now_ms();
+    idx.top_level(library_id).iter().filter(|it| f.matches(app, idx, &view, it, now)).cloned().collect()
 }
 
 /// Collections of a library as row entries: movie series with at least two movies there, and
@@ -59,11 +67,16 @@ pub(super) fn collections_of(app: &AppState, idx: &Index, user: &User, library_i
     let mut out: Vec<Value> = by_series
         .into_iter()
         .filter(|(_, (_, n))| *n >= 2)
-        .map(|(cid, (md, n))| collection_view(&collection_id(cid, library_id), library_id, &collection_name(app, &md), n, true))
+        .map(|(cid, (md, n))| collection_view(&collection_id(cid, library_id), library_id, &collection_name(app, &md), n, true, false))
         .collect();
     for c in app.db.collections_of(library_id) {
-        let visible = c.item_ids.iter().filter(|id| idx.item(id).is_some_and(|it| user.may_access(&it.library_id))).count();
-        out.push(collection_view(&c.id, library_id, &c.name, visible, false));
+        let smart = !c.filter.is_empty();
+        let visible = if smart {
+            smart_items(app, idx, user, library_id, &c.filter).len()
+        } else {
+            c.item_ids.iter().filter(|id| idx.item(id).is_some_and(|it| user.may_access(&it.library_id))).count()
+        };
+        out.push(collection_view(&c.id, library_id, &c.name, visible, false, smart));
     }
     out.sort_by_key(|c| c["title"].as_str().unwrap_or("").to_lowercase());
     out
@@ -85,6 +98,8 @@ struct Resolved {
     poster: Option<String>,
     backdrop: Option<String>,
     items: Vec<Arc<Item>>,
+    /// The filter of a smart collection.
+    filter: String,
 }
 
 fn resolve(app: &AppState, idx: &Index, user: &User, cid: &str) -> Result<Resolved, ApiError> {
@@ -111,11 +126,26 @@ fn resolve(app: &AppState, idx: &Index, user: &User, cid: &str) -> Result<Resolv
             poster: c.poster,
             backdrop: c.backdrop,
             items,
+            filter: String::new(),
         }
     } else {
         let c = app.db.collection(cid).ok_or_else(ApiError::not_found)?;
-        let items = c.item_ids.iter().filter_map(|id| idx.item(id).cloned()).collect();
-        Resolved { id: c.id, library_id: c.library_id, name: c.name, summary: c.summary, auto: false, poster: None, backdrop: None, items }
+        let items = if c.filter.is_empty() {
+            c.item_ids.iter().filter_map(|id| idx.item(id).cloned()).collect()
+        } else {
+            smart_items(app, idx, user, &c.library_id, &c.filter)
+        };
+        Resolved {
+            id: c.id,
+            library_id: c.library_id,
+            name: c.name,
+            summary: c.summary,
+            auto: false,
+            poster: None,
+            backdrop: None,
+            items,
+            filter: c.filter,
+        }
     };
     if !user.may_access(&r.library_id) {
         return Err(ApiError::not_found());
@@ -131,8 +161,11 @@ pub async fn collection(State(app): State<Arc<AppState>>, Extension(ctx): Extens
     let view = View::new(&app, &idx, u);
     let items = view.decorate_all(r.items.iter());
     let watched = items.iter().filter(|v| v["progress"]["watched"] == true).count();
-    let mut m = collection_view(&r.id, &r.library_id, &r.name, r.items.len(), r.auto);
+    let mut m = collection_view(&r.id, &r.library_id, &r.name, r.items.len(), r.auto, !r.filter.is_empty());
     m["summary"] = json!(r.summary);
+    if !r.filter.is_empty() {
+        m["filter"] = json!(r.filter);
+    }
     m["items"] = json!(items);
     m["watchedCount"] = json!(watched);
     ok(m)
@@ -167,6 +200,9 @@ fn own_collection(app: &AppState, cid: &str) -> Result<OwnCollection, ApiError> 
 
 /// Adds a movie or show of the collection's library.
 fn add_to_collection(app: &AppState, c: &mut OwnCollection, item_id: &str) -> Result<(), ApiError> {
+    if !c.filter.is_empty() {
+        return Err(ApiError::bad_request("error.collectionSmart"));
+    }
     let idx = app.catalog.snapshot();
     let it = idx.item(item_id).ok_or_else(|| ApiError::bad_request("error.unknownItem"))?;
     if it.library_id != c.library_id || it.parent_id.is_some() {
@@ -183,8 +219,10 @@ pub async fn create_collection(State(app): State<Arc<AppState>>, Extension(ctx):
     ctx.admin()?;
     let l = app.db.library(body.str("libraryId").unwrap_or("")).ok_or_else(|| ApiError::bad_request("error.libraryMissing"))?;
     let name = valid_name(body.str("name").unwrap_or(""), "error.nameRequired")?;
-    let mut c = app.db.create_collection(&l.id, &name);
-    if let Some(item) = body.str("itemId") {
+    // With a filter: a smart collection, whose entries follow the library.
+    let filter = super::filter::Filter::parse(body.str("filter").unwrap_or("")).to_query();
+    let mut c = app.db.create_collection(&l.id, &name, &filter);
+    if let Some(item) = body.str("itemId").filter(|_| filter.is_empty()) {
         add_to_collection(&app, &mut c, item)?;
     }
     created(json!({"id": c.id, "name": c.name}))
@@ -203,6 +241,13 @@ pub async fn update_collection(
     }
     if body.has("summary") {
         c.summary = body.string("summary").trim().chars().take(4000).collect();
+    }
+    if body.has("filter") && !c.filter.is_empty() {
+        let f = super::filter::Filter::parse(body.str("filter").unwrap_or("")).to_query();
+        if f.is_empty() {
+            return Err(ApiError::bad_request("error.filterEmpty"));
+        }
+        c.filter = f;
     }
     app.db.save_collection(&c);
     ok(json!({"id": c.id, "name": c.name}))

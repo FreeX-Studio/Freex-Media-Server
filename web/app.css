@@ -534,7 +534,7 @@ button.nav-link {
     font-weight: 600;
 }
 
-select, .field input, .inline input {
+select, .field input, .inline input, .filter-field input {
     height: 38px;
     padding: 0 12px;
     border-radius: var(--radius-m);
@@ -1022,6 +1022,69 @@ select, .field input, .inline input {
 
 .lib-tools select {
     height: 34px;
+}
+
+.filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.filter-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.filter-btn.on {
+    border-color: var(--glass);
+}
+
+.filter-btn .badge {
+    min-width: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--glass);
+    color: #111;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 18px;
+}
+
+.filter-panel {
+    margin: 4px 0 22px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-m);
+    background: rgba(255, 255, 255, .03);
+}
+
+.filter-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 12px 14px;
+}
+
+.filter-field {
+    display: grid;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.filter-field select, .filter-field input {
+    width: 100%;
+    height: 34px;
+}
+
+.filter-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
+.filter-actions:empty {
+    display: none;
 }
 
 .size-slider {

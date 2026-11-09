@@ -15,7 +15,7 @@ The gaps that show in daily use. All of them fit the current architecture.
 | ~~**Chapters**~~ | **Delivered in 0.21.0** – see [Playback](playback.md#chapters). |
 | ~~**Trailers and extras from disk**~~ | **Delivered in 0.21.0** – see [Media library](media-library.md#trailers-and-extras). |
 | ~~**Multiple versions of a title**~~ | **Delivered in 0.21.0** – see [Media library](media-library.md#several-versions-of-a-movie). |
-| **Library filters and saved filters** | Filter by year, rating, resolution, unwatched, actor and more; save a filter as a smart collection or smart playlist. Today: sorting and genre only. |
+| ~~**Library filters and saved filters**~~ | **Delivered in 0.21.0** (smart collections) – see [Media library](media-library.md#filters-and-smart-collections). |
 | **Parental controls** | Maximum age rating per user (FSK/MPAA from the metadata), hidden libraries, a PIN to switch users on a shared screen. |
 | **Per-user quality defaults** | Remember the chosen quality per user and network (at home vs. away), with "automatic" from the measured bandwidth. Today the quality is chosen per playback. |
 | **HDR tone mapping** | HDR10 and Dolby Vision sources converted for SDR displays with ffmpeg's tone mapping (software or hardware). Today a transcoded HDR file looks washed out. |

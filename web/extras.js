@@ -64,7 +64,7 @@
     }
 
     async function addToCollection(item) {
-        const colls = (await api("GET", `/api/libraries/${item.libraryId}/collections`)).filter((c) => !c.auto);
+        const colls = (await api("GET", `/api/libraries/${item.libraryId}/collections`)).filter((c) => !c.auto && !c.smart);
         const name = h("input", {id: "co-name", placeholder: t("Name of the new collection"), maxlength: 80});
         const error = h("div", {class: "error-text", role: "alert"});
         const close = modal(t("Add to collection"),
@@ -368,7 +368,7 @@
                 }}, icon("settings")) : null);
         const grid = h("div", {class: "grid"}, c.items.map((it) => {
             const el = card(it, "poster");
-            if (!c.auto && S.user.admin) {
+            if (!c.auto && !c.smart && S.user.admin) {
                 el.querySelector(".card-actions").append(h("button", {class: "card-btn card-remove", title: t("Remove from collection"),
                     "aria-label": t("Remove from collection"), html: M.ICONS.close, onclick: async (e) => {
                         e.preventDefault();
@@ -387,8 +387,11 @@
                 h("div", {class: "parent-title"}, t("Collection")),
                 h("h1", null, c.title),
                 h("div", {class: "facts"}, h("span", null, tn(c.childCount, "1 title", "{0} titles")), h("span", null, t("{0} watched", c.watchedCount)),
-                    c.auto ? h("span", null, t("from TMDB")) : null),
+                    c.auto ? h("span", null, t("from TMDB")) : null, c.smart ? h("span", null, t("Smart collection")) : null),
                 actions,
+                c.smart ? h("p", {class: "hint"}, t("Filled automatically by its filter: new titles that match appear here by themselves."), " ",
+                    link(`/library/${c.libraryId}/all?${c.filter}${S.user.admin ? "&smart=" + encodeURIComponent(c.id) : ""}`, null,
+                        S.user.admin ? t("Edit filter") : t("Show the filter"))) : null,
                 c.summary ? h("p", {class: "summary"}, c.summary) : null)),
             h("div", {class: "detail-children"}, grid)));
     });
@@ -443,6 +446,7 @@
         return {facts, crew: crewEl, collections: colls, cast, unmatched};
     };
 
+    M.modal = modal;
     M.startTogether = startTogether;
     M.inviteDialog = inviteDialog;
 })();

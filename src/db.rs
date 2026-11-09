@@ -169,6 +169,10 @@ const MIGRATIONS: &[&str] = &[
         analyzed_at INTEGER NOT NULL
     );
     "#,
+    // 7: smart collections keep a library filter instead of a list of entries
+    r#"
+    ALTER TABLE collections ADD COLUMN filter TEXT NOT NULL DEFAULT '';
+    "#,
 ];
 
 /// Login events kept per user.
@@ -276,6 +280,9 @@ pub struct OwnCollection {
     pub summary: String,
     pub item_ids: Vec<String>,
     pub created_at: i64,
+    /// A smart collection's library filter (a query string, see `api::filter`); empty for a
+    /// collection of chosen entries.
+    pub filter: String,
 }
 
 #[derive(Clone, Debug)]
@@ -824,7 +831,7 @@ impl Db {
 
     fn collection_rows(&self, filter: &str, arg: &str) -> Vec<OwnCollection> {
         let c = self.c();
-        let sql = format!("SELECT id, library_id, name, summary, created_at FROM collections WHERE {filter} = ?1");
+        let sql = format!("SELECT id, library_id, name, summary, created_at, filter FROM collections WHERE {filter} = ?1");
         let rows: Vec<OwnCollection> = {
             let mut st = c.prepare_cached(&sql).unwrap();
             st.query_map([arg], |r| {
@@ -835,6 +842,7 @@ impl Db {
                     summary: r.get(3)?,
                     item_ids: Vec::new(),
                     created_at: r.get(4)?,
+                    filter: r.get(5)?,
                 })
             })
             .unwrap()
@@ -859,7 +867,7 @@ impl Db {
         self.collection_rows("id", id).pop()
     }
 
-    pub fn create_collection(&self, library_id: &str, name: &str) -> OwnCollection {
+    pub fn create_collection(&self, library_id: &str, name: &str, filter: &str) -> OwnCollection {
         let c = OwnCollection {
             id: crate::auth::id(),
             library_id: library_id.to_string(),
@@ -867,11 +875,12 @@ impl Db {
             summary: String::new(),
             item_ids: Vec::new(),
             created_at: now_ms(),
+            filter: filter.to_string(),
         };
         self.c()
             .execute(
-                "INSERT INTO collections (id, library_id, name, summary, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![c.id, c.library_id, c.name, c.summary, c.created_at],
+                "INSERT INTO collections (id, library_id, name, summary, created_at, filter) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![c.id, c.library_id, c.name, c.summary, c.created_at, c.filter],
             )
             .unwrap();
         c
@@ -881,7 +890,10 @@ impl Db {
         let mut c = self.c();
         let r = (|| -> rusqlite::Result<()> {
             let tx = c.transaction()?;
-            tx.execute("UPDATE collections SET name = ?2, summary = ?3 WHERE id = ?1", params![o.id, o.name, o.summary])?;
+            tx.execute(
+                "UPDATE collections SET name = ?2, summary = ?3, filter = ?4 WHERE id = ?1",
+                params![o.id, o.name, o.summary, o.filter],
+            )?;
             Db::write_items(&tx, "collection_items", "collection_id", &o.id, &o.item_ids)?;
             tx.commit()
         })();

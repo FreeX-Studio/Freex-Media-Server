@@ -58,8 +58,9 @@ every language, so apps can react to it:
 | Method | Path | |
 |---|---|---|
 | `GET` | `/api/libraries` | Libraries |
-| `GET` | `/api/libraries/{id}/items?sort=title\|added\|year\|rating&unwatched=1&genre=` | Movies or shows of a library |
-| `GET` | `/api/libraries/{id}/collections` | Collections of a library |
+| `GET` | `/api/libraries/{id}/items?sort=title\|added\|year\|rating\|duration&order=asc\|desc` and filters | Movies or shows of a library. Filters: `watched=unwatched\|inProgress\|watched`, `genre`, `yearFrom`, `yearTo`, `minRating`, `resolution=4K\|1080p\|720p\|576p\|SD`, `contentRating`, `person` (part of an actor's or director's name), `addedDays`, `q` (part of the title); `unwatched=1` still works. The answer has the choices (`genres`, `contentRatings`, `resolutions`, `years`) and the applied `filter` as a query string |
+| `GET` | `/api/libraries/{id}/collections` | Collections of a library (`auto` for movie series, `smart` for smart collections) |
+| `POST` / `PUT` | `/api/collections`, `/api/collections/{id}` | Admins: `{libraryId, name, itemId}` makes a collection; with `filter` (a query string of the filters above) a smart collection, whose entries are the matching titles for each user. `PUT` changes `name`, `summary` and, for smart collections, `filter` |
 | `GET` | `/api/hubs` | Rows of the home screen |
 | `GET` | `/api/search?q=` | Search |
 | `GET` | `/api/items/{id}` | Details, with seasons and episodes; for movies and episodes `media` (tracks, subtitles, `chapters`), `markers` and `previews`; for movies in several versions `versions` (`id`, `label`, `resolution`, `videoCodec`, `size`, `primary`, `current`; a version id works wherever an item id does, e.g. `/api/items/{versionId}/playback`, and its progress is the movie's); for movies and shows `extras` (entries of type `extra` with `extraType`; they play like movies, keep no progress and do not appear in lists or search) |

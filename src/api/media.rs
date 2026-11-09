@@ -14,6 +14,7 @@
 //! search, artwork, plus the folder picker and scan triggers for admins.
 
 use crate::AppState;
+use crate::auth::now_ms;
 use crate::db::{Library, Progress, User};
 use crate::http::{ApiError, ApiResult, Ctx, ok};
 use crate::i18n::Text;
@@ -50,7 +51,7 @@ impl<'a> View<'a> {
         View { app, idx, progress: app.db.progress_of(&user.id), watchlist: app.db.watchlist(&user.id).into_iter().collect() }
     }
 
-    fn progress(&self, id: &str) -> Progress {
+    pub(super) fn progress(&self, id: &str) -> Progress {
         self.progress.get(id).copied().unwrap_or_default()
     }
 
@@ -160,7 +161,7 @@ impl<'a> View<'a> {
     }
 
     /// Episodes below a show or season, and how many of them are watched.
-    fn count_leaves(&self, it: &Item) -> (usize, usize) {
+    pub(super) fn count_leaves(&self, it: &Item) -> (usize, usize) {
         let mut counts = (0, 0);
         for c in self.idx.children(&it.id) {
             if c.kind == Kind::Episode {
@@ -176,7 +177,7 @@ impl<'a> View<'a> {
         counts
     }
 
-    fn fully_watched(&self, it: &Item) -> bool {
+    pub(super) fn fully_watched(&self, it: &Item) -> bool {
         if it.kind.playable() {
             self.progress(&it.id).watched
         } else {
@@ -185,7 +186,7 @@ impl<'a> View<'a> {
         }
     }
 
-    fn any_watched(&self, it: &Item) -> bool {
+    pub(super) fn any_watched(&self, it: &Item) -> bool {
         if it.kind.playable() { self.progress(&it.id).touched() } else { self.count_leaves(it).1 > 0 }
     }
 
@@ -261,8 +262,8 @@ pub async fn library_items(
     let view = View::new(&app, &idx, u);
     let sort = q.get("sort").map_or("title", String::as_str);
     let desc = q.get("order").map_or(sort != "title", |o| o == "desc");
-    let unwatched_only = q.get("unwatched").is_some_and(|v| v == "1");
-    let genre = q.get("genre").map_or("", String::as_str);
+    let filter = super::filter::Filter::from_params(&q);
+    let now = now_ms();
 
     let mut items: Vec<Arc<Item>> = idx.top_level(&l.id).to_vec();
     let cmp = |a: &Arc<Item>, b: &Arc<Item>| -> Ordering {
@@ -276,19 +277,37 @@ pub async fn library_items(
     };
     items.sort_by(|a, b| if desc { cmp(b, a) } else { cmp(a, b) });
 
+    // What the filters can choose from, over the whole library.
     let mut genres = BTreeSet::new();
+    let mut ratings = BTreeSet::new();
+    let mut resolutions = BTreeSet::new();
+    let (mut year_min, mut year_max) = (i32::MAX, 0);
     let mut out = Vec::new();
     for it in &items {
         genres.extend(it.genre_list().map(str::to_string));
-        if !genre.is_empty() && !it.has_genre(genre) {
-            continue;
+        if let Some(md) = app.metadata.get(&it.id).filter(|m| !m.content_rating.is_empty()) {
+            ratings.insert(md.content_rating.clone());
         }
-        if unwatched_only && view.fully_watched(it) {
-            continue;
+        resolutions.extend(super::filter::files(&idx, it).iter().map(|f| f.resolution_label()).filter(|r| !r.is_empty()));
+        if it.year > 0 {
+            (year_min, year_max) = (year_min.min(it.year), year_max.max(it.year));
         }
-        out.push(view.decorate(it, false));
+        if filter.matches(&app, &idx, &view, it, now) {
+            out.push(view.decorate(it, false));
+        }
     }
-    ok(json!({"library": library_view(&app, &l, u.admin), "genres": genres, "items": out}))
+    let order = ["4K", "1080p", "720p", "576p", "SD"];
+    let mut resolutions: Vec<&str> = resolutions.into_iter().collect();
+    resolutions.sort_by_key(|r| order.iter().position(|o| o == r));
+    ok(json!({
+        "library": library_view(&app, &l, u.admin),
+        "genres": genres,
+        "contentRatings": ratings,
+        "resolutions": resolutions,
+        "years": if year_max > 0 { json!([year_min, year_max]) } else { json!(null) },
+        "filter": filter.to_query(),
+        "items": out,
+    }))
 }
 
 pub async fn item(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ctx>, Path(id): Path<String>) -> ApiResult {

@@ -16,6 +16,7 @@
 mod account;
 mod admin;
 mod extras;
+mod filter;
 mod lists;
 mod media;
 mod metadata;

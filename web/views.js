@@ -63,53 +63,112 @@
 
     applyPosterSize(Number(M.store.get(POSTER_KEY)) || 156);
 
+    /** Filter keys of the library list (see api/filter.rs); everything else in the URL is not a filter. */
+    const FILTER_KEYS = ["watched", "genre", "yearFrom", "yearTo", "minRating", "resolution", "contentRating", "person", "addedDays", "q"];
+
     M.route("/library/:id/all", async (main, p, query) => {
         const sort = query.get("sort") || "title";
-        const unwatched = query.get("unwatched") === "1";
-        const genre = query.get("genre") || "";
+        const smartId = query.get("smart") || "";
         const q = new URLSearchParams({sort});
-        if (unwatched) q.set("unwatched", "1");
-        if (genre) q.set("genre", genre);
+        for (const k of FILTER_KEYS) if (query.get(k)) q.set(k, query.get(k));
+        // Links of older versions
+        if (query.get("unwatched") === "1" && !query.get("watched")) q.set("watched", "unwatched");
         const data = await api("GET", `/api/libraries/${p.id}/items?${q}`);
         const lib = data.library;
+        const active = FILTER_KEYS.filter((k) => q.get(k));
 
         const update = (changes) => {
             const u = new URLSearchParams(location.search);
+            u.delete("unwatched");
             for (const [k, v] of Object.entries(changes)) {
                 if (v) u.set(k, v); else u.delete(k);
             }
             M.navigate(`/library/${p.id}/all?${u}`, true);
         };
+        const resetAll = () => update(Object.fromEntries(FILTER_KEYS.map((k) => [k, ""])));
         const sorts = [["title", t("Title")], ["added", t("Added")], ["year", t("Release year")], ["rating", t("Rating")]];
         if (lib.type === "movies") sorts.push(["duration", t("Duration")]);
         const sortSel = h("select", {"aria-label": t("Sort order"), onchange: (e) => update({sort: e.target.value})},
             sorts.map(([v, l]) => h("option", {value: v, selected: v === sort}, l)));
-        const filterSel = h("select", {"aria-label": "Filter", onchange: (e) => update({unwatched: e.target.value})},
-            h("option", {value: ""}, t("All")), h("option", {value: "1", selected: unwatched}, t("Unwatched")));
-        const genreSel = data.genres.length ? h("select", {"aria-label": "Genre", onchange: (e) => update({genre: e.target.value})},
-            h("option", {value: ""}, t("All genres")),
-            data.genres.map((g) => h("option", {value: g, selected: g === genre}, g))) : null;
         const size = h("input", {type: "range", min: 110, max: 240, step: 2, value: Number(M.store.get(POSTER_KEY)) || 156,
             "aria-label": t("Poster size"), class: "size-slider", oninput: (e) => {
                 applyPosterSize(e.target.value);
                 M.store.set(POSTER_KEY, e.target.value);
             }});
 
+        // ---- the filter panel
+        const select = (key, label, options) => h("label", {class: "filter-field"}, h("span", null, label),
+            h("select", {onchange: (e) => update({[key]: e.target.value})},
+                options.map(([v, l]) => h("option", {value: v, selected: String(q.get(key) || "") === String(v)}, l))));
+        const text = (key, label, attrs) => {
+            const input = h("input", Object.assign({value: q.get(key) || "", onchange: (e) => update({[key]: e.target.value.trim()})}, attrs));
+            input.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") input.blur();
+            });
+            return h("label", {class: "filter-field"}, h("span", null, label), input);
+        };
+        const any = ["", t("Any")];
+        const [yMin, yMax] = data.years || ["", ""];
+        const fields = [
+            select("watched", t("Watched"), [["", t("All")], ["unwatched", t("Unwatched")], ["inProgress", t("In progress")], ["watched", t("Watched")]]),
+            data.genres.length ? select("genre", "Genre", [["", t("All genres")]].concat(data.genres.map((g) => [g, g]))) : null,
+            text("yearFrom", t("Year from"), {type: "number", min: 1880, max: 2100, placeholder: yMin, class: "year"}),
+            text("yearTo", t("Year to"), {type: "number", min: 1880, max: 2100, placeholder: yMax, class: "year"}),
+            select("minRating", t("Rating"), [any].concat([9, 8, 7, 6, 5].map((r) => [r, t("{0} or more", r)]))),
+            data.resolutions.length ? select("resolution", t("Resolution"), [any].concat(data.resolutions.map((r) => [r, r]))) : null,
+            data.contentRatings.length ? select("contentRating", t("Age rating"), [any].concat(data.contentRatings.map((r) => [r, r]))) : null,
+            select("addedDays", t("Added"), [any, [7, t("Last 7 days")], [30, t("Last 30 days")], [90, t("Last 3 months")], [365, t("Last year")]]),
+            text("person", t("Actor or director"), {type: "search", placeholder: t("Name")}),
+            text("q", t("Title contains"), {type: "search"}),
+        ];
+        const saveBtn = S.user.admin && active.length ? h("button", {class: "btn small", onclick: () => saveSmart()},
+            smartId ? t("Update smart collection") : t("Save as smart collection")) : null;
+        const panel = h("div", {class: "filter-panel", hidden: !active.length && M.store.get("freex.filters") !== "1"},
+            h("div", {class: "filter-fields"}, fields),
+            h("div", {class: "filter-actions"},
+                active.length ? h("button", {class: "btn small", onclick: resetAll}, t("Reset filters")) : null, saveBtn));
+        const filterBtn = h("button", {class: "btn small filter-btn" + (active.length ? " on" : ""), "aria-expanded": String(!panel.hidden),
+            onclick: () => {
+                panel.hidden = !panel.hidden;
+                filterBtn.setAttribute("aria-expanded", String(!panel.hidden));
+                M.store.set("freex.filters", panel.hidden ? "0" : "1");
+            }}, icon("filter"), t("Filter"), active.length ? h("span", {class: "badge"}, active.length) : null);
+
+        async function saveSmart() {
+            const filter = data.filter;
+            if (smartId) {
+                await api("PUT", `/api/collections/${smartId}`, {filter});
+                M.toast(t("Smart collection updated"));
+                return M.navigate(`/collection/${smartId}`);
+            }
+            const name = h("input", {id: "sc-name", maxlength: 80, placeholder: t("e.g. Unwatched 90s movies")});
+            const close = M.modal(t("Save as smart collection"),
+                h("p", {class: "hint"}, t("The collection keeps this filter: titles that match later appear in it by themselves, and everyone sees it with their own watch state.")),
+                h("div", {class: "field"}, h("label", {for: "sc-name"}, t("Name")), name),
+                h("div", {class: "btn-row"}, h("button", {class: "btn primary", onclick: async () => {
+                    const c = await api("POST", "/api/collections", {libraryId: p.id, name: name.value, filter});
+                    close();
+                    M.navigate(`/collection/${c.id}`);
+                }}, t("Save"))));
+            name.focus();
+        }
+
         let body;
         if (data.items.length) {
             body = h("div", {class: "grid"}, data.items.map((it) => card(it, "poster")));
         } else if (lib.scanning) {
             body = h("div", {class: "empty"}, h("h2", null, t("Scanning")), h("p", null, t("The library is being scanned. The page updates as soon as the scan is finished.")));
-        } else if (unwatched || genre) {
+        } else if (active.length) {
             body = h("div", {class: "empty"}, h("h2", null, t("No matches")), h("p", null, t("Nothing matches these filters.")),
-                h("button", {class: "btn", onclick: () => update({unwatched: "", genre: ""})}, t("Reset filters")));
+                h("button", {class: "btn", onclick: resetAll}, t("Reset filters")));
         } else {
             body = h("div", {class: "empty"}, h("h2", null, t("This library is empty")),
                 h("p", null, t("No videos were found in the folders. Check the folders in the settings and start a new scan.")),
                 S.user.admin ? link("/settings/libraries", {class: "btn"}, t("Check folders")) : null);
         }
         main.replaceChildren(h("div", {class: "page"},
-            libraryHeader(lib, "all", [h("span", {class: "count"}, data.items.length), filterSel, genreSel, sortSel, size]),
+            libraryHeader(lib, "all", [h("span", {class: "count"}, data.items.length), filterBtn, sortSel, size]),
+            panel,
             body));
     });
 

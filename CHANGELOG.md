@@ -18,7 +18,11 @@
 - **Several versions of a movie** (4K and 1080p, Director's Cut) in one folder are one entry with a version picker
   on the item page and in the player; the versions share their watch state (see
   [Media library](docs/media-library.md#several-versions-of-a-movie))
-- FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; a switch for the previews in the server settings
+- **Library filters:** watch state, genre, years, rating, resolution, age rating, recently added, actor or director
+  and title, in a filter panel on the *Library* tab; a filter can be saved as a **smart collection** that fills
+  itself and shows every user their own watch state (see
+  [Media library](docs/media-library.md#filters-and-smart-collections))
+- FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; a switch for the previews in the server settings
 
 ## FreeX Media Server 0.20.0 · FreeX Web 1.5.0.0
 
