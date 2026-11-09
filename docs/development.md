@@ -50,7 +50,7 @@ sudo apt install build-essential gcc-mingw-w64-x86-64 dpkg nsis curl unzip pytho
 ```
 
 Stages: toolchain (installs the pinned toolchain), checks (`cargo fmt --check`, clippy with warnings as errors), tests,
-both release builds, packaging. Artifacts: the `.deb`, the setup `.exe`, the archives and `SHA256SUMS` in `dist/`.
+both release builds, packaging. Artifacts: the `.deb`, the setup `.exe`, the archives and `SHA256SUMS` in `dist/`; `dist/` is emptied before packaging, so a build only publishes the packages of its own version.
 The build needs to reach crates.io, github.com and gyan.dev.
 
 ## Project structure

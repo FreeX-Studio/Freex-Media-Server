@@ -80,6 +80,9 @@ pipeline {
         stage('Package') {
             steps {
                 sh '''
+                    # The workspace is kept between builds (target/ caches the compiled
+                    # dependencies), so packages of earlier versions must not be left in dist/.
+                    rm -rf dist
                     VERSION="$(sed -n 's/^version = "\\(.*\\)"$/\\1/p' Cargo.toml | head -n 1)"
                     packaging/deb/build-deb.sh "$VERSION" target/release/freex-media-server dist
                     packaging/windows/build-installer.sh "$VERSION" "target/$WINDOWS_TARGET/release/freex-media-server.exe" dist
@@ -91,7 +94,7 @@ pipeline {
 
     post {
         success {
-            archiveArtifacts artifacts: 'dist/*', fingerprint: true
+            archiveArtifacts artifacts: 'dist/*', fingerprint: true, allowEmptyArchive: false
         }
     }
 }
