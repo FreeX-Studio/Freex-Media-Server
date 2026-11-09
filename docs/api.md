@@ -95,6 +95,7 @@ every language, so apps can react to it:
 | `GET` | `/api/admin/settings` | Settings of `config.toml` (secrets only as set / not set) and `pendingRestart` |
 | `PUT` | `/api/admin/settings` | `{currentPassword, values: {"server.port": 32600, …}}`; a secret sent as `null` stays unchanged |
 | `POST` | `/api/admin/restart` | Restart the server with the saved configuration |
+| `GET` / `DELETE` | `/api/items/{id}/files` | Admins, with `[library] allow_delete`: the files deleting a movie (or a version: its id, or `?version=`), episode, season or show would remove / delete them and rescan the library |
 | `POST` | `/api/admin/maintenance` | Run the nightly maintenance now (409 while it runs); its schedule and last report are `maintenance` in the dashboard |
 | `GET` / `POST` | `/api/admin/webhooks` | Webhooks with their secret and last delivery / `{url, events}` adds one |
 | `PUT` / `DELETE` | `/api/admin/webhooks/{id}` | `{url, events, newSecret}` changes one / deletes it; `POST …/{id}/test` sends a test event |

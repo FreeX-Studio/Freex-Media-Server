@@ -51,6 +51,11 @@ tvmaze = true
 # Detect intros and end credits of TV episodes ("Skip intro")
 enabled = true
 
+[library]
+# Admins may delete movies and episodes from disk. The service may only write to its own folders:
+#   sudo systemctl edit freex-media-server  ->  [Service] ReadWritePaths=/srv/media
+allow_delete = false
+
 [maintenance]
 # Nightly: database backup, cache clean-up, rescan of all libraries (server time zone)
 enabled = true

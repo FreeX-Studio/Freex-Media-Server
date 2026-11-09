@@ -89,6 +89,11 @@ start = "03:00"
 # Database backups kept in <data>/backups (0 = none)
 backups = 7
 
+[library]
+# Admins may delete movies and episodes from disk on the item page. The server needs write access
+# to the media folders for that (the Debian service: a ReadWritePaths drop-in)
+allow_delete = false
+
 [scanner]
 # Automatic rescan of all libraries, in minutes (0 = only manual scans)
 interval_minutes = 30
@@ -115,6 +120,7 @@ pub struct Config {
     pub markers: MarkersConfig,
     pub previews: PreviewsConfig,
     pub maintenance: MaintenanceConfig,
+    pub library: LibraryConfig,
     /// Folder of the configuration file; relative paths are resolved against it.
     #[serde(skip)]
     pub base_dir: PathBuf,
@@ -170,6 +176,12 @@ impl Default for MarkersConfig {
     fn default() -> Self {
         MarkersConfig { enabled: true }
     }
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct LibraryConfig {
+    pub allow_delete: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -259,6 +271,7 @@ impl Default for Config {
             markers: MarkersConfig::default(),
             previews: PreviewsConfig::default(),
             maintenance: MaintenanceConfig::default(),
+            library: LibraryConfig::default(),
             base_dir: PathBuf::from("."),
         }
     }

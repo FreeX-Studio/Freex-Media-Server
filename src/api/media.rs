@@ -627,6 +627,69 @@ pub(super) async fn image_path(app: &AppState, it: &Arc<Item>, kind: &str) -> Op
 
 // ====================================================================== administration
 
+/// The files deleting an item would remove (`?version=` for one version of a movie), as names
+/// relative to their library folder, for the confirmation.
+pub async fn deletable_files(
+    State(app): State<Arc<AppState>>,
+    Extension(ctx): Extension<Ctx>,
+    Path(id): Path<String>,
+    Query(q): Params,
+) -> ApiResult {
+    ctx.admin()?;
+    let (lib, files) = files_to_delete(&app, &id, q.get("version").map(String::as_str))?;
+    let size: u64 = files.iter().filter_map(|f| std::fs::metadata(f).ok()).map(|m| m.len()).sum();
+    let names: Vec<String> = files.iter().map(|f| relative(&lib, f)).collect();
+    ok(json!({"files": names, "size": size}))
+}
+
+/// Deletes the files of an item from disk and rescans its library. Body: `{version}` optional.
+pub async fn delete_files(
+    State(app): State<Arc<AppState>>,
+    Extension(ctx): Extension<Ctx>,
+    Path(id): Path<String>,
+    body: crate::http::JsonBody,
+) -> ApiResult {
+    let admin = ctx.admin()?;
+    let (lib, files) = files_to_delete(&app, &id, body.str("version"))?;
+    let roots = lib.paths.clone();
+    let list = files.clone();
+    let deleted = tokio::task::spawn_blocking(move || crate::media::delete::delete(&list, &roots))
+        .await
+        .map_err(|e| ApiError::from_text(StatusCode::INTERNAL_SERVER_ERROR, Text::new("error.deleteFailed").arg(e.to_string())))?
+        .map_err(|e| {
+            tracing::warn!("Deleting failed: {e}");
+            ApiError::from_text(StatusCode::INTERNAL_SERVER_ERROR, Text::new("error.deleteFailed").arg(e))
+        })?;
+    tracing::info!("'{}' deleted {deleted} files of '{}' in '{}'", admin.username, id, lib.name);
+    Scanner::scan(&app, &lib.id);
+    ok(json!({"deleted": deleted}))
+}
+
+fn files_to_delete(app: &AppState, id: &str, version: Option<&str>) -> Result<(Library, Vec<PathBuf>), ApiError> {
+    if !app.config.library.allow_delete {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "error.deleteOff"));
+    }
+    let idx = app.catalog.snapshot();
+    // A version id stands for that version of its movie.
+    let it = idx.item(id).ok_or_else(ApiError::not_found)?;
+    let (it, version) = match &it.version_of {
+        Some(movie) => (idx.item(movie).ok_or_else(ApiError::not_found)?.clone(), Some(it.id.as_str())),
+        None => (it.clone(), version),
+    };
+    let lib = app.db.library(&it.library_id).ok_or_else(ApiError::not_found)?;
+    let files = crate::media::delete::files_of(&idx, &it, version);
+    // Only files inside the library's folders, whatever the index says.
+    let files: Vec<PathBuf> = files.into_iter().filter(|f| lib.paths.iter().any(|r| f.starts_with(r))).collect();
+    if files.is_empty() {
+        return Err(ApiError::not_found());
+    }
+    Ok((lib, files))
+}
+
+fn relative(lib: &Library, f: &std::path::Path) -> String {
+    lib.paths.iter().find_map(|r| f.strip_prefix(r).ok()).unwrap_or(f).to_string_lossy().into_owned()
+}
+
 pub async fn scan_library(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ctx>, Path(id): Path<String>) -> ApiResult {
     ctx.admin()?;
     let l = app.db.library(&id).ok_or_else(ApiError::not_found)?;

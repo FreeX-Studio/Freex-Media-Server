@@ -24,7 +24,7 @@ The gaps that show in daily use. All of them fit the current architecture.
 | ~~**Server dashboard**~~ | **Delivered in 0.21.0** – *Settings → Dashboard* in FreeX Web; CPU figures need Linux. |
 | ~~**Scheduled maintenance**~~ | **Delivered in 0.21.0** – see [Configuration](configuration.md). |
 | ~~**Webhooks**~~ | **Delivered in 0.21.0** – see [API](api.md#webhooks). |
-| **Delete files from the library** | Delete a movie or episode from disk from the item page (admins only, with confirmation). |
+| ~~**Delete files from the library**~~ | **Delivered in 0.21.0** – see [Configuration](configuration.md). |
 | **Manual metadata editing** | Edit title, summary, artwork and genres by hand and lock them against refreshes. Today: fix match only. |
 | **Theme music** | Play a show's theme on its page. Low priority. |
 
