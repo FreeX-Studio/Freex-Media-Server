@@ -96,7 +96,7 @@ pub fn delete(files: &[PathBuf], library_roots: &[String]) -> Result<usize, Stri
     dirs.sort_by_key(|d| std::cmp::Reverse(d.components().count()));
     dirs.dedup();
     for mut d in dirs {
-        while !roots.iter().any(|r| *r == d) && roots.iter().any(|r| d.starts_with(r)) {
+        while !roots.contains(&d) && roots.iter().any(|r| d.starts_with(r)) {
             // remove_dir only removes empty folders.
             if std::fs::remove_dir(&d).is_err() {
                 break;
