@@ -34,17 +34,30 @@
 
     // ------------------------------------------------------------------ library
 
+    /** The view of a library last open on this device ("recommended", "all" with its sort and
+     *  filters, or "collections"); the sidebar link opens it again. */
+    const tabKey = (id) => "freex.libraryView." + id;
+    M.rememberLibraryView = (id, path) => M.store.set(tabKey(id), path);
+
     function libraryHeader(lib, tab, tools) {
+        M.rememberLibraryView(lib.id, tab === "all" ? `all${location.search}` : tab);
         return h("div", {class: "lib-head"},
             h("h1", null, lib.name),
             h("nav", {class: "lib-tabs", "aria-label": t("View")},
-                link(`/library/${lib.id}`, {class: tab === "recommended" ? "active" : ""}, t("Recommended")),
+                link(`/library/${lib.id}/recommended`, {class: tab === "recommended" ? "active" : ""}, t("Recommended")),
                 link(`/library/${lib.id}/all`, {class: tab === "all" ? "active" : ""}, t("Library")),
                 lib.type === "movies" ? link(`/library/${lib.id}/collections`, {class: tab === "collections" ? "active" : ""}, t("Collections")) : null),
             h("div", {class: "lib-tools"}, tools));
     }
 
-    M.route("/library/:id", async (main, p) => {
+    M.route("/library/:id", (main, p) => {
+        const last = M.store.get(tabKey(p.id)) || "recommended";
+        // Only own paths of this library are taken from the store.
+        const safe = /^(recommended|collections|all(\?[^#]*)?)$/.test(last) ? last : "recommended";
+        M.navigate(`/library/${p.id}/${safe}`, true);
+    });
+
+    M.route("/library/:id/recommended", async (main, p) => {
         const lib = S.libraries.find((l) => l.id === p.id) || (await api("GET", "/api/libraries")).find((l) => l.id === p.id);
         if (!lib) throw new M.ApiError(404, t("This library no longer exists."));
         const hubs = await api("GET", `/api/libraries/${p.id}/hubs`);
