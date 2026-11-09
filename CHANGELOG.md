@@ -2,6 +2,14 @@
 
 # Changelog
 
+## Unreleased
+
+- **API for the FreeX TV apps:** CORS for apps whose pages have an origin of their own (FreeX TV on Samsung TVs and
+  Fire TV), without credentials; from another origin, state-changing requests need the token header, sign-in a
+  JSON body, and the first setup stays with the server's own pages. `POST /api/items/{id}/playback` takes
+  `"tokenUrls": true` for players that cannot send the token: the stream URL then carries its own access token, like
+  for a Chromecast (see [API](docs/api.md))
+
 ## FreeX Media Server 0.21.0 · FreeX Web 1.6.0.0
 
 - **Seek previews:** hovering over or dragging the seek bar shows a frame of that point with its time. The server

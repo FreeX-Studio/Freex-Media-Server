@@ -12,6 +12,12 @@ sign-in cookie is only accepted for `GET` requests (images, video, subtitles), s
 actions on behalf of a signed-in user. Requests that change state must also come from the server's own origin or
 without an `Origin` header (native apps).
 
+Apps whose pages have an origin of their own (FreeX TV on Samsung TVs and Fire TV) may call the API across origins:
+the server answers CORS preflights and lets any origin read API answers, but never with credentials, so the cookie
+does not count there. From another origin, state-changing requests are accepted when they carry the token in
+`X-FreeX-Token` (or `Authorization: Bearer`), and `POST /api/login` and `/api/login/verify` with a JSON body;
+`/api/setup` only from the server's own pages.
+
 ```bash
 curl -s -X POST https://media.example.org/api/login \
   -H 'Content-Type: application/json' -d '{"username":"alice","password":"…"}'
@@ -68,7 +74,7 @@ every language, so apps can react to it:
 | `GET` | `/api/items/{id}` | Details, with seasons and episodes; for movies and episodes `media` (tracks, subtitles, `chapters`), `markers` and `previews`; for movies in several versions `versions` (`id`, `label`, `resolution`, `videoCodec`, `size`, `primary`, `current`; a version id works wherever an item id does, e.g. `/api/items/{versionId}/playback`, and its progress is the movie's); for movies and shows `extras` (entries of type `extra` with `extraType`; they play like movies, keep no progress and do not appear in lists or search) |
 | `GET` | `/api/items/{id}/image/{poster\|backdrop\|thumb}` | Artwork |
 | `GET` | `/api/items/{id}/previews` | Seek preview sprite sheet (JPEG). The grid is `previews` in the item details: `{intervalMs, width, height, columns, rows, count, version}`; frame `n` shows `n × intervalMs` and sits in column `n % columns`, row `n / columns`. Missing while it is not made yet |
-| `POST` | `/api/items/{id}/playback` | `{caps, quality, bandwidth, audio, subtitle, burnSubtitle, startMs}` → playback mode and stream URL (`burnSubtitle: true` burns a text `subtitle` into the picture; `textBurnIn` says whether the server can), the `quality` used, whether it was `automatic`, and the `network`. `quality` `auto` (or missing) takes the user's default for the network, `bandwidth` (bits/s) is what the client measured; with `"player": "external"` (a native player that decodes every format, e.g. mpv in FreeX Desktop) always direct play |
+| `POST` | `/api/items/{id}/playback` | `{caps, quality, bandwidth, audio, subtitle, burnSubtitle, startMs}` → playback mode and stream URL (`burnSubtitle: true` burns a text `subtitle` into the picture; `textBurnIn` says whether the server can), the `quality` used, whether it was `automatic`, and the `network`. `quality` `auto` (or missing) takes the user's default for the network, `bandwidth` (bits/s) is what the client measured; with `"player": "external"` (a native player that decodes every format, e.g. mpv in FreeX Desktop) always direct play; with `"tokenUrls": true` the `url` carries its own access token (`/api/cast/{token}/stream` or `…/hls/index.m3u8`), for native players that cannot send the token header (FreeX TV) |
 | `GET` | `/api/items/{id}/stream` | The file itself (supports range requests) |
 | `GET` | `/api/transcode/{session}/index.m3u8` | HLS playlist (VOD) of a conversion over the whole title; segments `s<n>.m4s`, converted on request |
 | `GET` | `/api/items/{id}/subtitles/{id}.vtt` | Subtitle as WebVTT |

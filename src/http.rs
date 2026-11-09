@@ -196,7 +196,15 @@ pub async fn context(State(app): State<Arc<AppState>>, mut req: Request, next: N
 
     // HTTP/2 carries the host in the :authority pseudo-header, which is part of the URI here.
     let authority = req.uri().authority().map(|a| a.to_string());
-    let response = if !safe && !same_origin(&headers, authority.as_deref(), trust) {
+    let path = req.uri().path().to_string();
+    let foreign = header_str(&headers, "origin").is_some() && !same_origin(&headers, authority.as_deref(), trust);
+    // The FreeX TV apps run from their own origin and ask before each request with a JSON body or the token.
+    if api && foreign && method == Method::OPTIONS && header_str(&headers, "access-control-request-method").is_some() {
+        let mut r = StatusCode::NO_CONTENT.into_response();
+        cors_headers(r.headers_mut(), Some(&headers));
+        return r;
+    }
+    let response = if !safe && foreign && !app_request(&headers, &path) {
         ApiError::new(StatusCode::FORBIDDEN, "error.crossSite").into_response()
     } else {
         if api {
@@ -239,7 +247,42 @@ pub async fn context(State(app): State<Arc<AppState>>, mut req: Request, next: N
         None => response,
     };
     add_security_headers(response.headers_mut(), secure, &app.build);
+    if api && foreign {
+        cors_headers(response.headers_mut(), None);
+    }
     response
+}
+
+/// CORS for the FreeX apps whose pages have an origin of their own (FreeX TV on Samsung TVs and
+/// Fire TV). Any origin may read API answers, but without credentials: the browser sends no cookie,
+/// so only a request with the sign-in token in a header gets anything that is not public.
+/// `preflight` holds the request headers of an `OPTIONS` request.
+fn cors_headers(h: &mut HeaderMap, preflight: Option<&HeaderMap>) {
+    let set = |h: &mut HeaderMap, k: &'static str, v: &'static str| {
+        h.insert(k, HeaderValue::from_static(v));
+    };
+    set(h, "access-control-allow-origin", "*");
+    set(h, "access-control-expose-headers", "content-range, content-length, accept-ranges, retry-after, x-freex-build");
+    if let Some(req) = preflight {
+        set(h, "access-control-allow-methods", "GET, HEAD, POST, PUT, DELETE");
+        set(h, "access-control-allow-headers", "x-freex-token, authorization, content-type, accept-language, range");
+        set(h, "access-control-max-age", "600");
+        // Chrome asks before a page from the internet or a secure context talks to a server in the home network.
+        if header_str(req, "access-control-request-private-network") == Some("true") {
+            set(h, "access-control-allow-private-network", "true");
+        }
+    }
+}
+
+/// A state-changing request from another origin that is still allowed: one of an app, which carries
+/// the sign-in token in a header (no website has it, and the cookie never counts for such requests),
+/// or a sign-in with a JSON body (which a website cannot send without the CORS preflight). Setting
+/// up the first admin stays with the server's own pages.
+fn app_request(h: &HeaderMap, path: &str) -> bool {
+    let token = header_str(h, TOKEN_HEADER).is_some_and(|t| !t.is_empty())
+        || header_str(h, "authorization").is_some_and(|a| a.starts_with("Bearer "));
+    let json = header_str(h, "content-type").is_some_and(|c| c.trim_start().to_ascii_lowercase().starts_with("application/json"));
+    token || (json && matches!(path, "/api/login" | "/api/login/verify"))
 }
 
 fn static_lang(lang: &str) -> &'static str {
@@ -423,6 +466,21 @@ mod tests {
         assert!(!same_origin(&h, None, false));
         h.insert("origin", HeaderValue::from_static("null"));
         assert!(!same_origin(&h, None, false));
+    }
+
+    #[test]
+    fn app_requests_from_other_origins() {
+        let mut h = HeaderMap::new();
+        h.insert("origin", HeaderValue::from_static("null"));
+        assert!(!app_request(&h, "/api/login"), "a form post");
+        assert!(!app_request(&h, "/api/items/x/watched"));
+        h.insert("content-type", HeaderValue::from_static("application/json"));
+        assert!(app_request(&h, "/api/login"));
+        assert!(app_request(&h, "/api/login/verify"));
+        assert!(!app_request(&h, "/api/setup"), "the first admin only from the server's pages");
+        assert!(!app_request(&h, "/api/items/x/progress"), "JSON without the token");
+        h.insert(TOKEN_HEADER, HeaderValue::from_static("abc"));
+        assert!(app_request(&h, "/api/items/x/progress"));
     }
 
     #[test]

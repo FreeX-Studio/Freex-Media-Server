@@ -141,7 +141,7 @@ fn chromecast() -> Capabilities {
     }
 }
 
-const CAST_PREFIX: &str = "/api/cast/";
+pub(super) const CAST_PREFIX: &str = "/api/cast/";
 const EXTRA_VALIDITY_MS: i64 = 6 * 3_600_000;
 
 /// Access of one Chromecast to one item, without a login: the receiver gets URLs with a token.
@@ -161,6 +161,16 @@ impl Grants {
         let mut all = self.0.lock().unwrap();
         all.retain(|_, g| g.expires > now);
         all.get(token).map(|g| (g.user_id.clone(), g.item_id.clone(), g.session.clone()))
+    }
+
+    /// Lets a player that cannot send the sign-in token (a Chromecast, the native player of a TV)
+    /// load the files of one playback, for the length of the title and a few hours more.
+    pub(super) fn grant(&self, user_id: &str, item_id: &str, session: Option<String>, duration_ms: i64) -> String {
+        let token = crate::auth::token();
+        let validity = if duration_ms > 0 { duration_ms } else { 4 * 3_600_000 } + EXTRA_VALIDITY_MS;
+        let grant = Grant { user_id: user_id.to_string(), item_id: item_id.to_string(), session, expires: now_ms() + validity };
+        self.0.lock().unwrap().insert(token.clone(), grant);
+        token
     }
 }
 

@@ -64,7 +64,7 @@ fn is_text_subtitle(f: &crate::media::MediaFile, sid: &str) -> bool {
 
 /// Decides how to play an item in this player. Body: `{caps, quality, audio, subtitle, startMs}`;
 /// with `"player": "external"` (mpv in FreeX Desktop, which decodes everything) the file is always
-/// played directly.
+/// played directly; with `"tokenUrls": true` the URL carries its own access token (FreeX TV).
 pub async fn start(State(app): State<Arc<AppState>>, Extension(ctx): Extension<Ctx>, Path(id): Path<String>, body: JsonBody) -> ApiResult {
     let u = ctx.user()?;
     let it = playable(&app.catalog.snapshot(), u, &id)?;
@@ -128,6 +128,13 @@ pub async fn start(State(app): State<Arc<AppState>>, Extension(ctx): Extension<C
                 return Err(ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "error.transcodeFailedWith").arg(why));
             }
         },
+    }
+    if body.bool("tokenUrls") == Some(true) {
+        // For native players that cannot send the token (FreeX TV): the same files under URLs with a token.
+        let session = m["session"].as_str().map(str::to_string);
+        let token = app.cast_grants.grant(&u.id, &it.id, session.clone(), f.duration_ms);
+        let file = if session.is_some() { "hls/index.m3u8" } else { "stream" };
+        m["url"] = json!(format!("{}{token}/{file}", super::extras::CAST_PREFIX));
     }
     let bitrate = playback::stream_bitrate(f, &plan);
     let mode = plan.mode.name();
