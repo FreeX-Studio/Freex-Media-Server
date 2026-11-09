@@ -55,8 +55,55 @@ const SKIP_FOLDERS: [&str; 18] = [
     "metadata",
     "system volume information",
 ];
-/// Smaller files named "sample" or "-trailer" are not main content.
+/// Smaller files named "sample" are not main content.
 const SAMPLE_MAX_BYTES: u64 = 300 * 1024 * 1024;
+/// Folders of bonus videos next to a movie or inside a show folder, and the type of extra they hold.
+const EXTRA_FOLDERS: [(&str, &str); 10] = [
+    ("trailers", "trailer"),
+    ("featurettes", "featurette"),
+    ("behind the scenes", "behindTheScenes"),
+    ("deleted scenes", "deletedScene"),
+    ("interviews", "interview"),
+    ("scenes", "scene"),
+    ("shorts", "short"),
+    ("extras", "other"),
+    ("other", "other"),
+    ("others", "other"),
+];
+/// Endings of file names of bonus videos lying next to the main file (`Inception (2010)-trailer.mkv`).
+const EXTRA_SUFFIXES: [(&str, &str); 9] = [
+    ("-trailer", "trailer"),
+    ("-featurette", "featurette"),
+    ("-behindthescenes", "behindTheScenes"),
+    ("-deleted", "deletedScene"),
+    ("-interview", "interview"),
+    ("-scene", "scene"),
+    ("-short", "short"),
+    ("-other", "other"),
+    ("-extra", "other"),
+];
+
+/// English name of an extra type, used as title of extras that have no name of their own.
+pub fn extra_label(extra_type: &str) -> &'static str {
+    match extra_type {
+        "trailer" => "Trailer",
+        "featurette" => "Featurette",
+        "behindTheScenes" => "Behind the scenes",
+        "deletedScene" => "Deleted scene",
+        "interview" => "Interview",
+        "scene" => "Scene",
+        "short" => "Short film",
+        _ => "Extra",
+    }
+}
+
+/// A bonus video found by [`find_videos`].
+struct FoundExtra {
+    path: PathBuf,
+    extra_type: &'static str,
+    /// In an extras folder (owner: the folder above) or named with a suffix (owner: same folder).
+    in_folder: bool,
+}
 
 /// Stable 16-character id from the given parts.
 pub fn stable_id(parts: &[&str]) -> String {
@@ -227,10 +274,17 @@ impl Build {
                 }
                 continue;
             }
-            for video in find_videos(&root) {
+            let (videos, extras) = find_videos(&root);
+            for video in videos {
                 let r = if lib.kind == "movies" { b.add_movie(&root, &video) } else { b.add_episode(&root, &video) };
                 if let Err(e) = r {
                     tracing::warn!("Skipping {}: {e}", video.display());
+                }
+            }
+            // After the main files, so their owners are known.
+            for extra in extras {
+                if let Err(e) = b.add_extra(&root, &extra) {
+                    tracing::warn!("Skipping {}: {e}", extra.path.display());
                 }
             }
         }
@@ -404,6 +458,57 @@ impl Build {
         Ok(())
     }
 
+    /// A trailer or other bonus video, attached to the movie or show of its folder.
+    fn add_extra(&mut self, root: &Path, extra: &FoundExtra) -> std::io::Result<()> {
+        let video = &extra.path;
+        let file_name = file_name(video);
+        let base = names::strip_extension(&file_name).to_string();
+        let dir = video.parent().unwrap_or(root);
+        let owner_dir = if extra.in_folder { dir.parent().unwrap_or(root) } else { dir };
+        let prefix = (!extra.in_folder).then(|| strip_extra_suffix(&base).0);
+        let Some(owner) = self.owner_of(owner_dir, prefix) else {
+            tracing::debug!("No movie or show for the extra {}", video.display());
+            return Ok(());
+        };
+        let abs = text(video);
+        let id = stable_id(&[&self.library_id, "extra", &abs]);
+        let mut item = Item::new(id.clone(), &self.library_id, Kind::Extra);
+        item.parent_id = Some(owner);
+        item.extra_type = extra.extra_type.to_string();
+        // Files in an extras folder are named after their content; "Movie-trailer" only names the movie.
+        let own_name = if extra.in_folder { title_year(&base).title } else { String::new() };
+        item.title = if own_name.is_empty() { extra_label(extra.extra_type).to_string() } else { own_name };
+        item.sort_title = sort_title(&item.title);
+        let sc = self.sidecars(dir);
+        item.poster_path = sc.image(&[&format!("{base}-thumb"), &base]);
+        item.file = Some(self.file_info(&id, video, &sc, &base)?);
+        item.added_at = self.added_at(&id, video)?;
+        self.put(item);
+        Ok(())
+    }
+
+    /// The movie or show whose folder is `dir`; with several movies in one folder, the one whose
+    /// file name is `prefix`.
+    fn owner_of(&self, dir: &Path, prefix: Option<&str>) -> Option<String> {
+        let dir = text(dir);
+        let movies: Vec<&Item> =
+            self.items.iter().filter(|it| it.kind == Kind::Movie && it.folder.as_deref() == Some(dir.as_str())).collect();
+        if let Some(p) = prefix
+            && let Some(m) =
+                movies.iter().find(|m| m.file.as_ref().is_some_and(|f| names::strip_extension(f.file_name()).eq_ignore_ascii_case(p)))
+        {
+            return Some(m.id.clone());
+        }
+        if movies.len() == 1 {
+            return Some(movies[0].id.clone());
+        }
+        if !movies.is_empty() {
+            return None;
+        }
+        let it = self.items.iter().find(|it| matches!(it.kind, Kind::Show | Kind::Season) && it.folder.as_deref() == Some(dir.as_str()))?;
+        if it.kind == Kind::Show { Some(it.id.clone()) } else { it.parent_id.clone() }
+    }
+
     /// The file's data: kept from the last scan if the file is unchanged, otherwise probed again.
     fn file_info(&mut self, id: &str, video: &Path, sc: &Sidecars, base: &str) -> std::io::Result<MediaFile> {
         let meta = std::fs::metadata(video)?;
@@ -455,10 +560,32 @@ fn mtime_ms(meta: &std::fs::Metadata) -> i64 {
     meta.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map_or(0, |d| d.as_millis() as i64)
 }
 
-/// Video files below a folder, sorted, without hidden files, bonus folders and samples.
-/// Symbolic links to files are followed, links to folders are not (they could form loops).
-fn find_videos(root: &Path) -> Vec<PathBuf> {
+/// `("Inception (2010)", Some("trailer"))` for `Inception (2010)-trailer`; the name unchanged and
+/// None for other names.
+fn strip_extra_suffix(base: &str) -> (&str, Option<&'static str>) {
+    let lower = base.to_lowercase();
+    for (suffix, extra_type) in EXTRA_SUFFIXES {
+        if lower.ends_with(suffix) && lower.len() > suffix.len() {
+            return (&base[..base.len() - suffix.len()], Some(extra_type));
+        }
+    }
+    (base, None)
+}
+
+fn video_file(path: &Path, name: &str) -> Option<u64> {
+    if !VIDEO_EXTENSIONS.contains(&names::extension(name).as_str()) {
+        return None;
+    }
+    std::fs::metadata(path).ok().filter(std::fs::Metadata::is_file).map(|m| m.len())
+}
+
+/// Video files below a folder, sorted, without hidden files, system folders and samples; and,
+/// separately, the bonus videos: the files directly in extras folders (`Trailers/`) and files
+/// named with an extra suffix (`-trailer`). Symbolic links to files are followed, links to
+/// folders are not (they could form loops).
+fn find_videos(root: &Path) -> (Vec<PathBuf>, Vec<FoundExtra>) {
     let mut out = Vec::new();
+    let mut extras = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     while let Some(dir) = stack.pop() {
         let entries = match std::fs::read_dir(&dir) {
@@ -476,28 +603,41 @@ fn find_videos(root: &Path) -> Vec<PathBuf> {
             let path = entry.path();
             let Ok(ft) = entry.file_type() else { continue };
             if ft.is_dir() {
-                if !SKIP_FOLDERS.contains(&name.to_lowercase().as_str()) && !path.join(".ignore").exists() {
+                let lower = name.to_lowercase();
+                if path.join(".ignore").exists() {
+                    continue;
+                }
+                if let Some((_, extra_type)) = EXTRA_FOLDERS.iter().find(|(f, _)| *f == lower) {
+                    // Only the files directly inside; an extras folder at the library root belongs to nothing.
+                    if dir != root {
+                        let Ok(inner) = std::fs::read_dir(&path) else { continue };
+                        for e in inner.flatten() {
+                            let n = e.file_name().to_string_lossy().into_owned();
+                            if !n.starts_with('.') && video_file(&e.path(), &n).is_some() {
+                                extras.push(FoundExtra { path: e.path(), extra_type, in_folder: true });
+                            }
+                        }
+                    }
+                } else if !SKIP_FOLDERS.contains(&lower.as_str()) {
                     stack.push(path);
                 }
                 continue;
             }
-            let ext = names::extension(&name);
-            if !VIDEO_EXTENSIONS.contains(&ext.as_str()) {
+            let Some(size) = video_file(&path, &name) else { continue };
+            let base = names::strip_extension(&name);
+            if let (_, Some(extra_type)) = strip_extra_suffix(base) {
+                extras.push(FoundExtra { path, extra_type, in_folder: false });
                 continue;
             }
-            let Ok(meta) = std::fs::metadata(&path) else { continue };
-            if !meta.is_file() {
-                continue;
-            }
-            let lower = name.to_lowercase();
-            if meta.len() < SAMPLE_MAX_BYTES && (lower.contains("sample") || lower.ends_with(&format!("-trailer.{ext}"))) {
+            if size < SAMPLE_MAX_BYTES && name.to_lowercase().contains("sample") {
                 continue;
             }
             out.push(path);
         }
     }
     out.sort();
-    out
+    extras.sort_by(|a, b| a.path.cmp(&b.path));
+    (out, extras)
 }
 
 /// Listing of one folder, to find artwork, `.nfo` files and subtitles next to a video.
@@ -601,6 +741,53 @@ mod tests {
         assert_eq!((subs.len(), subs[0].language.as_str(), subs[0].forced), (1, "de", true));
         assert_eq!(probes.len(), 2);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn finds_extras() {
+        let root = temp("extras");
+        touch(&root.join("Inception (2010)/Inception (2010).mkv"), 10);
+        touch(&root.join("Inception (2010)/Inception (2010)-trailer.mp4"), 10);
+        touch(&root.join("Inception (2010)/Featurettes/Making.of.Inception.mkv"), 10);
+        touch(&root.join("Inception (2010)/Behind The Scenes/Dreams.mkv"), 10);
+        // Several movies in one folder: a suffix names its movie, an extras folder is ambiguous.
+        touch(&root.join("Matrix (1999).mkv"), 10);
+        touch(&root.join("Dune (2021).mkv"), 10);
+        touch(&root.join("Dune (2021)-trailer.mkv"), 10);
+        touch(&root.join("Trailers/Something.mkv"), 10);
+        let (items, probes) = Build::run(&lib("movies", &root), HashMap::new(), true);
+        let id_of = |t: &str| items.iter().find(|i| i.kind == Kind::Movie && i.title == t).unwrap().id.clone();
+        let extras: Vec<_> = items.iter().filter(|i| i.kind == Kind::Extra).collect();
+        assert_eq!(extras.len(), 4);
+        assert_eq!(items.iter().filter(|i| i.kind == Kind::Movie).count(), 3);
+        let of = |owner: &str| {
+            let mut v: Vec<_> = extras
+                .iter()
+                .filter(|e| e.parent_id.as_deref() == Some(owner))
+                .map(|e| (e.extra_type.as_str(), e.title.as_str()))
+                .collect();
+            v.sort();
+            v
+        };
+        assert_eq!(
+            of(&id_of("Inception")),
+            vec![("behindTheScenes", "Dreams"), ("featurette", "Making of Inception"), ("trailer", "Trailer")]
+        );
+        assert_eq!(of(&id_of("Dune")), vec![("trailer", "Trailer")]);
+        assert_eq!(probes.len(), 7);
+
+        let shows = temp("show-extras");
+        touch(&shows.join("Dark/Staffel 1/Dark.S01E01.mkv"), 10);
+        touch(&shows.join("Dark/Extras/Interview.mkv"), 10);
+        touch(&shows.join("Dark/Staffel 1/Deleted Scenes/Scene 1.mkv"), 10);
+        let (items, _) = Build::run(&lib("shows", &shows), HashMap::new(), true);
+        let show = items.iter().find(|i| i.kind == Kind::Show).unwrap();
+        let extras: Vec<_> = items.iter().filter(|i| i.kind == Kind::Extra).collect();
+        assert_eq!(extras.len(), 2);
+        assert!(extras.iter().all(|e| e.parent_id.as_deref() == Some(show.id.as_str())));
+        assert_eq!(items.iter().filter(|i| i.kind == Kind::Episode).count(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&shows);
     }
 
     #[test]

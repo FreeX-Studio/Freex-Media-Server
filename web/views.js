@@ -241,7 +241,9 @@
         const backdrop = h("div", {class: "backdrop"}, h("img", {src: M.img(it, "backdrop"), alt: "", onerror: (e) => e.target.remove()}));
         main.replaceChildren(h("div", {class: "detail"}, backdrop,
             h("div", {class: "detail-body"}, mirror, info),
-            h("div", {class: "detail-children"}, childrenSection(it), ex.cast)));
+            h("div", {class: "detail-children"}, childrenSection(it),
+                it.extras && it.extras.length ? hubRow({title: t("Trailers and extras"), style: "landscape", items: it.extras}) : null,
+                ex.cast)));
     });
 
     function childrenSection(it) {

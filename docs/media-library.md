@@ -18,6 +18,9 @@ Movies/
     poster.jpg                      or The Matrix (1999)-poster.jpg
     fanart.jpg                      background image
     movie.nfo                       optional Kodi metadata
+    The Matrix (1999)-trailer.mkv   an extra (see below)
+    Featurettes/                    extras folder
+      Making of.mkv
   Inception.2010.1080p.BluRay.x264.mkv   scene release names work too
 
 Shows/
@@ -29,8 +32,23 @@ Shows/
       Dark - S01E01 - Secrets-thumb.jpg
 ```
 
-Folders named `Extras`, `Trailers`, `Featurettes`, `Samples` and similar, and folders that contain a `.ignore` file,
-are skipped.
+Folders named `Samples`, system folders (`@eaDir`, `#recycle`, …) and folders that contain a `.ignore` file are
+skipped, as are files with "sample" in the name under 300 MB.
+
+### Trailers and extras
+
+Bonus videos are shown on the page of their movie or show under *Trailers and extras* and play like any other title
+(without resume position or watch history). They are found in two ways:
+
+| Where | Type |
+|---|---|
+| A folder next to the movie, or in the show or season folder: `Trailers/`, `Featurettes/`, `Behind The Scenes/`, `Deleted Scenes/`, `Interviews/`, `Scenes/`, `Shorts/`, `Extras/`, `Other/` | by the folder; the title is the file name |
+| A file next to the movie named with a suffix: `-trailer`, `-featurette`, `-behindthescenes`, `-deleted`, `-interview`, `-scene`, `-short`, `-other`, `-extra` | by the suffix; the title is the type ("Trailer") |
+
+Only the files directly inside an extras folder count. In a folder with several movies, a suffixed file belongs to
+the movie with the same name (`Dune (2021)-trailer.mkv` → `Dune (2021).mkv`); extras folders there and at the
+library root are ignored, since it is not clear which title they belong to. Extras of shows always belong to the
+show, also when they lie in a season folder.
 
 ## Local metadata and artwork
 

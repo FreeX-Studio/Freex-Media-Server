@@ -267,6 +267,7 @@ fn playable_ids(idx: &Index, it: &Item) -> Vec<String> {
         Kind::Movie | Kind::Episode => vec![it.id.clone()],
         Kind::Show => idx.episodes_of(it).iter().map(|e| e.id.clone()).collect(),
         Kind::Season => idx.children(&it.id).iter().map(|e| e.id.clone()).collect(),
+        Kind::Extra => Vec::new(),
     }
 }
 

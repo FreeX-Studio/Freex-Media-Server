@@ -13,7 +13,7 @@ The gaps that show in daily use. All of them fit the current architecture.
 |---|---|
 | ~~**Seek preview thumbnails**~~ | **Delivered in 0.21.0** – see [Playback](playback.md#seek-previews). |
 | ~~**Chapters**~~ | **Delivered in 0.21.0** – see [Playback](playback.md#chapters). |
-| **Trailers and extras from disk** | `Trailers/`, `Featurettes/`, `Behind The Scenes/` folders and `-trailer` files are skipped today; show them on the item page and play them. |
+| ~~**Trailers and extras from disk**~~ | **Delivered in 0.21.0** – see [Media library](media-library.md#trailers-and-extras). |
 | **Subtitle download** | Search and download from OpenSubtitles per title and language, stored next to the video or in the data directory. |
 | **Multiple versions of a title** | Several files for one movie (4K and 1080p, Director's Cut) as one entry with a version picker instead of duplicates. |
 | **Library filters and saved filters** | Filter by year, rating, resolution, unwatched, actor and more; save a filter as a smart collection or smart playlist. Today: sorting and genre only. |

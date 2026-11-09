@@ -153,9 +153,10 @@
         const spinner = h("div", {class: "player-spinner"}, h("span", {class: "spin big"}));
         const notice = h("div", {class: "notice", hidden: true});
 
-        const back = () => history.length > 1 ? history.back() : M.navigate(`/item/${item.id}`, true);
-        const heading = item.type === "episode" ? item.showTitle : item.title;
-        const sub = item.type === "episode" ? `${M.episodeCode(item)}, ${item.title}` : (item.year || "");
+        const back = () => history.length > 1 ? history.back() : M.navigate(`/item/${item.ownerId || item.id}`, true);
+        const isExtra = item.type === "extra";
+        const heading = item.type === "episode" ? item.showTitle : isExtra ? item.ownerTitle || M.extraTitle(item) : item.title;
+        const sub = item.type === "episode" ? `${M.episodeCode(item)}, ${item.title}` : isExtra ? M.extraTitle(item) : (item.year || "");
 
         // ---- bottom bar
         const seek = h("input", {type: "range", class: "seek", min: 0, max: Math.max(1, Math.round(durationMs / 1000)), step: 1, value: 0,
@@ -183,7 +184,7 @@
             seekWrap,
             h("div", {class: "ctl-row"},
                 h("div", {class: "ctl-left"},
-                    h("div", {class: "now-art"}, M.art(item, item.type === "episode" ? "thumb" : "poster", item.title)),
+                    h("div", {class: "now-art"}, M.art(item, item.type === "episode" || isExtra ? "thumb" : "poster", item.title)),
                     h("div", {class: "now-text"}, h("div", {class: "now-title"}, heading), h("div", {class: "now-sub"}, sub))),
                 h("div", {class: "ctl-center"},
                     h("button", {class: "ctl", "aria-label": t("Back 10 seconds"), onclick: () => seekTo(position() - 10000, true)}, icon("replay10")),

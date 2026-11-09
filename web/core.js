@@ -788,6 +788,9 @@ window.FreeX = (() => {
                 return tn(item.leafCount || 0, "1 episode", "{0} episodes");
             case "episode":
                 return `${episodeCode(item)}, ${item.title}`;
+            case "extra":
+                return [EXTRA_LABELS[item.extraType] ? t(EXTRA_LABELS[item.extraType]) : t("Extra"),
+                    item.media && item.media.durationMs ? fmtClock(item.media.durationMs) : ""].filter(Boolean).join(" · ");
             default:
                 return "";
         }
@@ -846,8 +849,28 @@ window.FreeX = (() => {
     }
 
     /** Poster (portrait) or thumbnail (landscape) card with hover actions. */
+    /** English names of the kinds of extras (translated with t). */
+    const EXTRA_LABELS = {trailer: "Trailer", featurette: "Featurette", behindTheScenes: "Behind the scenes",
+        deletedScene: "Deleted scene", interview: "Interview", scene: "Scene", short: "Short film", other: "Extra"};
+
+    /** The title of an extra; extras without a name of their own are called after their kind. */
+    function extraTitle(item) {
+        return Object.values(EXTRA_LABELS).includes(item.title) ? t(item.title) : item.title;
+    }
+
+    /** A trailer or other extra: plays at once, it has no page of its own. */
+    function extraCard(item) {
+        const title = extraTitle(item);
+        return link(`/play/${item.id}`, {class: "card landscape extra", "aria-label": t("Play {0}", title)},
+            h("div", {class: "art"}, art(item, "thumb", title),
+                h("div", {class: "card-actions"}, h("span", {class: "card-play", html: ICONS.play}))),
+            h("div", {class: "title", title}, title),
+            h("div", {class: "meta"}, cardMeta(item)));
+    }
+
     function card(item, style) {
         if (item.type === "collection" || item.type === "playlist") return listCard(item);
+        if (item.type === "extra") return extraCard(item);
         const landscape = style === "landscape";
         const kind = landscape ? "thumb" : "poster";
         const title = item.type === "episode" && landscape ? item.showTitle || item.title : item.title;
@@ -897,7 +920,7 @@ window.FreeX = (() => {
             row);
     }
 
-    return {S, store, noteBuild, t, tn, tParts, num, locale, h, ICONS, icon, fmtDuration, fmtClock, fmtDate, fmtSize, fmtBitrate, language, codecName, channels,
+    return {S, store, noteBuild, extraTitle, t, tn, tParts, num, locale, h, ICONS, icon, fmtDuration, fmtClock, fmtDate, fmtSize, fmtBitrate, language, codecName, channels,
         audioLabel, subtitleLabel, episodeCode, deviceName, toast, img, art, api, ApiError, logoutLocal, logout, route,
         navigate, link, render, emptyState, popup, closeMenus, refreshLibraries, renderSidebar, card, hubRow, isWatched,
         setWatched, playHref, itemMenu, progressBar, unwatchedBadge, menuExtensions, PREF_LANGS, defaultTracks, avatar,

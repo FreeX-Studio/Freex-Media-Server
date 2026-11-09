@@ -83,7 +83,19 @@ impl<'a> View<'a> {
             m["viewedLeafCount"] = json!(viewed);
             m["childCount"] = json!(self.idx.children(&it.id).len());
         }
-        if full {
+        if it.kind == Kind::Extra
+            && let Some(owner) = self.idx.parent(it)
+        {
+            m["ownerId"] = json!(owner.id);
+            m["ownerTitle"] = json!(owner.title);
+        }
+        if full && matches!(it.kind, Kind::Movie | Kind::Show) {
+            let extras: Vec<Value> = self.idx.extras(&it.id).iter().map(|e| self.decorate(e, false)).collect();
+            if !extras.is_empty() {
+                m["extras"] = json!(extras);
+            }
+        }
+        if full && it.kind != Kind::Extra {
             super::metadata::extend(self.app, self.idx, it, &mut m);
             if it.kind == Kind::Episode
                 && let Some(mk) = self.app.markers.as_ref().and_then(|s| s.get(it))
@@ -448,7 +460,7 @@ pub async fn search(State(app): State<Arc<AppState>>, Extension(ctx): Extension<
                 Kind::Movie => &mut movies,
                 Kind::Show => &mut shows,
                 Kind::Episode => &mut episodes,
-                Kind::Season => continue,
+                Kind::Season | Kind::Extra => continue,
             };
             if list.len() < SEARCH_LIMIT {
                 list.push(view.decorate(it, false));
@@ -480,7 +492,7 @@ fn poster(idx: &Index, it: &Arc<Item>) -> Option<Source> {
     }
     match it.kind {
         Kind::Season | Kind::Episode => poster(idx, idx.parent(it)?),
-        Kind::Movie => Some(Source::Frame(it.clone())),
+        Kind::Movie | Kind::Extra => Some(Source::Frame(it.clone())),
         Kind::Show => thumb(idx, idx.episodes_of(it).first()?),
     }
 }
@@ -490,7 +502,7 @@ fn backdrop(idx: &Index, it: &Arc<Item>) -> Option<Source> {
         return Some(s);
     }
     match it.kind {
-        Kind::Season | Kind::Episode => backdrop(idx, idx.parent(it)?),
+        Kind::Season | Kind::Episode | Kind::Extra => backdrop(idx, idx.parent(it)?),
         Kind::Movie => Some(Source::Frame(it.clone())),
         Kind::Show => thumb(idx, idx.episodes_of(it).first()?),
     }
@@ -498,7 +510,7 @@ fn backdrop(idx: &Index, it: &Arc<Item>) -> Option<Source> {
 
 fn thumb(idx: &Index, it: &Arc<Item>) -> Option<Source> {
     match it.kind {
-        Kind::Episode => existing(&it.poster_path).or_else(|| Some(Source::Frame(it.clone()))),
+        Kind::Episode | Kind::Extra => existing(&it.poster_path).or_else(|| Some(Source::Frame(it.clone()))),
         Kind::Movie => existing(&it.backdrop_path).or_else(|| Some(Source::Frame(it.clone()))),
         _ => backdrop(idx, it),
     }

@@ -240,6 +240,10 @@ pub async fn progress(
         body.str("state").unwrap_or("playing"),
         body.bool("stopped").unwrap_or(false),
     );
+    if it.kind == Kind::Extra {
+        // Trailers and bonus videos keep no resume position and no history.
+        return ok(Progress::default().to_json());
+    }
     let old = app.db.progress(&u.id, &it.id);
     let now = now_ms();
     let p = if duration > 0 && offset as f64 >= duration as f64 * WATCHED_THRESHOLD {

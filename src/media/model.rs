@@ -50,12 +50,14 @@ pub enum Kind {
     Show,
     Season,
     Episode,
+    /// A trailer or other bonus video of a movie or show (`parent_id`), from the folders next to it.
+    Extra,
 }
 
 impl Kind {
-    /// Movies and episodes have a file; shows and seasons only group them.
+    /// Movies, episodes and extras have a file; shows and seasons only group them.
     pub fn playable(self) -> bool {
-        matches!(self, Kind::Movie | Kind::Episode)
+        matches!(self, Kind::Movie | Kind::Episode | Kind::Extra)
     }
 }
 
@@ -93,6 +95,10 @@ pub struct Item {
     pub imdb_hint: String,
     /// TVDB id of a show from the `.nfo` or the name, 0 if unknown.
     pub tvdb_hint: i64,
+    /// For extras: `trailer`, `featurette`, `behindTheScenes`, `deletedScene`, `interview`,
+    /// `scene`, `short` or `other`.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub extra_type: String,
 }
 
 impl Item {
@@ -121,6 +127,9 @@ impl Item {
         });
         if let Some(f) = &self.file {
             m["media"] = f.to_public();
+        }
+        if self.kind == Kind::Extra {
+            m["extraType"] = json!(self.extra_type);
         }
         m
     }

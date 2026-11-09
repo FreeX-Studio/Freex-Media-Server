@@ -27,13 +27,22 @@ pub struct Index {
     children: HashMap<String, Vec<Arc<Item>>>,
     /// Movies or shows by library id.
     top: HashMap<String, Vec<Arc<Item>>>,
+    /// Extras by the id of their movie or show; they are neither children nor top-level entries.
+    extras: HashMap<String, Vec<Arc<Item>>>,
 }
 
 impl Index {
     fn build(items: HashMap<String, Arc<Item>>) -> Index {
         let mut children: HashMap<String, Vec<Arc<Item>>> = HashMap::new();
         let mut top: HashMap<String, Vec<Arc<Item>>> = HashMap::new();
+        let mut extras: HashMap<String, Vec<Arc<Item>>> = HashMap::new();
         for it in items.values() {
+            if it.kind == Kind::Extra {
+                if let Some(p) = &it.parent_id {
+                    extras.entry(p.clone()).or_default().push(it.clone());
+                }
+                continue;
+            }
             match &it.parent_id {
                 Some(p) => children.entry(p.clone()).or_default().push(it.clone()),
                 None => top.entry(it.library_id.clone()).or_default().push(it.clone()),
@@ -45,7 +54,15 @@ impl Index {
         for list in top.values_mut() {
             list.sort_by(|a, b| a.sort_title.cmp(&b.sort_title));
         }
-        Index { items, children, top }
+        for list in extras.values_mut() {
+            list.sort_by(|a, b| extra_order(&a.extra_type).cmp(&extra_order(&b.extra_type)).then_with(|| a.sort_title.cmp(&b.sort_title)));
+        }
+        Index { items, children, top, extras }
+    }
+
+    /// Trailers, featurettes and other bonus videos of a movie or show.
+    pub fn extras(&self, id: &str) -> &[Arc<Item>] {
+        self.extras.get(id).map_or(&[], Vec::as_slice)
     }
 
     pub fn item(&self, id: &str) -> Option<&Arc<Item>> {
@@ -65,10 +82,12 @@ impl Index {
         self.top.get(library_id).map_or(&[], Vec::as_slice)
     }
 
+    /// Movies, shows, seasons and episodes of all libraries, without extras.
     pub fn all(&self) -> impl Iterator<Item = &Arc<Item>> {
-        self.items.values()
+        self.items.values().filter(|it| it.kind != Kind::Extra)
     }
 
+    /// Every entry of a library, extras included.
     pub fn of_library<'a>(&'a self, library_id: &'a str) -> impl Iterator<Item = &'a Arc<Item>> {
         self.items.values().filter(move |it| it.library_id == library_id)
     }
@@ -88,6 +107,14 @@ impl Index {
             _ => None,
         }
     }
+}
+
+/// Trailers first, then the other kinds in a fixed order.
+fn extra_order(t: &str) -> usize {
+    ["trailer", "featurette", "behindTheScenes", "deletedScene", "interview", "scene", "short", "other"]
+        .iter()
+        .position(|x| *x == t)
+        .unwrap_or(9)
 }
 
 pub struct Catalog {

@@ -98,7 +98,7 @@ impl Previews {
 
     /// Movies and episodes with a picture and a length worth scrubbing through.
     pub fn wanted(item: &Item) -> bool {
-        item.kind.playable()
+        matches!(item.kind, super::Kind::Movie | super::Kind::Episode)
             && item.file.as_ref().is_some_and(|f| f.duration_ms >= MIN_DURATION_MS && f.width > 0 && !f.video_codec.is_empty())
     }
 

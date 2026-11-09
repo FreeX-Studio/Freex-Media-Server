@@ -11,7 +11,11 @@
   the player and `Page Down` / `Page Up` to jump between chapters (see [Playback](docs/playback.md#chapters)). The
   item details have `media.chapters` (`startMs`, `endMs`, `title`); files are probed once more on the next scan to
   read them
-- FreeX Web 1.6.0.0: seek previews and chapters in the player; a switch for the previews in the server settings
+- **Trailers and extras from disk:** `Trailers/`, `Featurettes/`, `Behind The Scenes/` and the other extras folders
+  next to a movie or in a show, and files named `-trailer`, `-featurette` and so on, are shown under *Trailers and
+  extras* on the item page and play there (see [Media library](docs/media-library.md#trailers-and-extras)).
+  Before, they were skipped; `-trailer` files over 300 MB were taken for movies
+- FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras on the item page; a switch for the previews in the server settings
 
 ## FreeX Media Server 0.20.0 · FreeX Web 1.5.0.0
 
