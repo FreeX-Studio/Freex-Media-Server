@@ -3824,20 +3824,30 @@ h2, h3 {
     background: var(--fill-hover);
 }
 
+/* The sidebar is one continuous column from the top of the window down, with the brand at its
+   head, set off from the content by a darker tint and a hairline, as in desktop apps. */
 @media (min-width: 861px) {
-    .sidebar {
-        margin: 4px 0 12px 12px;
-        padding: 10px 8px;
-        border-radius: var(--r-panel);
-        background: var(--mat-regular);
-        border: 1px solid var(--hairline);
-        box-shadow: var(--highlight), 0 20px 50px rgba(0, 0, 0, .25);
-        backdrop-filter: var(--blur);
-        -webkit-backdrop-filter: var(--blur);
+    .shell {
+        --rail: var(--sidebar);
+        --rail-tint: rgba(12, 16, 22, .5);
     }
 
-    .shell {
-        grid-template-columns: calc(var(--sidebar) + 12px) 1fr;
+    /* The narrow rail leaves the title bar to the brand and the search. */
+    .shell.nav-collapsed .topbar {
+        background: transparent;
+    }
+
+    .topbar {
+        background: linear-gradient(to right, var(--rail-tint) 0 calc(var(--rail) - 1px), var(--hairline) calc(var(--rail) - 1px) var(--rail), transparent var(--rail));
+    }
+
+    .sidebar {
+        background: var(--rail-tint);
+        border-right: 1px solid var(--hairline);
+    }
+
+    .page, .detail-body, .detail-children {
+        padding-left: 44px;
     }
 }
 

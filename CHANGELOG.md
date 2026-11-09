@@ -50,8 +50,8 @@
   tagline, summary and own poster and background; edited fields stay through scans and refreshes until reset
 - **Theme music:** a `theme.mp3` in the folder of a show or movie plays quietly on its pages (the show's also on its
   seasons), with a button to switch it off on the device
-- **New look of FreeX Web:** translucent glass surfaces (floating sidebar, panels, menus, dialogs, the player's controls
-  as a capsule) over a soft light from the brand colours, rounder corners that grow with the surface, capsule
+- **New look of FreeX Web:** translucent glass surfaces (panels, menus, dialogs, the player's controls as a capsule), a
+  sidebar that runs as a tinted column from the top of the window, over a soft light from the brand colours, rounder corners that grow with the surface, capsule
   buttons, a segmented control for the library tabs, artwork that lifts on hover, and the system's own typeface
   (SF Pro on Apple devices, Segoe UI Variable on Windows); without translucency on systems that ask for less
 - FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; *Automatic* quality and the quality defaults under Account; the subtitle look and burning in text subtitles; the server dashboard with the maintenance; webhooks; deleting from disk and editing metadata in the item menu; theme music; a switch for the previews in the server settings
