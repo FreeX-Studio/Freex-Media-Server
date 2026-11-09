@@ -103,7 +103,8 @@
         // Tracks from the link (picked on the detail page), otherwise from the user's preferences.
         const preferred = M.defaultTracks(media, S.user.preferences);
         const state = {
-            quality: M.store.get("freex.quality") || "original",
+            // "auto": the user's default for this network (see the playback settings of the account).
+            quality: "auto",
             audio: query.get("a") != null ? Number(query.get("a")) : preferred.audio,
             subtitle: query.get("s") != null ? (query.get("s") === "none" ? null : query.get("s")) : preferred.sub,
             directPlay: true,
@@ -309,6 +310,56 @@
             }
         }
 
+        // ---- bandwidth for the automatic quality: measured once per quarter of an hour, and kept
+        // up to date from what hls.js sees while playing.
+        const BW_KEY = "freex.bandwidth";
+
+        function knownBandwidth() {
+            try {
+                const b = JSON.parse(sessionStorage.getItem(BW_KEY) || "null");
+                return b && Date.now() - b.at < 15 * 60000 ? b.bps : 0;
+            } catch (e) {
+                return 0;
+            }
+        }
+
+        function rememberBandwidth(bps) {
+            if (!(bps > 0)) return;
+            try {
+                sessionStorage.setItem(BW_KEY, JSON.stringify({bps: Math.round(bps), at: Date.now()}));
+            } catch (e) {
+                // private mode: measured again next time
+            }
+        }
+
+        /** Loads up to 2 MB of the file for at most three seconds and returns bits per second. */
+        async function measureBandwidth() {
+            const ctl = new AbortController();
+            const timer = setTimeout(() => ctl.abort(), 3000);
+            const t0 = performance.now();
+            let bytes = 0;
+            try {
+                const headers = {Range: "bytes=0-2097151"};
+                if (S.token) headers["X-FreeX-Token"] = S.token;
+                const res = await fetch(`/api/items/${encodeURIComponent(item.id)}/stream`, {headers, signal: ctl.signal, cache: "no-store"});
+                const reader = res.body.getReader();
+                for (;;) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+                    bytes += value.length;
+                }
+            } catch (e) {
+                // aborted after three seconds: what arrived until then counts
+            } finally {
+                clearTimeout(timer);
+            }
+            const seconds = (performance.now() - t0) / 1000;
+            if (bytes < 65536 || seconds <= 0) return 0;
+            const bps = bytes * 8 / seconds;
+            rememberBandwidth(bps);
+            return bps;
+        }
+
         async function load(atMs) {
             spinner.hidden = false;
             notice.hidden = true;
@@ -317,10 +368,13 @@
                 state.hls.destroy();
                 state.hls = null;
             }
+            const prefs = S.user.preferences || {};
+            const autoAway = state.quality === "auto" && S.user.network !== "home" && (prefs.qualityAway || "auto") === "auto";
+            if (autoAway && !knownBandwidth()) await measureBandwidth();
             let plan;
             try {
                 plan = await api("POST", `/api/items/${item.id}/playback`, {
-                    caps: capabilities(state.directPlay), quality: state.quality, audio: state.audio,
+                    caps: capabilities(state.directPlay), quality: state.quality, bandwidth: Math.round(knownBandwidth()), audio: state.audio,
                     subtitle: state.subtitle, startMs: Math.max(0, Math.round(atMs)),
                     client: clientId, device: M.deviceName ? M.deviceName(navigator.userAgent) : "",
                 });
@@ -351,6 +405,7 @@
                     },
                 });
                 state.hls = hls;
+                hls.on(window.Hls.Events.FRAG_LOADED, () => rememberBandwidth(hls.bandwidthEstimate));
                 let mediaRecoveries = 0;
                 let networkRetries = 0;
                 hls.on(window.Hls.Events.FRAG_LOADED, () => networkRetries = 0);
@@ -727,7 +782,11 @@
                         menu.remove();
                         onPick(value);
                     }}, h("span", {class: "pm-check", html: String(value) === String(current) ? M.ICONS.check : ""}), label)));
-            const qualities = (plan.qualities || [{id: "original", label: "Original"}]).map((q) => [q.id, q.label]);
+            const list = plan.qualities || [{id: "original", label: "Original"}];
+            const resolved = list.find((q) => q.id === plan.quality);
+            const qualities = [["auto", plan.automatic && resolved ? `${t("Automatic")} (${resolved.label})` : t("Automatic")]]
+                .concat(list.map((q) => [q.id, q.label]));
+            const currentQuality = plan.automatic ? "auto" : plan.quality || state.quality;
             const audio = media.audio.map((a) => [a.index, M.audioLabel(a)]);
             const subsList = [["", t("None")]].concat(media.subtitles.map((s) => [s.id, M.subtitleLabel(s)]));
             const modes = {direct: t("Direct play"), remux: t("Direct stream"), audio: t("Direct stream"), transcode: t("Transcoding")};
@@ -736,9 +795,11 @@
                 : modes[plan.mode] || "";
             const menu = h("div", {class: "player-menu popup-like", role: "dialog", "aria-label": t("Playback settings")},
                 h("div", {class: "pm-info"}, h("strong", null, modeText), plan.reason && plan.mode !== "direct" ? h("span", null, plan.reason) : null),
-                section(t("Quality"), qualities, state.quality, (v) => {
+                section(t("Quality"), qualities, currentQuality, (v) => {
                     state.quality = v;
-                    M.store.set("freex.quality", v);
+                    // Remembered for this user and network (home or away), on every device.
+                    const key = plan.network === "home" ? "qualityHome" : "qualityAway";
+                    api("PUT", "/api/me/preferences", {[key]: v}).then((u) => S.user = Object.assign(u, {network: S.user.network})).catch(() => null);
                     if (v === "original") state.directPlay = true;
                     restart();
                 }),

@@ -58,7 +58,15 @@ pub async fn start(State(app): State<Arc<AppState>>, Extension(ctx): Extension<C
     let it = playable(&app.catalog.snapshot(), u, &id)?;
     let f = it.file.as_ref().expect("playable");
     let caps = Capabilities::parse(body.get("caps").unwrap_or(&Value::Null));
-    let quality = playback::quality(body.str("quality").unwrap_or("original"));
+    // "auto" (or nothing): the user's default for this network, automatic from the bandwidth the
+    // player measured.
+    let home = playback::home_network(&ctx.ip);
+    let saved = if home { &u.quality_home } else { &u.quality_away };
+    let asked = body.str("quality").filter(|q| playback::known_quality(q)).unwrap_or("auto");
+    let wanted = if asked == "auto" { saved.as_str() } else { asked };
+    let automatic = wanted == "auto" || !playback::known_quality(wanted);
+    let quality =
+        if automatic { playback::automatic(home, num(&body, "bandwidth").unwrap_or(0), f.bitrate) } else { playback::quality(wanted) };
     let audio = num(&body, "audio").unwrap_or(-1) as i32;
     let mut start = num(&body, "startMs").unwrap_or(0).max(0);
     if f.duration_ms > 0 && start >= f.duration_ms {
@@ -76,6 +84,9 @@ pub async fn start(State(app): State<Arc<AppState>>, Extension(ctx): Extension<C
         "burnedSubtitle": (plan.burn_subtitle >= 0).then(|| format!("e{}", plan.burn_subtitle)),
         "durationMs": f.duration_ms,
         "qualities": QUALITIES.iter().map(|q| json!({"id": q.id, "label": q.label})).collect::<Vec<_>>(),
+        "quality": quality.id,
+        "automatic": automatic,
+        "network": if home { "home" } else { "away" },
         "startMs": start,
     });
     match (plan.mode, &app.transcoder) {

@@ -64,6 +64,44 @@ pub fn quality(id: &str) -> Quality {
     QUALITIES.iter().find(|q| q.id == id).copied().unwrap_or(QUALITIES[0])
 }
 
+/// Whether `id` names a quality or `auto`.
+pub fn known_quality(id: &str) -> bool {
+    id == "auto" || QUALITIES.iter().any(|q| q.id == id)
+}
+
+/// The quality "automatic" stands for. In the home network the original; from outside the
+/// best step that fits into the measured bandwidth (bits per second) with room to spare, the
+/// original if the whole file fits, and 4 Mbit/s without a measurement.
+pub fn automatic(home: bool, bandwidth: i64, file_bitrate: i64) -> Quality {
+    if home {
+        return QUALITIES[0];
+    }
+    if bandwidth <= 0 {
+        return quality("4000");
+    }
+    // Two thirds of the measured speed: audio, container and the ups and downs of the line.
+    let usable = bandwidth * 2 / 3;
+    if file_bitrate > 0 && file_bitrate <= usable {
+        return QUALITIES[0];
+    }
+    QUALITIES[1..].iter().find(|q| q.video_bitrate <= usable).copied().unwrap_or(QUALITIES[QUALITIES.len() - 1])
+}
+
+/// Whether a client address is in the home network: loopback, private and link-local ranges,
+/// IPv6 unique local addresses.
+pub fn home_network(ip: &str) -> bool {
+    match ip.parse::<std::net::IpAddr>() {
+        Ok(std::net::IpAddr::V4(v4)) => v4.is_loopback() || v4.is_private() || v4.is_link_local(),
+        Ok(std::net::IpAddr::V6(v6)) => {
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                return v4.is_loopback() || v4.is_private() || v4.is_link_local();
+            }
+            v6.is_loopback() || (v6.segments()[0] & 0xfe00) == 0xfc00 || (v6.segments()[0] & 0xffc0) == 0xfe80
+        }
+        Err(_) => false,
+    }
+}
+
 /// Decoder support reported by the browser.
 #[derive(Debug, Default)]
 pub struct Capabilities {
@@ -237,6 +275,19 @@ mod tests {
     fn chrome() -> Capabilities {
         Capabilities::parse(&json!({"containers": ["mp4", "webm", "mkv"], "video": ["h264", "vp9"], "audio": ["aac", "opus"],
                                      "mseVideo": ["h264"], "mseAudio": ["aac"]}))
+    }
+
+    #[test]
+    fn automatic_quality() {
+        assert_eq!(automatic(true, 0, 30_000_000).id, "original");
+        assert_eq!(automatic(false, 0, 30_000_000).id, "4000");
+        assert_eq!(automatic(false, 100_000_000, 30_000_000).id, "original");
+        assert_eq!(automatic(false, 10_000_000, 30_000_000).id, "4000");
+        assert_eq!(automatic(false, 20_000_000, 30_000_000).id, "12000");
+        assert_eq!(automatic(false, 500_000, 30_000_000).id, "1000");
+        assert!(home_network("192.168.1.20") && home_network("10.0.0.1") && home_network("127.0.0.1"));
+        assert!(home_network("fd12:3456::1") && home_network("::ffff:192.168.0.5") && home_network("::1"));
+        assert!(!home_network("8.8.8.8") && !home_network("2a01:4f8::1") && !home_network("?"));
     }
 
     #[test]

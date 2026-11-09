@@ -342,6 +342,16 @@
         const subLang = h("select", {id: "pref-sublang"}, langOptions(t("Same as the audio language")));
         subLang.value = p.subtitleLanguage || "";
         const subLangField = field("pref-sublang", t("Subtitle language"), subLang);
+        // Same steps as the player menu (media::playback::QUALITIES).
+        const QUALITY_STEPS = [["auto", t("Automatic")], ["original", "Original"], ["20000", "20 Mbit/s 1080p"], ["12000", "12 Mbit/s 1080p"],
+            ["8000", "8 Mbit/s 1080p"], ["4000", "4 Mbit/s 720p"], ["2000", "2 Mbit/s 720p"], ["1000", "1 Mbit/s 480p"]];
+        const qualitySel = (id, value) => {
+            const s = h("select", {id}, QUALITY_STEPS.map(([v, l]) => h("option", {value: v}, l)));
+            s.value = value || "auto";
+            return s;
+        };
+        const qHome = qualitySel("pref-qhome", p.qualityHome);
+        const qAway = qualitySel("pref-qaway", p.qualityAway);
         const sync = () => subLangField.hidden = mode.value === "off";
         mode.addEventListener("change", sync);
         sync();
@@ -350,9 +360,15 @@
             field("pref-audio", t("Preferred audio language"), audio, t("If a file does not have this language, its default track is played.")),
             field("pref-submode", t("Switch on subtitles"), mode),
             subLangField,
+            field("pref-qhome", t("Quality in the home network"), qHome, t("Automatic: the original file.")),
+            field("pref-qaway", t("Quality on the go"), qAway,
+                t("Automatic: the best quality the connection allows, measured when playback starts. A quality chosen in the player is remembered here.")),
+            h("p", {class: "hint"}, S.user.network === "home" ? t("This device is in the home network right now.") : t("This device is outside the home network right now.")),
             h("button", {class: "btn primary", onclick: async () => {
+                    const network = S.user.network;
                     S.user = await api("PUT", "/api/me/preferences",
-                        {audioLanguage: audio.value, subtitleMode: mode.value, subtitleLanguage: subLang.value});
+                        {audioLanguage: audio.value, subtitleMode: mode.value, subtitleLanguage: subLang.value, qualityHome: qHome.value, qualityAway: qAway.value});
+                    S.user.network = network;
                     M.toast(t("Playback settings saved"));
                 }}, t("Save")));
     }

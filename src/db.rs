@@ -179,6 +179,11 @@ const MIGRATIONS: &[&str] = &[
     ALTER TABLE users ADD COLUMN allow_unrated INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE users ADD COLUMN pin_hash TEXT;
     "#,
+    // 9: default quality per network
+    r#"
+    ALTER TABLE users ADD COLUMN quality_home TEXT NOT NULL DEFAULT 'auto';
+    ALTER TABLE users ADD COLUMN quality_away TEXT NOT NULL DEFAULT 'auto';
+    "#,
 ];
 
 /// Login events kept per user.
@@ -214,6 +219,9 @@ pub struct User {
     pub allow_unrated: bool,
     /// Hash of the PIN for switching to this account on a shared screen.
     pub pin_hash: Option<String>,
+    /// Quality for playback in the home network and from outside: `auto` or a quality id.
+    pub quality_home: String,
+    pub quality_away: String,
 }
 
 impl User {
@@ -238,6 +246,8 @@ impl User {
                 "subtitleLanguage": self.subtitle_language,
                 "uiLanguage": self.ui_language,
                 "unpinned": self.unpinned,
+                "qualityHome": self.quality_home,
+                "qualityAway": self.quality_away,
             },
         })
     }
@@ -357,7 +367,7 @@ impl Library {
 
 const USER_COLUMNS: &str = "id, username, password_hash, admin, created_at, password_changed_at, totp_secret, \
     totp_enabled, totp_last_step, recovery_codes, avatar_version, all_libraries, audio_language, subtitle_mode, \
-    subtitle_language, ui_language, unpinned, max_age, allow_unrated, pin_hash";
+    subtitle_language, ui_language, unpinned, max_age, allow_unrated, pin_hash, quality_home, quality_away";
 
 fn json_list(s: String) -> Vec<String> {
     serde_json::from_str(&s).unwrap_or_default()
@@ -386,6 +396,8 @@ fn user_from_row(r: &Row) -> rusqlite::Result<User> {
         max_age: r.get(17)?,
         allow_unrated: r.get(18)?,
         pin_hash: r.get(19)?,
+        quality_home: r.get(20)?,
+        quality_away: r.get(21)?,
     })
 }
 
@@ -502,7 +514,7 @@ impl Db {
             "UPDATE users SET username = ?2, password_hash = ?3, admin = ?4, password_changed_at = ?5, totp_secret = ?6, \
              totp_enabled = ?7, totp_last_step = ?8, recovery_codes = ?9, avatar_version = ?10, all_libraries = ?11, \
              audio_language = ?12, subtitle_mode = ?13, subtitle_language = ?14, ui_language = ?15, unpinned = ?16, \
-             max_age = ?17, allow_unrated = ?18, pin_hash = ?19 WHERE id = ?1",
+             max_age = ?17, allow_unrated = ?18, pin_hash = ?19, quality_home = ?20, quality_away = ?21 WHERE id = ?1",
             params![
                 u.id,
                 u.username,
@@ -523,6 +535,8 @@ impl Db {
                 u.max_age,
                 u.allow_unrated,
                 u.pin_hash,
+                u.quality_home,
+                u.quality_away,
             ],
         )
         .unwrap();

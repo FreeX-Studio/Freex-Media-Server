@@ -25,7 +25,10 @@
 - **Parental controls:** an age limit per user (with or without titles that have no rating) hides everything rated
   above it in every list, the search and playback; age ratings also come from `.nfo` files. **Switching users with a
   PIN** on a shared screen, for every account except admins (see [Security](docs/security.md#parental-controls))
-- FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; a switch for the previews in the server settings
+- **Quality per user and network:** a default quality for the home network and for on the go, kept on the server
+  and remembered from the player; *Automatic* plays the original at home and picks the quality from the measured
+  connection on the go (see [Playback](docs/playback.md#how-a-file-is-played))
+- FreeX Web 1.6.0.0: seek previews and chapters in the player; trailers and extras and the version picker on the item page; the filter panel and smart collections; parental controls in the user administration, the PIN under Account and *Switch user* in the account menu; *Automatic* quality and the quality defaults under Account; a switch for the previews in the server settings
 
 ## FreeX Media Server 0.20.0 · FreeX Web 1.5.0.0
 

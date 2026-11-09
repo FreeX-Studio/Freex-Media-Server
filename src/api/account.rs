@@ -152,7 +152,7 @@ fn start_session(app: &AppState, ctx: &Ctx, u: &User, method: &str) -> ApiResult
     let token = app.db.create_session(&u.id, &ctx.ip, &ctx.user_agent);
     app.db.add_login_event(&u.id, &event(ctx, true, method));
     tracing::info!("Login '{}' from {} ({})", u.username, ctx.ip, method);
-    let mut r = Json(json!({"token": token, "user": u.to_public()})).into_response();
+    let mut r = Json(json!({"token": token, "user": user_json(u, ctx)})).into_response();
     session_cookie(&mut r, &token, i64::from(app.config.security.session_days) * 86_400, ctx.secure);
     Ok(r)
 }
@@ -168,7 +168,15 @@ pub async fn logout(State(app): State<Arc<AppState>>, Extension(ctx): Extension<
 }
 
 pub async fn me(Extension(ctx): Extension<Ctx>) -> ApiResult {
-    ok(ctx.user()?.to_public())
+    ok(user_json(ctx.user()?, &ctx))
+}
+
+/// The account with the network the request comes from (`home` or `away`), which decides the
+/// default quality.
+fn user_json(u: &User, ctx: &Ctx) -> Value {
+    let mut m = u.to_public();
+    m["network"] = json!(if crate::media::playback::home_network(&ctx.ip) { "home" } else { "away" });
+    m
 }
 
 /// Checks the current password for sensitive changes (brute-force protected like the sign-in).
@@ -368,6 +376,14 @@ pub async fn preferences(State(app): State<Arc<AppState>>, Extension(ctx): Exten
     }
     if let Some(v) = body.get("unpinned") {
         u.unpinned = nav_entries(v)?;
+    }
+    for (key, slot) in [("qualityHome", &mut u.quality_home), ("qualityAway", &mut u.quality_away)] {
+        if let Some(q) = body.str(key) {
+            if !crate::media::playback::known_quality(q) {
+                return Err(ApiError::bad_request("error.unknownQuality").arg(q.to_string()));
+            }
+            *slot = q.to_string();
+        }
     }
     (u.audio_language, u.subtitle_mode, u.subtitle_language, u.ui_language) = (audio, mode, subs, ui);
     app.db.update_user(&u);

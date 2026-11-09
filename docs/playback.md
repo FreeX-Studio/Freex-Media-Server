@@ -34,7 +34,14 @@ browser after all, the player switches to conversion automatically. Network erro
 server has ended (for example after a long pause) is started again at the same position, and playback that stops
 making progress is restarted by itself.
 
-Quality can be chosen from *Original* down to 1 Mbit/s. Admins see all running playbacks, direct or converted, in the
+Quality can be chosen from *Original* down to 1 Mbit/s, or *Automatic*. Every user has a default quality for the
+home network and one for on the go (*Account → Playback*), kept on the server, so it holds on every device; picking
+a quality in the player changes the default of the network the device is in. Requests from loopback, private
+(`10.x`, `172.16–31.x`, `192.168.x`), link-local and IPv6 unique local addresses count as the home network; behind a
+reverse proxy that needs `trust_proxy`. *Automatic* plays the original at home; on the go FreeX Web measures the
+connection when playback starts (two megabytes of the file, at most three seconds, then every quarter of an hour
+from what the stream itself delivers) and the server picks the best step that fits into two thirds of it, without
+a measurement 4 Mbit/s. Admins see all running playbacks, direct or converted, in the
 activity menu in the header.
 
 ## Hardware acceleration
