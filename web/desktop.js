@@ -12,7 +12,7 @@
 
 /*
  * FreeX Web, FreeX Desktop part: only active when FreeX Web runs inside the Windows app
- * (github.com/LinzN/freex-desktop), which loads it straight from the server and gives its pages
+ * (github.com/FreeX-Studio/freex-desktop), which loads it straight from the server and gives its pages
  * a few app commands. In a browser this file does nothing and M.desktop stays undefined.
  *
  * The app adds: switching to another server, real full screen for the player, and playback in

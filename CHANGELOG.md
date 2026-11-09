@@ -82,7 +82,7 @@ upcoming apps keep working; playback and conversion are still done by ffmpeg exa
 
 ## FreeX Media Server 0.14.0 · FreeX Web 1.4.0.0
 
-**FreeX Desktop: the Windows app.** [FreeX Desktop](https://github.com/LinzN/freex-desktop) shows FreeX Web from
+**FreeX Desktop: the Windows app.** [FreeX Desktop](https://github.com/FreeX-Studio/freex-desktop) shows FreeX Web from
 your server in its own window and can play every file directly with mpv. This release adds what the app needs:
 
 - FreeX Web recognizes the app and adds *Settings → FreeX Desktop* (player choice, switch server, app version),

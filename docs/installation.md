@@ -112,7 +112,7 @@ net stop freex-media-server          :: stop (start with net start, e.g. after e
 Unpack the archive of a release (`freex-media-server-<version>-linux-x86_64.tar.gz`) or build from source:
 
 ```bash
-git clone https://github.com/LinzN/freex-media-server.git
+git clone https://github.com/FreeX-Studio/freex-media-server.git
 cd freex-media-server
 cargo build --release          # target/release/freex-media-server
 ./target/release/freex-media-server

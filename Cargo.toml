@@ -4,7 +4,7 @@ version = "0.21.0"
 edition = "2024"
 description = "FreeX Media Server: your media, your server, your freedom"
 license = "LGPL-3.0-only"
-repository = "https://github.com/LinzN/freex-media-server"
+repository = "https://github.com/FreeX-Studio/freex-media-server"
 rust-version = "1.89"
 
 [dependencies]

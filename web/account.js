@@ -1009,8 +1009,8 @@
                     kv(`${st.web ? st.web.name : "FreeX Web"} (${t("web interface")})`, st.web ? st.web.version : ""),
                     app ? kv(`${app.app} (${t("Windows app")})`, app.version) : null,
                     kv(t("Server name"), st.name))),
-            panel(t("Source code"), h("p", null, h("a", {href: "https://github.com/LinzN/freex-media-server", target: "_blank", rel: "noopener"},
-                "github.com/LinzN/freex-media-server"))));
+            panel(t("Source code"), h("p", null, h("a", {href: "https://github.com/FreeX-Studio/freex-media-server", target: "_blank", rel: "noopener"},
+                "github.com/FreeX-Studio/freex-media-server"))));
     }
 
     // ------------------------------------------------------------------ server settings

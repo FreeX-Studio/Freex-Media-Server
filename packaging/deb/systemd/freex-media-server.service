@@ -1,7 +1,7 @@
 # Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3.
 [Unit]
 Description=FreeX
-Documentation=https://github.com/LinzN/freex-media-server
+Documentation=https://github.com/FreeX-Studio/freex-media-server
 After=network-online.target
 Wants=network-online.target
 

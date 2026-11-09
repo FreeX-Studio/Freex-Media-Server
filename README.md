@@ -56,7 +56,7 @@ apps for iOS, Android and TV are planned and will use the same API.
 |---|---|---|
 | **FreeX Media Server** | The core: libraries, users, streaming, conversion and the API | this repository |
 | **FreeX Web** | Web interface and browser client, served by the server | included (`web/`) |
-| **FreeX Desktop** | Windows app, plays every file directly with mpv | [LinzN/freex-desktop](https://github.com/LinzN/freex-desktop) |
+| **FreeX Desktop** | Windows app, plays every file directly with mpv | [FreeX-Studio/freex-desktop](https://github.com/FreeX-Studio/freex-desktop) |
 | **FreeX iOS** | Native iPhone and iPad app | planned |
 | **FreeX Android** | App for Android smartphones and tablets | planned |
 | **FreeX TV** | Smart TV and streaming device apps | later |
