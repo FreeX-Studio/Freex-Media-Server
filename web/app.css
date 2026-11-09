@@ -1024,6 +1024,45 @@ select, .field input, .inline input, .filter-field input {
     height: 34px;
 }
 
+.edit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0 14px;
+}
+
+.field label .pill {
+    margin-left: 8px;
+}
+
+.link-btn {
+    margin-left: 8px;
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--glass);
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+}
+
+.art-edits {
+    display: grid;
+    gap: 8px;
+    margin: 6px 0 12px;
+}
+
+.art-edit {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.art-edit > span {
+    min-width: 90px;
+    color: var(--muted);
+}
+
 .file-list {
     max-height: 260px;
     overflow: auto;

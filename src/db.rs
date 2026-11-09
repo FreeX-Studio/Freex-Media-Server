@@ -198,6 +198,13 @@ const MIGRATIONS: &[&str] = &[
         created_at INTEGER NOT NULL
     );
     "#,
+    // 12: metadata edited by hand
+    r#"
+    CREATE TABLE item_edits (
+        item_id TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+    );
+    "#,
 ];
 
 /// Login events kept per user.
@@ -517,6 +524,26 @@ impl Db {
              ON CONFLICT(id) DO UPDATE SET url = ?2, events = ?3, secret = ?4",
             params![h.id, h.url, h.events.join(","), h.secret, h.created_at],
         );
+    }
+
+    // ------------------------------------------------------------------ edited metadata
+
+    pub fn item_edits(&self) -> Vec<(String, String)> {
+        let c = self.c();
+        let mut st = c.prepare_cached("SELECT item_id, data FROM item_edits").unwrap();
+        st.query_map([], |r| Ok((r.get(0)?, r.get(1)?))).unwrap().filter_map(Result::ok).collect()
+    }
+
+    /// Stores the edits of an entry; `None` removes them.
+    pub fn save_item_edit(&self, item_id: &str, data: Option<&str>) {
+        let c = self.c();
+        let _ = match data {
+            Some(d) => c.execute(
+                "INSERT INTO item_edits (item_id, data) VALUES (?1, ?2) ON CONFLICT(item_id) DO UPDATE SET data = ?2",
+                params![item_id, d],
+            ),
+            None => c.execute("DELETE FROM item_edits WHERE item_id = ?1", [item_id]),
+        };
     }
 
     pub fn delete_webhook(&self, id: &str) -> bool {

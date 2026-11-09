@@ -18,6 +18,7 @@
 //! id from the `.nfo` or the name, a search with several variants of the title (see
 //! [`matching`]), and for shows TVmaze, whose IMDb/TVDB ids TMDB then resolves exactly.
 
+pub mod edits;
 pub mod matching;
 pub mod tmdb;
 
@@ -110,6 +111,8 @@ pub struct Service {
     queued: Mutex<HashSet<String>>,
     serial: tokio::sync::Mutex<()>,
     last_error: Mutex<Option<Text>>,
+    /// Metadata edited by hand, by item id.
+    edits: RwLock<HashMap<String, edits::Edit>>,
 }
 
 fn s(v: &Value, k: &str) -> String {
@@ -156,6 +159,22 @@ impl Service {
             queued: Mutex::default(),
             serial: tokio::sync::Mutex::new(()),
             last_error: Mutex::default(),
+            edits: RwLock::new(db.item_edits().into_iter().filter_map(|(id, d)| serde_json::from_str(&d).ok().map(|e| (id, e))).collect()),
+        }
+    }
+
+    pub fn edit(&self, item_id: &str) -> Option<edits::Edit> {
+        self.edits.read().unwrap().get(item_id).cloned()
+    }
+
+    /// Stores the edits of an entry (an empty edit removes them).
+    pub fn set_edit(&self, db: &Db, item_id: &str, e: edits::Edit) {
+        if e.is_empty() {
+            db.save_item_edit(item_id, None);
+            self.edits.write().unwrap().remove(item_id);
+        } else {
+            db.save_item_edit(item_id, Some(&serde_json::to_string(&e).expect("serializable")));
+            self.edits.write().unwrap().insert(item_id.to_string(), e);
         }
     }
 
@@ -190,11 +209,16 @@ impl Service {
     }
 
     /// Merges stored metadata into the entries of a library (after a scan). No network.
+    /// Edits made by hand are applied last, so they win.
     pub fn apply_all(&self, items: &mut [Item]) {
         let all = self.items.read().unwrap();
+        let edits = self.edits.read().unwrap();
         for it in items.iter_mut() {
             if let Some(md) = all.get(&it.id) {
                 apply(it, md);
+            }
+            if let Some(e) = edits.get(&it.id) {
+                e.apply(it);
             }
         }
     }
@@ -268,7 +292,7 @@ impl Service {
     }
 
     /// Applies the stored metadata to the current entries of a library.
-    fn reapply(&self, app: &AppState, library_id: &str) {
+    pub fn reapply(&self, app: &AppState, library_id: &str) {
         app.catalog.update_library(&app.db, library_id, |items| self.apply_all(items));
     }
 

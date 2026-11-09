@@ -88,6 +88,11 @@ pub fn router(app: Arc<AppState>) -> Router {
         .route("/api/metadata/image", get(metadata::search_image))
         .route("/api/items/{id}/metadata/match", post(metadata::pin))
         .route("/api/items/{id}/metadata/refresh", post(metadata::refresh))
+        .route("/api/items/{id}/edit", get(metadata::get_edit).put(metadata::put_edit))
+        .route(
+            "/api/items/{id}/artwork/{kind}",
+            put(metadata::put_artwork).delete(metadata::delete_artwork).layer(axum::extract::DefaultBodyLimit::max(profile::MAX_UPLOAD)),
+        )
         .route("/api/items/{id}/metadata/unmatch", post(metadata::unpin))
         .route("/api/libraries/{id}/metadata", post(metadata::refresh_library))
         .route("/api/extras/status", get(metadata::status))

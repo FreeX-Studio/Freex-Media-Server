@@ -48,8 +48,8 @@ pub fn remove_avatar(app: &AppState, user_id: &str) {
     }
 }
 
-/// Decodes JPEG, PNG, GIF, BMP or WebP, crops the centre square and returns a 256 × 256 PNG.
-pub fn to_avatar(data: &[u8]) -> Result<Vec<u8>, ApiError> {
+/// Decodes an uploaded picture (JPEG, PNG, GIF, BMP, WebP) with limits on its size.
+pub fn decode_image(data: &[u8]) -> Result<image::DynamicImage, ApiError> {
     let reader = image::ImageReader::new(std::io::Cursor::new(data))
         .with_guessed_format()
         .map_err(|_| ApiError::bad_request("error.imageUnreadable"))?;
@@ -71,7 +71,13 @@ pub fn to_avatar(data: &[u8]) -> Result<Vec<u8>, ApiError> {
     limits.max_image_height = Some(h);
     limits.max_alloc = Some(1024 * 1024 * 1024);
     reader.limits(limits);
-    let img = reader.decode().map_err(|_| ApiError::bad_request("error.imageUnreadable"))?;
+    reader.decode().map_err(|_| ApiError::bad_request("error.imageUnreadable"))
+}
+
+/// Decodes JPEG, PNG, GIF, BMP or WebP, crops the centre square and returns a 256 × 256 PNG.
+pub fn to_avatar(data: &[u8]) -> Result<Vec<u8>, ApiError> {
+    let img = decode_image(data)?;
+    let (w, h) = (img.width(), img.height());
     let side = w.min(h);
     let square = img.crop_imm((w - side) / 2, (h - side) / 2, side, side);
     let out = square.resize_exact(AVATAR_SIZE, AVATAR_SIZE, FilterType::CatmullRom).to_rgba8();

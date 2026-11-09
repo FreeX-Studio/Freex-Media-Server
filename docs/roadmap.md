@@ -25,7 +25,7 @@ The gaps that show in daily use. All of them fit the current architecture.
 | ~~**Scheduled maintenance**~~ | **Delivered in 0.21.0** – see [Configuration](configuration.md). |
 | ~~**Webhooks**~~ | **Delivered in 0.21.0** – see [API](api.md#webhooks). |
 | ~~**Delete files from the library**~~ | **Delivered in 0.21.0** – see [Configuration](configuration.md). |
-| **Manual metadata editing** | Edit title, summary, artwork and genres by hand and lock them against refreshes. Today: fix match only. |
+| ~~**Manual metadata editing**~~ | **Delivered in 0.21.0** – see [Media library](media-library.md#editing-metadata-by-hand). |
 | **Theme music** | Play a show's theme on its page. Low priority. |
 
 ## Phase 2 – more kinds of media and the apps

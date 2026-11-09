@@ -107,3 +107,9 @@ later that match appear in it by themselves, and every user sees it with their o
 collection shows each user what they have not seen). *Edit filter* on the collection page opens the library with
 the filter, *Update smart collection* saves the change.
 
+## Editing metadata by hand
+
+Admins can change title, original title, sort title, year, rating, age rating, genres, tagline and summary of a
+movie, show, season or episode (*… → Edit metadata*), and upload their own poster and background. Edited fields win
+over file names, `.nfo` files and the online metadata, also after scans and refreshes; *Reset* brings back what those
+say. The edits are kept in the database, uploaded pictures in `<data>/artwork`.

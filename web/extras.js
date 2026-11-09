@@ -171,6 +171,88 @@
 
     // ------------------------------------------------------------------ menu entries for items
 
+    /** Editing title, summary, genres … and the artwork of an entry by hand. */
+    async function editMetadata(item) {
+        let data;
+        try {
+            data = await api("GET", `/api/items/${item.id}/edit`);
+        } catch (e) {
+            return M.toast(e.message, true);
+        }
+        const v = data.values;
+        const reset = new Set();
+        const inputs = {};
+        const row = (key, label, input) => {
+            inputs[key] = input;
+            const edited = data.edited.includes(key);
+            const undo = edited ? h("button", {class: "link-btn", type: "button", onclick: () => {
+                reset.add(key);
+                undo.replaceWith(h("span", {class: "muted small"}, t("reset on save")));
+                input.disabled = true;
+            }}, t("Reset")) : null;
+            return h("div", {class: "field"}, h("label", {for: "me-" + key}, label, edited ? h("span", {class: "pill"}, t("edited")) : null, undo), input);
+        };
+        const inp = (key, attrs) => h("input", Object.assign({id: "me-" + key, value: v[key] ?? ""}, attrs));
+        const summary = h("textarea", {id: "me-summary", rows: 6}, v.summary || "");
+        const art = (kind, label) => {
+            const file = h("input", {type: "file", accept: "image/*", hidden: true, onchange: async () => {
+                if (!file.files[0]) return;
+                try {
+                    await fetch(`/api/items/${item.id}/artwork/${kind}`, {method: "PUT", body: file.files[0], credentials: "same-origin",
+                        headers: Object.assign({"Content-Type": file.files[0].type || "application/octet-stream", "X-Requested-With": "FreeX"},
+                            S.token ? {"X-FreeX-Token": S.token} : {})}).then(async (r) => {
+                        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+                    });
+                    M.toast(t("Picture saved"));
+                    close();
+                    M.render();
+                } catch (e) {
+                    error.textContent = e.message;
+                }
+            }});
+            return h("div", {class: "art-edit"}, h("span", null, label),
+                h("button", {class: "btn small", type: "button", onclick: () => file.click()}, t("Upload")),
+                data[kind] ? h("button", {class: "btn small", type: "button", onclick: async () => {
+                    await api("DELETE", `/api/items/${item.id}/artwork/${kind}`);
+                    close();
+                    M.render();
+                }}, t("Remove own picture")) : null, file);
+        };
+        const error = h("div", {class: "error-text", role: "alert"});
+        const close = modal(t("Edit metadata"),
+            h("p", {class: "muted"}, t("Edited fields stay as they are on scans and metadata refreshes until they are reset.")),
+            h("div", {class: "edit-grid"},
+                row("title", t("Title"), inp("title", {maxlength: 300})),
+                row("originalTitle", t("Original title"), inp("originalTitle", {maxlength: 300})),
+                row("sortTitle", t("Sort as"), inp("sortTitle", {maxlength: 300, placeholder: t("from the title")})),
+                row("year", t("Year"), inp("year", {type: "number", min: 0, max: 3000})),
+                row("rating", t("Rating"), inp("rating", {type: "number", min: 0, max: 10, step: 0.1})),
+                row("contentRating", t("Age rating"), inp("contentRating", {maxlength: 20, placeholder: "FSK 12"})),
+                row("genres", "Genres", inp("genres", {maxlength: 500, placeholder: t("comma separated")})),
+                row("tagline", t("Tagline"), inp("tagline", {maxlength: 500}))),
+            row("summary", t("Summary"), summary),
+            h("div", {class: "art-edits"}, art("poster", t("Poster")), item.type !== "episode" ? art("backdrop", t("Background")) : null),
+            error,
+            h("div", {class: "btn-row"}, h("button", {class: "btn primary", onclick: async () => {
+                const values = {};
+                for (const [key, el] of Object.entries(inputs)) {
+                    if (reset.has(key)) continue;
+                    const now = el.value;
+                    const before = key === "summary" ? v.summary || "" : String(v[key] ?? "");
+                    if (now === before) continue;
+                    values[key] = key === "year" ? Number(now) : key === "rating" ? Number(now) : now;
+                }
+                try {
+                    await api("PUT", `/api/items/${item.id}/edit`, {values, reset: [...reset]});
+                    close();
+                    M.toast(t("Metadata saved"));
+                    M.render();
+                } catch (e) {
+                    error.textContent = e.message;
+                }
+            }}, t("Save")), h("button", {class: "btn", onclick: () => close()}, t("Cancel"))));
+    }
+
     /** Shows which files go, and deletes them after a second click. */
     async function deleteFromDisk(item) {
         let info;
@@ -215,6 +297,9 @@
         if (S.user.admin && (item.type === "movie" || item.type === "show")) {
             out.push({label: t("Add to collection"), onclick: () => addToCollection(item)});
             out.push({label: t("Fix match"), onclick: () => fixMatch(item)});
+        }
+        if (S.user.admin && ["movie", "show", "season", "episode"].includes(item.type)) {
+            out.push({label: t("Edit metadata …"), onclick: () => editMetadata(item)});
         }
         if (S.user.admin && S.status && S.status.allowDelete && ["movie", "show", "season", "episode"].includes(item.type)) {
             out.push({label: t("Delete from disk …"), danger: true, onclick: () => deleteFromDisk(item)});
