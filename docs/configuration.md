@@ -34,7 +34,7 @@ TMDB key is never sent to the browser.
 | `[server]` `tls_key` | empty | Private key of the certificate (PEM, unencrypted) |
 | `[server]` `trust_proxy` | `false` | Trust `X-Forwarded-For/-Proto/-Host`; only behind your own reverse proxy |
 | `[data]` `directory` | `data` | Database, index and metadata (relative to the configuration file) |
-| `[data]` `cache_directory` | `cache` | Thumbnails, subtitles, transcoding segments; safe to delete while stopped |
+| `[data]` `cache_directory` | `cache` | Thumbnails, seek previews, subtitles, transcoding segments; safe to delete while stopped |
 | `[security]` `session_days` | `30` | A sign-in stays valid this many days without use |
 | `[security]` `min_password_length` | `10` | Minimum length of new passwords |
 | `[ffmpeg]` `ffprobe` | `ffprobe` | ffprobe: a name on the PATH or a full path; an `ffmpeg` folder next to the server program is tried first |
@@ -44,6 +44,7 @@ TMDB key is never sent to the browser.
 | `[tmdb]` `region` | `DE` | Country for age ratings |
 | `[tmdb]` `tvmaze` | `true` | Ask TVmaze (free, no key) for shows the TMDB search does not find |
 | `[markers]` `enabled` | `true` | Detect intros and end credits of episodes |
+| `[previews]` `enabled` | `true` | Make seek preview thumbnails after scans (see [Playback](playback.md#seek-previews)) |
 | `[transcoder]` `enabled` | `true` | Convert files the client cannot play |
 | `[transcoder]` `directory` | `transcode` | Segments of running conversions; relative to the cache directory or absolute (e.g. on an SSD) |
 | `[transcoder]` `max_sessions` | `3` | Simultaneous conversions |

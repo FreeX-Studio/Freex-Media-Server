@@ -64,6 +64,7 @@ every language, so apps can react to it:
 | `GET` | `/api/search?q=` | Search |
 | `GET` | `/api/items/{id}` | Details, with seasons and episodes |
 | `GET` | `/api/items/{id}/image/{poster\|backdrop\|thumb}` | Artwork |
+| `GET` | `/api/items/{id}/previews` | Seek preview sprite sheet (JPEG). The grid is `previews` in the item details: `{intervalMs, width, height, columns, rows, count, version}`; frame `n` shows `n × intervalMs` and sits in column `n % columns`, row `n / columns`. Missing while it is not made yet |
 | `POST` | `/api/items/{id}/playback` | `{caps, quality, audio, subtitle, startMs}` → playback mode and stream URL; with `"player": "external"` (a native player that decodes every format, e.g. mpv in FreeX Desktop) always direct play |
 | `GET` | `/api/items/{id}/stream` | The file itself (supports range requests) |
 | `GET` | `/api/transcode/{session}/index.m3u8` | HLS playlist (VOD) of a conversion over the whole title; segments `s<n>.m4s`, converted on request |

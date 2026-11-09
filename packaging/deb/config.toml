@@ -51,6 +51,10 @@ tvmaze = true
 # Detect intros and end credits of TV episodes ("Skip intro")
 enabled = true
 
+[previews]
+# Small frames above the seek bar while scrubbing, made in the background after scans
+enabled = true
+
 [transcoder]
 # Convert files the browser cannot play (codec, container, bitrate) with ffmpeg
 enabled = true

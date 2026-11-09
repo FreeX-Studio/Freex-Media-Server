@@ -161,7 +161,10 @@
         const seek = h("input", {type: "range", class: "seek", min: 0, max: Math.max(1, Math.round(durationMs / 1000)), step: 1, value: 0,
             "aria-label": "Position"});
         const produced = h("div", {class: "seek-produced"});
-        const seekWrap = h("div", {class: "seek-wrap"}, produced, seek);
+        const previewFrame = h("div", {class: "frame", hidden: true});
+        const previewTime = h("div", {class: "at"});
+        const preview = h("div", {class: "seek-preview", hidden: true, "aria-hidden": "true"}, previewFrame, previewTime);
+        const seekWrap = h("div", {class: "seek-wrap"}, preview, produced, seek);
         const timeNow = h("span", {class: "time"}, "0:00");
         const timeTotal = h("span", {class: "time muted"}, M.fmtClock(durationMs));
         const playBtn = h("button", {class: "ctl big", "aria-label": t("Play")}, icon("play"));
@@ -570,10 +573,62 @@
         seek.addEventListener("input", () => {
             dragging = true;
             timeNow.textContent = M.fmtClock(seek.value * 1000);
+            showPreview(seek.value / Number(seek.max));
         });
         seek.addEventListener("change", () => {
             dragging = false;
+            if (!hovering) preview.hidden = true;
             seekTo(seek.value * 1000, true);
+        });
+
+        // ---- seek previews: a frame and the time above the seek bar while hovering or dragging.
+        // The frames come from one sprite sheet per title (see docs/playback.md).
+        const sheet = item.previews && item.previews.count > 0 ? item.previews : null;
+        if (sheet) {
+            const url = `/api/items/${encodeURIComponent(item.id)}/previews?v=${encodeURIComponent(sheet.version || "")}`;
+            const img = new Image();
+            img.onload = () => {
+                previewFrame.style.backgroundImage = `url("${url}")`;
+                previewFrame.hidden = false;
+            };
+            img.src = url; // loaded in advance, so the first hover shows a frame at once
+        }
+        let hovering = false;
+
+        /** Shows the preview for a fraction 0..1 of the title, above that point of the seek bar. */
+        function showPreview(fraction) {
+            if (!durationMs) return;
+            const f = Math.min(1, Math.max(0, fraction));
+            const ms = f * durationMs;
+            previewTime.textContent = M.fmtClock(ms);
+            preview.hidden = false;
+            if (sheet && !previewFrame.hidden) {
+                const w = previewFrame.clientWidth || 200;
+                const scale = w / sheet.width;
+                const n = Math.min(sheet.count - 1, Math.floor(ms / sheet.intervalMs));
+                const col = n % sheet.columns, row = Math.floor(n / sheet.columns);
+                Object.assign(previewFrame.style, {
+                    height: Math.round(sheet.height * scale) + "px",
+                    backgroundSize: `${sheet.columns * sheet.width * scale}px ${sheet.rows * sheet.height * scale}px`,
+                    backgroundPosition: `${-col * sheet.width * scale}px ${-row * sheet.height * scale}px`,
+                });
+            }
+            // The thumb of a range input travels between half its width from either end.
+            const track = seekWrap.clientWidth, thumb = 14;
+            const x = thumb / 2 + f * (track - thumb);
+            const half = preview.offsetWidth / 2;
+            preview.style.left = Math.min(track - half, Math.max(half, x)) + "px";
+        }
+
+        seekWrap.addEventListener("pointermove", (e) => {
+            if (e.pointerType !== "mouse" && !dragging) return;
+            hovering = true;
+            const r = seekWrap.getBoundingClientRect(), thumb = 14;
+            showPreview((e.clientX - r.left - thumb / 2) / Math.max(1, r.width - thumb));
+        });
+        seekWrap.addEventListener("pointerleave", () => {
+            hovering = false;
+            if (!dragging) preview.hidden = true;
         });
 
         function toggleFullscreen() {

@@ -2,6 +2,13 @@
 
 # Changelog
 
+## FreeX Media Server 0.21.0 · FreeX Web 1.6.0.0
+
+- **Seek previews:** hovering over or dragging the seek bar shows a frame of that point with its time. The server
+  makes one sprite sheet per movie and episode after scans, in the background and at low priority, from the
+  keyframes only (see [Playback](docs/playback.md#seek-previews)); `[previews] enabled` switches it off
+- FreeX Web 1.6.0.0: seek previews in the player; a switch for them in the server settings
+
 ## FreeX Media Server 0.20.0 · FreeX Web 1.5.0.0
 
 **The server is now written in Rust.** One native program of a few megabytes that starts instantly, needs a

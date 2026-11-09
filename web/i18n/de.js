@@ -108,6 +108,8 @@ FreeXI18n.add("de", {
     "Description": "Beschreibung",
     "Details are in the server log.": "Details stehen im Server-Log.",
     "Detect intros and credits of episodes": "Intro und Abspann von Serienfolgen erkennen",
+    "Make seek preview thumbnails": "Vorschaubilder für die Zeitleiste erstellen",
+    "Small frames above the seek bar while scrubbing. Made in the background after scans; needs some disk space in the cache folder.": "Kleine Bilder über der Zeitleiste beim Spulen. Werden nach Scans im Hintergrund erstellt und brauchen etwas Platz im Cache-Ordner.",
     "Device signed out": "Gerät abgemeldet",
     "Direct play": "Direkte Wiedergabe",
     "Direct stream": "Direct Stream",

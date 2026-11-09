@@ -68,6 +68,40 @@ pub fn command(program: &str) -> Command {
     c
 }
 
+/// `nice` and `ionice` in front of a command, where they exist (Linux and other Unix systems).
+pub fn low_priority() -> Vec<String> {
+    let mut p: Vec<String> = Vec::new();
+    if let Some(nice) = ["/usr/bin/nice", "/bin/nice"].iter().find(|x| Path::new(x).is_file()) {
+        p.extend([nice.to_string(), "-n".into(), "10".into()]);
+    }
+    if let Some(ionice) = ["/usr/bin/ionice", "/bin/ionice"].iter().find(|x| Path::new(x).is_file()) {
+        p.extend([ionice.to_string(), "-c".into(), "2".into(), "-n".into(), "7".into()]);
+    }
+    p
+}
+
+/// Like [`command`], for background work that must not slow down playback: below normal
+/// priority for CPU and disk.
+pub fn background(program: &str) -> Command {
+    let prefix = low_priority();
+    let mut c = match prefix.split_first() {
+        Some((first, rest)) => {
+            let mut c = Command::new(first);
+            c.args(rest).arg(program);
+            c
+        }
+        None => Command::new(program),
+    };
+    c.stdin(Stdio::null()).kill_on_drop(true);
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
+        c.creation_flags(CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS);
+    }
+    c
+}
+
 async fn works(program: &str) -> bool {
     let mut c = command(program);
     c.arg("-version").stdout(Stdio::null()).stderr(Stdio::null());

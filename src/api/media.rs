@@ -98,6 +98,12 @@ impl<'a> View<'a> {
                 }
                 m["markers"] = mm;
             }
+            if let Some(l) = self.app.previews.as_ref().and_then(|p| p.layout(it)) {
+                let mut v = serde_json::to_value(l).expect("serializable");
+                // Changes with the file, for the image URL.
+                v["version"] = json!(format!("{:x}", it.file.as_ref().map_or(0, |f| f.modified)));
+                m["previews"] = v;
+            }
         }
         m
     }
@@ -507,6 +513,19 @@ pub async fn image(
     let u = ctx.user()?;
     let it = visible_item(&app.catalog.snapshot(), u, &id)?;
     let path = image_path(&app, &it, &kind).await.ok_or_else(ApiError::not_found)?;
+    crate::files::send(&path, IMAGE_CACHE_SECONDS, &headers).await
+}
+
+/// The seek preview sprite sheet of a movie or episode; its grid is `previews` in the item view.
+pub async fn previews(
+    State(app): State<Arc<AppState>>,
+    Extension(ctx): Extension<Ctx>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+) -> ApiResult {
+    let u = ctx.user()?;
+    let it = visible_item(&app.catalog.snapshot(), u, &id)?;
+    let (path, _) = app.previews.as_ref().and_then(|p| p.get(&it)).ok_or_else(ApiError::not_found)?;
     crate::files::send(&path, IMAGE_CACHE_SECONDS, &headers).await
 }
 

@@ -59,6 +59,8 @@ pub struct AppState {
     pub activity: activity::Activity,
     /// None when detection is switched off or ffmpeg is missing.
     pub markers: Option<markers::Service>,
+    /// Seek preview thumbnails; None if switched off or ffmpeg is missing.
+    pub previews: Option<media::previews::Previews>,
     pub together: Arc<together::Together>,
     pub cast_grants: api::Grants,
     /// None when conversion is switched off or ffmpeg is missing.
@@ -150,6 +152,12 @@ fn run(config_path: PathBuf) -> Result<Outcome, String> {
             let tools = media::probe::Tools::find(&config.ffmpeg.ffprobe, &config.ffmpeg.ffmpeg).await;
             let ffmpeg = tools.ffmpeg_ok.then(|| tools.ffmpeg.clone());
             let subtitles = media::subtitles::Subtitles::new(&cache, ffmpeg.clone());
+            let previews = if !config.previews.enabled {
+                tracing::info!("Seek previews are switched off (previews.enabled)");
+                None
+            } else {
+                ffmpeg.clone().map(|f| media::previews::Previews::new(&cache, f))
+            };
             let thumbs = media::thumbs::Thumbs::new(cache, ffmpeg.clone());
             let markers = if !config.markers.enabled {
                 tracing::info!("Intro/credits detection is switched off (markers.enabled)");
@@ -186,6 +194,7 @@ fn run(config_path: PathBuf) -> Result<Outcome, String> {
                 metadata,
                 activity: activity::Activity::default(),
                 markers,
+                previews,
                 together,
                 cast_grants: api::Grants::default(),
                 scanner: media::scanner::Scanner::default(),

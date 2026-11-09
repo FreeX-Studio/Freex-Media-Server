@@ -721,7 +721,8 @@
             ["tmdb.language", "Language", "For titles and descriptions, e.g. en-US or de-DE"],
             ["tmdb.region", "Country for age ratings", "e.g. US or DE"],
             ["tmdb.tvmaze", "Ask TVmaze for shows TMDB does not find", "Free, needs no key."],
-            ["markers.enabled", "Detect intros and credits of episodes"]]],
+            ["markers.enabled", "Detect intros and credits of episodes"],
+            ["previews.enabled", "Make seek preview thumbnails", "Small frames above the seek bar while scrubbing. Made in the background after scans; needs some disk space in the cache folder."]]],
         ["Transcoding", [
             ["transcoder.enabled", "Convert files the browser cannot play directly"],
             ["transcoder.maxSessions", "Simultaneous conversions"],

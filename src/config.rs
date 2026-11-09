@@ -62,6 +62,11 @@ tvmaze = true
 # episodes of a season; needs ffmpeg
 enabled = true
 
+[previews]
+# Small frames above the seek bar while scrubbing, made with ffmpeg in the background after
+# scans (one sprite sheet per title in the cache directory)
+enabled = true
+
 [transcoder]
 # Convert files the browser cannot play (codec, container, bitrate) with ffmpeg
 enabled = true
@@ -100,6 +105,7 @@ pub struct Config {
     pub transcoder: Transcoder,
     pub tmdb: TmdbConfig,
     pub markers: MarkersConfig,
+    pub previews: PreviewsConfig,
     /// Folder of the configuration file; relative paths are resolved against it.
     #[serde(skip)]
     pub base_dir: PathBuf,
@@ -159,6 +165,18 @@ impl Default for MarkersConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
+pub struct PreviewsConfig {
+    pub enabled: bool,
+}
+
+impl Default for PreviewsConfig {
+    fn default() -> Self {
+        PreviewsConfig { enabled: true }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct Transcoder {
     pub enabled: bool,
     pub directory: PathBuf,
@@ -206,6 +224,7 @@ impl Default for Config {
             transcoder: Transcoder::default(),
             tmdb: TmdbConfig::default(),
             markers: MarkersConfig::default(),
+            previews: PreviewsConfig::default(),
             base_dir: PathBuf::from("."),
         }
     }

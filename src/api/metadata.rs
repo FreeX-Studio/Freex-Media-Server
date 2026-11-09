@@ -170,6 +170,8 @@ pub async fn status(State(app): State<Arc<AppState>>, Extension(ctx): Extension<
         "metadataError": app.metadata.last_error().map(|t| ctx.t(&t)),
         "markers": app.markers.is_some(),
         "markersBusy": app.markers.as_ref().is_some_and(|m| m.busy()),
+        "previews": app.previews.is_some(),
+        "previewsBusy": app.previews.as_ref().is_some_and(|p| p.busy()),
     }))
 }
 

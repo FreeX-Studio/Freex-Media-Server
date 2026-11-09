@@ -18,6 +18,7 @@ mod model;
 pub mod names;
 pub mod nfo;
 pub mod playback;
+pub mod previews;
 pub mod probe;
 pub mod scanner;
 pub mod subtitles;

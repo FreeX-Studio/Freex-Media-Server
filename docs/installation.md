@@ -56,7 +56,7 @@ The package follows the Filesystem Hierarchy Standard and Debian policy:
 | `/lib/systemd/system/freex-media-server.service` | systemd service |
 | `/etc/freex-media-server/config.toml` | Configuration, owned by `freex`, mode `640` |
 | `/var/lib/freex-media-server/` | Database, library index, metadata, artwork: **this is what you back up** |
-| `/var/cache/freex-media-server/` | Thumbnails, extracted subtitles, transcoding segments; recreated as needed |
+| `/var/cache/freex-media-server/` | Thumbnails, seek previews, extracted subtitles, transcoding segments; recreated as needed |
 | journald | Log (`journalctl -u freex-media-server`) |
 
 The configuration is not a dpkg conffile: it is created from the template once and then belongs to the server,
@@ -157,7 +157,7 @@ package). Caches go to the cache directory (`cache/`, `/var/cache/freex-media-se
 | `freex.db` | SQLite database: users, password hashes, two-factor secrets, sessions, login history, preferences, libraries and the scanned index, watch state and history, playlists, watchlist, own collections, TMDB metadata, intro and credits markers |
 | `metadata/` | Downloaded artwork of titles, people and movie series |
 | `avatars/` | Profile pictures, re-encoded by the server |
-| cache: `thumbs/`, `subtitles/`, `transcode/` | Preview frames, extracted subtitles, segments of running conversions; safe to delete while the server is stopped |
+| cache: `thumbs/`, `previews/`, `subtitles/`, `transcode/` | Preview frames, seek preview sheets, extracted subtitles, segments of running conversions; safe to delete while the server is stopped |
 
 For a backup, stop the server and copy the data directory, or back up the database while it runs:
 

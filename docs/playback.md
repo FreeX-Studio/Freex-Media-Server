@@ -6,6 +6,7 @@
 - [Hardware acceleration](#hardware-acceleration)
 - [Audio tracks and subtitles](#audio-tracks-and-subtitles)
 - [Skip intro and credits](#skip-intro-and-credits)
+- [Seek previews](#seek-previews)
 - [Watch Together](#watch-together)
 - [Chromecast](#chromecast)
 - [Keyboard shortcuts](#keyboard-shortcuts)
@@ -64,6 +65,18 @@ version.
 
 During playback a *Skip intro* button appears in the intro. When the credits start, *Next episode* appears with a
 countdown; for the last episode *Skip credits*.
+
+## Seek previews
+
+While the mouse is over the seek bar, or while the bar is dragged, FreeX Web shows a small frame of that point of the
+title with its time. The frames are made after a scan, in the background and at low priority, for every movie and
+episode longer than a minute: ffmpeg decodes only the keyframes of the file, takes one frame every 10 seconds (longer
+titles get a longer interval, so a title has at most about 600 frames) and puts them, 240 pixels wide, into one
+JPEG sprite sheet. A two-hour film takes a few hundred kilobytes to a few megabytes in the cache directory
+(`previews/`). The sheet belongs to one version of the file; a replaced file gets new previews, and previews of
+removed titles are deleted.
+
+Titles that have no previews yet show only the time. Switch them off with `[previews] enabled = false`.
 
 ## Watch Together
 

@@ -160,6 +160,7 @@ async fn scan_now(app: &Arc<AppState>, lib: Library) {
     // New entries, renamed ones and old metadata are fetched in the background.
     crate::metadata::Service::refresh_library(app, &lib.id, false);
     crate::markers::Service::analyze_library(app, &lib.id, false);
+    super::previews::Previews::generate_library(app, &lib.id, false);
     tracing::info!("Scanned library '{}': {count} entries, {probed} files probed, {} ms", lib.name, start.elapsed().as_millis());
 }
 

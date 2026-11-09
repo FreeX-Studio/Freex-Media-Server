@@ -98,7 +98,7 @@ Session tokens exist in plain text only in the browser; the database stores thei
    items instead of wiping them.
 
 After a scan, `metadata::Service` matches new or renamed titles on TMDB and `markers::Service` analyses new
-episodes, both in the background.
+episodes and `media::previews` makes the seek preview sheets of new files, all in the background.
 
 ## Playing a title
 
@@ -135,6 +135,7 @@ unlocks only that title for a limited time, because the Chromecast cannot sign i
 | Periodic rescans | `media::scanner` (every `interval_minutes`) |
 | TMDB matching and refresh | `metadata::Service` (one library at a time, at most four requests in parallel) |
 | Intro and credits detection | `markers::Service` (one season at a time, once per file version) |
+| Seek preview sheets | `media::previews` (one file at a time, low priority, once per file version) |
 | Converting, one per playback | `transcode::Worker` (an ffmpeg process at a time, restarted where the player asks) |
 | Pausing and stopping conversions | `transcode::Transcoder` (every 5 seconds) |
 | Expired sessions | `main` (every hour) |

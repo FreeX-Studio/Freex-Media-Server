@@ -67,7 +67,7 @@ src/
   i18n.rs           message catalogs (i18n/messages_<language>.properties)
   api/              the API endpoints: account, users, server, media, playback, metadata, lists, profile, extras, admin
   media/            library entries, name parser, .nfo reader, ffprobe, scanner, in-memory index, playback planner,
-                    subtitles, preview frames
+                    subtitles, preview frames, seek preview sheets
   metadata/         TMDB and TVmaze clients, matching, online metadata
   transcode/        conversion sessions: segment plan, ffmpeg command lines, background workers
   markers/          intro and credits detection (audio fingerprints)

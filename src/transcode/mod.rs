@@ -199,7 +199,7 @@ impl Transcoder {
             ffprobe,
             root,
             config,
-            priority: low_priority(),
+            priority: probe::low_priority(),
             sessions: Mutex::default(),
             keyframes: Mutex::default(),
         });
@@ -326,18 +326,6 @@ impl Transcoder {
         }
         keys
     }
-}
-
-/// `nice` and `ionice` in front of ffmpeg, where they exist.
-fn low_priority() -> Vec<String> {
-    let mut p: Vec<String> = Vec::new();
-    if let Some(nice) = ["/usr/bin/nice", "/bin/nice"].iter().find(|x| Path::new(x).is_file()) {
-        p.extend([nice.to_string(), "-n".into(), "10".into()]);
-    }
-    if let Some(ionice) = ["/usr/bin/ionice", "/bin/ionice"].iter().find(|x| Path::new(x).is_file()) {
-        p.extend([ionice.to_string(), "-c".into(), "2".into(), "-n".into(), "7".into()]);
-    }
-    p
 }
 
 /// Removes leftover session folders. Only folders named like a session id are touched, so a
