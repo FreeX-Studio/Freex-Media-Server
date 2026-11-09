@@ -61,8 +61,8 @@ apps for iOS, Android and TV are planned and will use the same API.
 | **FreeX Android** | App for Android smartphones and tablets | planned |
 | **FreeX TV** | Smart TV and streaming device apps | later |
 
-Server and web client are versioned separately: the server uses the version in `Cargo.toml` (e.g. `0.20.0`),
-FreeX Web the version in [`web/version.json`](web/version.json) (e.g. `1.5.0.0`). Both are shown under
+Server and web client are versioned separately: the server uses the version in `Cargo.toml` (e.g. `0.21.0`),
+FreeX Web the version in [`web/version.json`](web/version.json) (e.g. `1.6.0.0`). Both are shown under
 *Settings → About FreeX*.
 
 ## Quick start
@@ -124,9 +124,8 @@ See [Installation](docs/installation.md) for details, paths, updates and running
 ## Roadmap
 
 FreeX Media Server is under active development and has not reached 1.0 yet. The [roadmap](docs/roadmap.md) lists
-what is still missing. Next up: seek preview thumbnails, chapters, trailers and extras, subtitle download, multiple
-versions of a title, parental controls and HDR tone mapping; then the native apps (**FreeX TV**, **FreeX iOS**,
-**FreeX Android**), music and photo libraries.
+what is still missing. With 0.21.0 the first phase (rounding off movies and shows) is complete; next up are the
+native apps (**FreeX TV**, **FreeX iOS**, **FreeX Android**), then music and photo libraries.
 
 ## Contributing
 

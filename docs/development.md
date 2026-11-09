@@ -119,8 +119,8 @@ FreeX Media Server and FreeX Web are separate products and are versioned indepen
 
 | Product | Version | Format |
 |---|---|---|
-| FreeX Media Server | `version` in `Cargo.toml` | three parts, e.g. `0.20.0` |
-| FreeX Web | `version` in `web/version.json` | four parts, e.g. `1.5.0.0` |
+| FreeX Media Server | `version` in `Cargo.toml` | three parts, e.g. `0.21.0` |
+| FreeX Web | `version` in `web/version.json` | four parts, e.g. `1.6.0.0` |
 
 Raise the server version for changes to the server and its API, the web client version for changes to the web
 interface. Both appear in the log at startup, under *Settings → Über FreeX* and in `GET /api/status`.
