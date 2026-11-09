@@ -110,6 +110,7 @@ See [Installation](docs/installation.md) for details, paths, updates and running
 | [Architecture](docs/architecture.md) | How the server works inside: requests, data, scanning, playback, FreeX Web |
 | [API](docs/api.md) | The JSON API used by FreeX Web and the upcoming apps |
 | [Changelog](CHANGELOG.md) | What is new in each release |
+| [Roadmap](docs/roadmap.md) | What is still missing, and in which order it comes |
 | [Development](docs/development.md) | Project structure, building, packaging, versioning and contributing |
 | [Rust port](docs/rust-port.md) | How the server was moved from Java to Rust, and what changed for users |
 
@@ -122,13 +123,10 @@ See [Installation](docs/installation.md) for details, paths, updates and running
 
 ## Roadmap
 
-FreeX Media Server is under active development and has not reached 1.0 yet. Planned next:
-
-- Native apps: **FreeX iOS**, **FreeX Android** and **FreeX TV**
-- Public, versioned API documentation for third-party clients
-- Music and photo libraries
-- Parental controls with age ratings per user
-- Downloads for offline playback in the apps
+FreeX Media Server is under active development and has not reached 1.0 yet. The [roadmap](docs/roadmap.md) lists
+what is still missing. Next up: seek preview thumbnails, chapters, trailers and extras, subtitle download, multiple
+versions of a title, parental controls and HDR tone mapping; then the native apps (**FreeX TV**, **FreeX iOS**,
+**FreeX Android**), music and photo libraries.
 
 ## Contributing
 
