@@ -54,7 +54,6 @@ The gaps that show in daily use. All of them fit the current architecture.
 ## Not planned
 
 - Anything that needs an account with a third party to use the server at home.
-- Live TV and recordings.
 - Advertising, streaming channels, rentals.
 
 ## Order of work
