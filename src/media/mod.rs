@@ -14,7 +14,6 @@
 //! the in-memory index and generated artwork.
 
 pub mod catalog;
-pub mod delete;
 mod model;
 pub mod names;
 pub mod nfo;

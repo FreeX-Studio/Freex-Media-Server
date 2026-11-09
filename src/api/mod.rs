@@ -73,7 +73,6 @@ pub fn router(app: Arc<AppState>) -> Router {
         .route("/api/items/{id}/image/{kind}", get(media::image))
         .route("/api/items/{id}/previews", get(media::previews))
         .route("/api/items/{id}/theme", get(media::theme))
-        .route("/api/items/{id}/files", get(media::deletable_files).delete(media::delete_files))
         .route("/api/fs", get(media::browse_folders))
         .route("/api/items/{id}/playback", post(playback::start))
         .route("/api/items/{id}/stream", get(playback::stream))

@@ -24,7 +24,6 @@ The gaps that show in daily use. All of them fit the current architecture.
 | ~~**Server dashboard**~~ | **Delivered in 0.21.0** – *Settings → Dashboard* in FreeX Web; CPU figures need Linux. |
 | ~~**Scheduled maintenance**~~ | **Delivered in 0.21.0** – see [Configuration](configuration.md). |
 | ~~**Webhooks**~~ | **Delivered in 0.21.0** – see [API](api.md#webhooks). |
-| ~~**Delete files from the library**~~ | **Delivered in 0.21.0** – see [Configuration](configuration.md). |
 | ~~**Manual metadata editing**~~ | **Delivered in 0.21.0** – see [Media library](media-library.md#editing-metadata-by-hand). |
 | ~~**Theme music**~~ | **Delivered in 0.21.0** – `theme.mp3` in the show or movie folder, see [Media library](media-library.md#folder-layout). |
 
@@ -54,6 +53,7 @@ The gaps that show in daily use. All of them fit the current architecture.
 
 - Anything that needs an account with a third party to use the server at home.
 - Advertising, streaming channels, rentals.
+- Deleting media files from the server through the web interface.
 
 ## Order of work
 

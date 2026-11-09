@@ -44,7 +44,6 @@ TMDB key is never sent to the browser.
 | `[tmdb]` `region` | `DE` | Country for age ratings |
 | `[tmdb]` `tvmaze` | `true` | Ask TVmaze (free, no key) for shows the TMDB search does not find |
 | `[markers]` `enabled` | `true` | Detect intros and end credits of episodes |
-| `[library]` `allow_delete` | `false` | Admins may delete titles from disk (*… → Delete from disk*). Deleted are the video files, their subtitles and the artwork and `.nfo` named after them, and the extras of a movie; folders only when they are empty afterwards. The server needs write access to the media folders: with the Debian package `sudo systemctl edit freex-media-server` and `[Service]` `ReadWritePaths=/path/to/media` |
 | `[maintenance]` `enabled` | `true` | Nightly maintenance: database backup, cache clean-up, rescan of all libraries (with metadata, intro detection and seek previews); also *Run now* on the dashboard |
 | `[maintenance]` `start` | `"03:00"` | When it starts, in the server's time zone (`HH:MM`). With it, `[scanner] interval_minutes` can be `0` |
 | `[maintenance]` `backups` | `7` | Database backups kept in `<data>/backups` (`freex-YYYY-MM-DD-HHMM.db`, a complete copy made with `VACUUM INTO`); `0` = none |

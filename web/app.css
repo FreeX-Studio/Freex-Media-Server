@@ -1082,18 +1082,6 @@ select, .field input, .inline input, .filter-field input {
     color: var(--muted);
 }
 
-.file-list {
-    max-height: 260px;
-    overflow: auto;
-    margin: 8px 0 14px;
-    padding-left: 18px;
-    font-size: 13px;
-}
-
-.file-list code {
-    word-break: break-all;
-}
-
 .check-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));

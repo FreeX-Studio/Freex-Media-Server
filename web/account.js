@@ -1045,8 +1045,6 @@
             ["transcoder.preset", "x264 preset", "Faster needs less CPU, the amount of data grows a little."],
             ["transcoder.directory", "Transcoding folder",
                 "Holds the video segments of running conversions, e.g. on a fast SSD. Relative to the cache folder or an absolute path. The server only deletes its own session folders there."]]],
-        ["Library", [
-            ["library.allowDelete", "Admins may delete files from disk", "In the “…” menu of a title. The server needs write access to the media folders; with the Debian package add them with: sudo systemctl edit freex-media-server → [Service] ReadWritePaths=/path/to/media"]]],
         ["Maintenance", [
             ["maintenance.enabled", "Nightly maintenance", "Database backup, cache clean-up and a rescan of all libraries with metadata, intro detection and seek previews."],
             ["maintenance.start", "Starts at", "Time of day in the server's time zone, e.g. 03:00."],

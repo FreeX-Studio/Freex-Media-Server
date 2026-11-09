@@ -253,40 +253,6 @@
             }}, t("Save")), h("button", {class: "btn", onclick: () => close()}, t("Cancel"))));
     }
 
-    /** Shows which files go, and deletes them after a second click. */
-    async function deleteFromDisk(item) {
-        let info;
-        try {
-            info = await api("GET", `/api/items/${item.id}/files`);
-        } catch (e) {
-            return M.toast(e.message, true);
-        }
-        const error = h("div", {class: "error-text", role: "alert"});
-        const go = h("button", {class: "btn danger", onclick: async () => {
-            if (go.dataset.confirm !== "1") {
-                go.dataset.confirm = "1";
-                go.textContent = t("Really delete? Click again");
-                return;
-            }
-            go.disabled = true;
-            try {
-                const r = await api("DELETE", `/api/items/${item.id}/files`, {});
-                close();
-                M.toast(tn(r.deleted, "1 file deleted", "{0} files deleted"));
-                const back = item.seasonId && item.type === "episode" ? `/item/${item.seasonId}` : item.showId && item.type === "season" ? `/item/${item.showId}` : `/library/${item.libraryId}`;
-                M.navigate(back, true);
-            } catch (e) {
-                error.textContent = e.message;
-                go.disabled = false;
-            }
-        }}, tn(info.files.length, "Delete 1 file", "Delete {0} files"));
-        const close = modal(t("Delete “{0}” from disk", item.title),
-            h("p", null, t("These files are deleted from the server's disk ({0}). This cannot be undone.", M.fmtSize(info.size) || "0 MB")),
-            h("ul", {class: "file-list"}, info.files.map((f) => h("li", null, h("code", null, f)))),
-            error,
-            h("div", {class: "btn-row"}, go, h("button", {class: "btn", onclick: () => close()}, t("Cancel"))));
-    }
-
     M.menuExtensions.push((item) => {
         const out = [];
         if (item.type === "movie" || item.type === "episode") out.push({label: t("Watch Together"), onclick: () => startTogether(item)});
@@ -300,9 +266,6 @@
         }
         if (S.user.admin && ["movie", "show", "season", "episode"].includes(item.type)) {
             out.push({label: t("Edit metadata …"), onclick: () => editMetadata(item)});
-        }
-        if (S.user.admin && S.status && S.status.allowDelete && ["movie", "show", "season", "episode"].includes(item.type)) {
-            out.push({label: t("Delete from disk …"), danger: true, onclick: () => deleteFromDisk(item)});
         }
         if (S.user.admin && item.type !== "collection") {
             out.push({label: t("Refresh metadata"), onclick: async () => {
