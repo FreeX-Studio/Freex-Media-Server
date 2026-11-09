@@ -3967,6 +3967,14 @@ select option {
     transition: transform .35s var(--ease), box-shadow .35s var(--ease);
 }
 
+/* A scrolling row clips what leaves it: room for the lifted, enlarged artwork and its shadow, taken
+   back with a negative margin so the row stays where it was. */
+.row {
+    padding: 12px 14px 18px;
+    margin: -12px -14px -14px;
+    scroll-padding-inline: 14px;
+}
+
 @media (hover: hover) {
     .card:hover .art {
         transform: translateY(-3px) scale(1.035);
