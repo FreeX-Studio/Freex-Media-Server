@@ -1,0 +1,11 @@
+#!/bin/sh
+# Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3, see /usr/share/doc/freex-media-server/copyright.
+# Pre-remove script of freex-media-server: stop the service before the files go away.
+set -e
+
+if [ -d /run/systemd/system ] && [ "$1" = "remove" ]; then
+    systemctl stop freex-media-server.service >/dev/null 2>&1 || true
+    systemctl disable freex-media-server.service >/dev/null 2>&1 || true
+fi
+
+exit 0

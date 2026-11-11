@@ -1,0 +1,37 @@
+# Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3.
+[Unit]
+Description=FreeX
+Documentation=https://github.com/FreeX-Studio/freex-media-server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=freex
+Group=freex
+SupplementaryGroups=video render
+# systemd creates and owns /var/lib/freex-media-server (state) and /var/cache/freex-media-server (cache).
+StateDirectory=freex-media-server
+StateDirectoryMode=0750
+CacheDirectory=freex-media-server
+CacheDirectoryMode=0750
+WorkingDirectory=/var/lib/freex-media-server
+UMask=0027
+Environment=LANG=C.UTF-8
+ExecStart=/usr/bin/freex-media-server /etc/freex-media-server/config.toml
+Restart=on-failure
+RestartSec=5
+
+# Hardening: the whole file system is read-only for the server (media folders included),
+# except its state and cache directories above and its configuration (settings page).
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths=/etc/freex-media-server
+
+[Install]
+WantedBy=multi-user.target

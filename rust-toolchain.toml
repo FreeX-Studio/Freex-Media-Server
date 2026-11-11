@@ -1,0 +1,6 @@
+# The toolchain every build uses, so a new clippy release cannot fail the build out of the blue.
+# Raise it on purpose, together with a clippy run.
+[toolchain]
+channel = "1.99.1"
+components = ["rustfmt", "clippy"]
+targets = ["x86_64-pc-windows-gnu"]

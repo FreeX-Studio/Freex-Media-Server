@@ -1,0 +1,24 @@
+#!/bin/sh
+# Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3, see /usr/share/doc/freex-media-server/copyright.
+# Post-remove script of freex-media-server.
+# "remove" keeps configuration and data; "purge" deletes them and the service user.
+# The media folders themselves are never touched.
+set -e
+
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload >/dev/null 2>&1 || true
+fi
+
+if [ "$1" = "purge" ]; then
+    rm -rf /var/lib/freex-media-server
+    rm -rf /var/cache/freex-media-server
+    rm -rf /etc/freex-media-server
+    if getent passwd freex >/dev/null; then
+        deluser --system freex >/dev/null 2>&1 || true
+    fi
+    if getent group freex >/dev/null; then
+        delgroup --system freex >/dev/null 2>&1 || true
+    fi
+fi
+
+exit 0

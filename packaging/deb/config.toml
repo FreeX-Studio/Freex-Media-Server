@@ -1,0 +1,102 @@
+# FreeX Media Server configuration (installed by the Debian package, kept on updates).
+# Most settings can also be changed by an admin in the web interface (Settings > Server),
+# which writes them back into this file. After editing it by hand:
+#   sudo systemctl restart freex-media-server
+# Libraries and users are managed in the web interface, not here.
+
+[server]
+# Name shown in the web interface and to apps
+name = "FreeX"
+# Address and port of the web interface; "0.0.0.0" listens on all network interfaces
+bind = "0.0.0.0"
+port = 32500
+# Set to true when a reverse proxy (nginx, Caddy, ...) is in front of the server: client
+# addresses and HTTPS are then taken from its X-Forwarded-* headers
+trust_proxy = false
+# HTTPS: certificate (with its chain) and private key as PEM files, relative to this file or
+# absolute. Both empty = plain HTTP, e.g. behind a reverse proxy that does TLS. The files must be
+# readable by the user "freex"
+tls_certificate = ""
+tls_key = ""
+
+[data]
+# Database and everything the server cannot recreate
+directory = "/var/lib/freex-media-server"
+# Files the server can recreate at any time (thumbnails, extracted subtitles, conversions);
+# safe to delete while the server is stopped
+cache_directory = "/var/cache/freex-media-server"
+
+[security]
+# A sign-in stays valid this many days without use
+session_days = 30
+# Minimum length of new passwords
+min_password_length = 10
+
+[ffmpeg]
+# The ffprobe and ffmpeg programs: names on the PATH or full paths
+ffprobe = "ffprobe"
+ffmpeg = "ffmpeg"
+
+[tmdb]
+# API key (v3) or read access token (v4) from https://www.themoviedb.org/settings/api (free).
+# Empty: only local .nfo files and artwork are used
+api_key = ""
+# Language of titles and descriptions, and country for age ratings
+language = "de-DE"
+region = "DE"
+# Ask TVmaze (free, no key) for shows the TMDB search does not find
+tvmaze = true
+
+[markers]
+# Detect intros and end credits of TV episodes ("Skip intro")
+enabled = true
+
+[maintenance]
+# Nightly: database backup, cache clean-up, rescan of all libraries (server time zone)
+enabled = true
+start = "03:00"
+# Backups kept in /var/lib/freex-media-server/backups (0 = none)
+backups = 7
+
+[previews]
+# Small frames above the seek bar while scrubbing, made in the background after scans
+enabled = true
+
+[transcoder]
+# Convert files the browser cannot play (codec, container, bitrate) with ffmpeg
+enabled = true
+# Where temporary segments are written: relative to the cache directory or an absolute path,
+# e.g. on a fast SSD. The server only ever deletes its own session folders there.
+# Outside /var/cache/freex-media-server the systemd service needs a drop-in:
+#   sudo systemctl edit freex-media-server  ->  [Service] ReadWritePaths=/path/to/transcode
+directory = "transcode"
+# Simultaneous conversions; more requests get a "busy" message
+max_sessions = 3
+# Hardware encoding: "none", "nvenc" (NVIDIA), "qsv" (Intel Quick Sync) or "vaapi" (Intel/AMD on Linux)
+hardware_acceleration = "none"
+vaapi_device = "/dev/dri/renderD128"
+# x264 speed/quality trade-off for software encoding ("ultrafast" ... "medium")
+preset = "veryfast"
+
+[dlna]
+# Shows the libraries on smart TVs, consoles, VLC, Kodi and other DLNA/UPnP players in the home
+# network. DLNA has no sign-in: everything there is seen with the libraries and age limit of `user`.
+enabled = false
+# The FreeX account whose libraries, age limit and resume positions DLNA uses (required)
+user = ""
+# Name shown on the TV; empty = the server name
+name = ""
+# Plain HTTP port for the players (TVs cannot use HTTPS); answers only the home network.
+# Discovery uses UDP port 1900 (SSDP); both must be open in a firewall on the server.
+port = 32501
+
+[jellyfin]
+# Lets native Jellyfin apps (Android TV and Fire TV, Findroid, Swiftfin, ...) use this server:
+# in the app, enter the server address followed by /jellyfin, e.g. http://192.168.1.10:32500/jellyfin
+enabled = false
+
+[scanner]
+# Automatic rescan of all libraries, in minutes (0 = only manual scans)
+interval_minutes = 30
+# Number of files probed with ffprobe at the same time
+threads = 4

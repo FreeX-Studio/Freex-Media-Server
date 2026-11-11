@@ -1,0 +1,12 @@
+# Template for conf/distributions of the APT repository (reprepro), see docs/apt-repository.md.
+# Copy it to <repository>/conf/distributions and put the id of the signing key in SignWith.
+# One suite serves Debian 12+ and Ubuntu 22.04+ alike: the package only needs glibc 2.34 and
+# ffmpeg from the distribution.
+Origin: MirraNET
+Label: MirraNET
+Suite: stable
+Codename: stable
+Architectures: amd64
+Components: main
+Description: FreeX packages by MirraNET
+SignWith: REPLACE-WITH-KEY-ID

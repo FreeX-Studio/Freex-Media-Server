@@ -1,0 +1,18 @@
+Package: freex-media-server
+Version: [[version]]
+Section: video
+Priority: optional
+Architecture: amd64
+Maintainer: Niklas Linz <niklas.linz@mirranet.de>
+Depends: ffmpeg, adduser, libc6 (>= 2.34)
+Suggests: intel-media-va-driver-non-free, mesa-va-drivers
+Homepage: https://github.com/FreeX-Studio/freex-media-server
+Description: FreeX Media Server - Your Media. Your Server. Your Freedom.
+ The FreeX server organises movie and TV show folders into libraries and
+ streams them to the browser, with a web interface in the style of the
+ well-known media servers:
+ continue watching, watch state per user, metadata from TMDB, collections,
+ playlists, skip intro, Watch Together and on-the-fly conversion with ffmpeg.
+ .
+ The web interface listens on port 32500. Configuration is in
+ /etc/freex-media-server/config.toml, data in /var/lib/freex-media-server.

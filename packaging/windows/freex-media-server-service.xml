@@ -1,0 +1,38 @@
+<!--
+  Copyright (c) 2026 MirraNET, Niklas Linz. All rights reserved.
+
+  This file is part of the MirraNET project and is licensed under the
+  GNU Lesser General Public License v3.0 (LGPLv3).
+
+  You may use, distribute and modify this code under the terms
+  of the LGPLv3 license. You should have received a copy of the
+  license along with this file. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>
+  or contact: niklas.linz@mirranet.de
+-->
+<!--
+  Windows service of FreeX Media Server, run by WinSW (freex-media-server-service.exe next to this
+  file). %BASE% is the installation folder; configuration, data and logs are in ProgramData.
+-->
+<service>
+    <id>freex-media-server</id>
+    <name>FreeX Media Server</name>
+    <description>Your Media. Your Server. Your Freedom.</description>
+
+    <executable>%BASE%\freex-media-server.exe</executable>
+    <arguments>"%ProgramData%\FreeX Media Server\config.toml"</arguments>
+    <workingdirectory>%ProgramData%\FreeX Media Server</workingdirectory>
+
+    <startmode>Automatic</startmode>
+    <delayedAutoStart>true</delayedAutoStart>
+    <!-- The server ends cleanly on Ctrl+C, which WinSW sends first; give it time to end conversions. -->
+    <stoptimeout>30 sec</stoptimeout>
+    <onfailure action="restart" delay="10 sec"/>
+    <onfailure action="restart" delay="60 sec"/>
+    <resetfailure>1 hour</resetfailure>
+
+    <logpath>%ProgramData%\FreeX Media Server\logs</logpath>
+    <log mode="roll-by-size">
+        <sizeThreshold>10240</sizeThreshold>
+        <keepFiles>5</keepFiles>
+    </log>
+</service>
