@@ -221,6 +221,13 @@ pub(super) async fn send_transcode_file(s: &Session, name: &str) -> ApiResult {
     let Some(parts) = parts else {
         let log = s.log();
         let last = log.lines().last().unwrap_or("").to_string();
+        // What ffmpeg said, for the admin: the player only shows that the conversion failed.
+        let said = if log.trim().is_empty() {
+            "no output from ffmpeg".to_string()
+        } else {
+            log.lines().map(str::trim).collect::<Vec<_>>().join(" | ")
+        };
+        tracing::warn!("Transcode {}: {name} could not be made: {said}", s.id);
         let status = if name == "init.mp4" { StatusCode::INTERNAL_SERVER_ERROR } else { StatusCode::NOT_FOUND };
         return Err(if last.is_empty() {
             ApiError::new(status, "error.transcodeFailed")
@@ -288,6 +295,26 @@ pub async fn subtitle(
     let sid = sid.strip_suffix(".vtt").unwrap_or(&sid);
     let text = app.subtitles.vtt(&it, sid).await.ok_or_else(ApiError::not_found)?;
     Ok(([(header::CONTENT_TYPE, "text/vtt; charset=utf-8"), (header::CACHE_CONTROL, "private, max-age=3600")], text).into_response())
+}
+
+/// A playback error the player could not recover from, written to the server log so the admin
+/// can see why a title does not play (the decoder of the browser, a broken file, the network).
+pub async fn playback_error(
+    State(app): State<Arc<AppState>>,
+    Extension(ctx): Extension<Ctx>,
+    Path(id): Path<String>,
+    body: JsonBody,
+) -> ApiResult {
+    let u = ctx.user()?;
+    let idx = app.catalog.snapshot();
+    let it = playable(&idx, u, &id)?;
+    let clean = |k: &str, max: usize| -> String {
+        body.str(k).unwrap_or("").chars().filter(|c| !c.is_control()).take(max).collect::<String>().trim().to_string()
+    };
+    let (mode, detail, device) = (clean("mode", 20), clean("detail", 400), clean("device", 80));
+    let device = if device.is_empty() { ctx.user_agent.chars().take(80).collect() } else { device };
+    tracing::warn!("Playback of '{}' failed for {} on {device} ({mode}): {detail}", it.title, u.username);
+    no_content()
 }
 
 /// Position reports of the player. Near the end the item counts as watched (once per playthrough).

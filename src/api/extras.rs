@@ -138,6 +138,8 @@ fn chromecast() -> Capabilities {
         mse_video: set(&["h264"]),
         mse_audio: set(&["aac", "mp3"]),
         direct_play_allowed: true,
+        hevc_main10: Some(false),
+        mse_hevc_main10: Some(false),
     }
 }
 

@@ -19,6 +19,13 @@
   nothing is found, with their first words (`The Continental Aus der Welt von John Wick` → `The Continental`), whose
   results need a close title or the right year. Show folders named like season packs (`Show.S01.German…`) no
   longer keep `S01` in the title. Entries without a match are searched again right after the update
+- **10-bit HEVC in the browser:** FreeX Web asks the browser for HEVC Main10 (HDR, most 4K) separately; browsers
+  that decode HEVC only with 8 bits get such files converted instead of copied, which failed in the browser's
+  decoder. If the browser still fails on copied video, the player switches to a full conversion by itself and
+  plays on
+- **Playback errors in the server log:** failed segments are logged with what ffmpeg said, and the player writes
+  errors it cannot recover from to the server log (title, user, device, cause), so *Details are in the server log*
+  holds true
 - **Season names in the viewer's language:** seasons without a name of their own are shown as "Season 2" or
   "Staffel 2" by the display language of the user (or, when the user follows the browser, the server's metadata
   language), in FreeX Web and the Jellyfin apps; before, they were always "Staffel 2"

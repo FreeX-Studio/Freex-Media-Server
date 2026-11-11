@@ -26,7 +26,9 @@
 
     // ------------------------------------------------------------------ browser capabilities
 
-    function capabilities(directPlay) {
+    const HEVC_MAIN10 = 'video/mp4; codecs="hvc1.2.4.L153.B0"';
+
+    function capabilities(directPlay, copyVideo = true) {
         const v = document.createElement("video");
         const can = (t) => v.canPlayType(t) !== "";
         const hasMse = !!(window.MediaSource && window.Hls && window.Hls.isSupported());
@@ -58,7 +60,11 @@
             containers,
             video: pick(videoTypes, can),
             audio: pick(audioTypes, can),
-            mseVideo: pick({h264: videoTypes.h264, hevc: videoTypes.hevc, av1: videoTypes.av1}, mse),
+            // After the browser failed on copied video, the server converts it.
+            mseVideo: copyVideo ? pick({h264: videoTypes.h264, hevc: videoTypes.hevc, av1: videoTypes.av1}, mse) : [],
+            // 10-bit HEVC (HDR, most 4K): many browsers decode HEVC only with 8 bits.
+            hevcMain10: can(HEVC_MAIN10),
+            mseHevcMain10: mse(HEVC_MAIN10),
             mseAudio: pick({aac: audioTypes.aac, mp3: ['audio/mp4; codecs="mp3"', "audio/mpeg"], ac3: audioTypes.ac3,
                 eac3: audioTypes.eac3, flac: ['audio/mp4; codecs="flac"'], opus: ['audio/mp4; codecs="opus"']}, mse),
             directPlay,
@@ -108,6 +114,7 @@
             audio: query.get("a") != null ? Number(query.get("a")) : preferred.audio,
             subtitle: query.get("s") != null ? (query.get("s") === "none" ? null : query.get("s")) : preferred.sub,
             directPlay: true,
+            copyVideo: true,
             plan: null,
             hls: null,
             burnSubtitle: false,
@@ -376,7 +383,7 @@
             let plan;
             try {
                 plan = await api("POST", `/api/items/${item.id}/playback`, {
-                    caps: capabilities(state.directPlay), quality: state.quality, bandwidth: Math.round(knownBandwidth()), audio: state.audio,
+                    caps: capabilities(state.directPlay, state.copyVideo), quality: state.quality, bandwidth: Math.round(knownBandwidth()), audio: state.audio,
                     burnSubtitle: state.burnSubtitle,
                     subtitle: state.subtitle, startMs: Math.max(0, Math.round(atMs)),
                     client: clientId, device: M.deviceName ? M.deviceName(navigator.userAgent) : "",
@@ -419,7 +426,8 @@
                     // that are still being written), so retrying the same session is pointless.
                     if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR && (status === 404 || status === 410)) {
                         if (watchdog.restart()) return;
-                        return fail(t("The conversion failed.") + (S.user.admin ? " " + t("Details are in the server log.") : ""));
+                        return fail(t("The conversion failed.") + (S.user.admin ? " " + t("Details are in the server log.") : ""),
+                            `${data.details} HTTP ${status}`);
                     }
                     if (!data.fatal) return;
                     if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR && mediaRecoveries < 2) {
@@ -427,13 +435,24 @@
                         hls.recoverMediaError();
                         return;
                     }
+                    if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR && state.copyVideo && plan.mode !== "transcode") {
+                        // The browser said it decodes the video but does not: let the server convert it.
+                        reportError(`decoder failed on copied video (${data.details}${data.error ? ": " + data.error.message : ""}), converting`);
+                        state.copyVideo = false;
+                        M.toast(t("The video is converted for your browser"));
+                        return start(position());
+                    }
                     if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR && status !== 503 && networkRetries < 4) {
                         networkRetries++;
                         setTimeout(() => state.hls === hls && hls.startLoad(), 1000 * networkRetries);
                         return;
                     }
+                    const what = `${data.type} ${data.details}${status ? " HTTP " + status : ""}${data.error ? ": " + data.error.message : ""}`;
+                    if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
+                        return fail(t("Your browser cannot play this stream."), what);
+                    }
                     fail(status === 503 ? t("The server is busy.") : t("The conversion failed.") +
-                        (S.user.admin ? " " + t("Details are in the server log.") : ""));
+                        (S.user.admin ? " " + t("Details are in the server log.") : ""), what);
                 });
                 hls.loadSource(plan.url);
                 hls.attachMedia(video);
@@ -527,7 +546,15 @@
             video.currentTime = target / 1000;
         }
 
-        function fail(message) {
+        /** Writes a playback problem to the server log (for the admin), without the user waiting. */
+        function reportError(detail) {
+            const body = {mode: state.plan ? state.plan.mode : "", detail: String(detail || ""),
+                device: M.deviceName ? M.deviceName(navigator.userAgent) : ""};
+            api("POST", `/api/items/${item.id}/playback-error`, body).catch(() => null);
+        }
+
+        function fail(message, detail) {
+            reportError(detail ? `${message} (${detail})` : message);
             spinner.hidden = true;
             const fmt = [media.container, media.videoCodec, media.audioCodec].filter(Boolean).map((s) => s.toUpperCase()).join(", ");
             notice.hidden = false;
@@ -574,7 +601,8 @@
                 M.toast(t("The file is converted for your browser"));
                 start(position());
             } else {
-                fail(t("Your browser cannot play this file."));
+                const e = video.error;
+                fail(t("Your browser cannot play this file."), e ? `media error ${e.code}${e.message ? ": " + e.message : ""}` : "");
             }
         });
         video.addEventListener("ended", () => {
@@ -805,7 +833,7 @@
                     // Remembered for this user and network (home or away), on every device.
                     const key = plan.network === "home" ? "qualityHome" : "qualityAway";
                     api("PUT", "/api/me/preferences", {[key]: v}).then((u) => S.user = Object.assign(u, {network: S.user.network})).catch(() => null);
-                    if (v === "original") state.directPlay = true;
+                    if (v === "original") state.directPlay = state.copyVideo = true;
                     restart();
                 }),
                 item.versions && item.versions.length > 1 ? section(t("Version"), item.versions.map((v) => [v.id, M.versionLabel(v)]),

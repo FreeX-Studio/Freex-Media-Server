@@ -662,6 +662,8 @@ FreeXI18n.add("de", {
     "Yesterday": "Gestern",
     "You": "Du",
     "Your browser cannot play this file.": "Dein Browser kann diese Datei nicht abspielen.",
+    "Your browser cannot play this stream.": "Dein Browser kann diesen Stream nicht abspielen.",
+    "The video is converted for your browser": "Das Video wird für deinen Browser umgewandelt",
     "{0} added to “{1}”": "{0} zu „{1}“ hinzugefügt",
     "{0} channels": "{0} Kanäle",
     "{0} created": "{0} angelegt",

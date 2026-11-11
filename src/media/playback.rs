@@ -111,6 +111,10 @@ pub struct Capabilities {
     pub mse_video: HashSet<String>,
     pub mse_audio: HashSet<String>,
     pub direct_play_allowed: bool,
+    /// Whether 10-bit HEVC (Main10, up to 4K) decodes, separately for files and for MediaSource;
+    /// None when the client does not say, which counts as yes (apps decode it in hardware).
+    pub hevc_main10: Option<bool>,
+    pub mse_hevc_main10: Option<bool>,
 }
 
 impl Capabilities {
@@ -127,6 +131,8 @@ impl Capabilities {
             mse_video: set("mseVideo"),
             mse_audio: set("mseAudio"),
             direct_play_allowed: m["directPlay"].as_bool().unwrap_or(true),
+            hevc_main10: m["hevcMain10"].as_bool(),
+            mse_hevc_main10: m["mseHevcMain10"].as_bool(),
         }
     }
 }
@@ -243,7 +249,10 @@ pub fn plan(f: &MediaFile, caps: &Capabilities, q: Quality, requested_audio: i32
     let hbd = high_bit_depth_or_chroma(f);
     let bitrate_ok = q.video_bitrate == 0
         || (f.bitrate > 0 && f.bitrate as f64 <= q.video_bitrate as f64 * 1.1) && (q.max_height == 0 || f.height <= q.max_height);
-    let video_decodable = caps.video.contains(&video) && !(video == "h264" && hbd);
+    // Browsers that decode HEVC often do so only for 8 bits (Main); 10-bit files (HDR, most 4K)
+    // then fail in the decoder although "hevc" is supported.
+    let hevc10 = video == "hevc" && hbd;
+    let video_decodable = caps.video.contains(&video) && !(video == "h264" && hbd) && !(hevc10 && caps.hevc_main10 == Some(false));
     let audio_decodable = audio.is_none_or(|a| caps.audio.contains(&codec_kind(&a.codec)));
     let first_audio = audio_index <= 0;
     let container_ok = caps.containers.contains(&container_kind(f));
@@ -254,7 +263,11 @@ pub fn plan(f: &MediaFile, caps: &Capabilities, q: Quality, requested_audio: i32
         return Plan::new(Mode::Direct, audio_index, Text::new("playback.direct"));
     }
     // Video can be copied into HLS if the browser's MediaSource accepts it and nothing forces a re-encode.
-    let video_copyable = burn < 0 && bitrate_ok && caps.mse_video.contains(&video) && !(video == "h264" && hbd);
+    let video_copyable = burn < 0
+        && bitrate_ok
+        && caps.mse_video.contains(&video)
+        && !(video == "h264" && hbd)
+        && !(hevc10 && caps.mse_hevc_main10 == Some(false));
     let audio_out = audio_out(audio, caps);
     if video_copyable {
         if audio_out == AudioOut::Copy {
@@ -268,7 +281,7 @@ pub fn plan(f: &MediaFile, caps: &Capabilities, q: Quality, requested_audio: i32
     let (target, height) = transcode_targets(f, q);
     let reason = if burn >= 0 {
         Text::new("playback.burnSubtitles")
-    } else if !video_decodable {
+    } else if !video_decodable || (bitrate_ok && !video_copyable) {
         let extra = if hbd { format!(" {}", f.pixel_format) } else { String::new() };
         Text::new("playback.video").arg(format!("{}{extra}", f.video_codec.to_uppercase()))
     } else {
@@ -393,6 +406,30 @@ mod tests {
         assert_eq!(plan(&hevc, &c, quality("original"), 0, None, true).reason.key, "playback.video");
         assert_eq!(choose_audio(&f, 7), 1);
         assert_eq!(external(&f, 0).mode, Mode::Direct);
+    }
+
+    #[test]
+    fn ten_bit_hevc() {
+        let mut f = file();
+        f.video_codec = "hevc".into();
+        f.pixel_format = "yuv420p10le".into();
+        f.audio_streams = vec![AudioStream { codec: "eac3".into(), ..AudioStream::default() }];
+        let edge = |main10: bool| {
+            Capabilities::parse(&json!({"containers": ["mp4"], "video": ["h264", "hevc"], "audio": ["aac"], "mseVideo": ["h264", "hevc"],
+                                         "mseAudio": ["aac"], "hevcMain10": main10, "mseHevcMain10": main10}))
+        };
+        // Main10 decodes: the video is copied, only the sound converted.
+        assert_eq!(plan(&f, &edge(true), quality("original"), 0, None, true).mode, Mode::Audio);
+        // Only 8-bit HEVC: the whole title is converted.
+        assert_eq!(plan(&f, &edge(false), quality("original"), 0, None, true).mode, Mode::Transcode);
+        // Apps that do not say keep copying.
+        let app = Capabilities::parse(
+            &json!({"containers": ["mp4"], "video": ["hevc"], "audio": ["aac"], "mseVideo": ["hevc"], "mseAudio": ["aac"]}),
+        );
+        assert_eq!(plan(&f, &app, quality("original"), 0, None, true).mode, Mode::Audio);
+        // 8-bit HEVC is not affected.
+        f.pixel_format = "yuv420p".into();
+        assert_eq!(plan(&f, &edge(false), quality("original"), 0, None, true).mode, Mode::Audio);
     }
 
     #[test]

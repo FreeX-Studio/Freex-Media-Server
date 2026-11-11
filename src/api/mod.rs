@@ -84,6 +84,7 @@ pub fn router(app: Arc<AppState>) -> Router {
         .route("/api/transcode/{session}", delete(playback::stop_transcode))
         .route("/api/items/{id}/subtitles/{sid}", get(playback::subtitle))
         .route("/api/items/{id}/progress", put(playback::progress))
+        .route("/api/items/{id}/playback-error", post(playback::playback_error))
         .route("/api/items/{id}/watched", post(playback::watched).delete(playback::unwatched))
         .route("/api/me/history", get(playback::my_history).delete(playback::clear_history))
         .route("/api/me/history/{hid}", delete(playback::remove_history))
