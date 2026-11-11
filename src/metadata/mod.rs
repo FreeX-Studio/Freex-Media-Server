@@ -770,11 +770,9 @@ impl Service {
             let sv = self.season(tmdb, id, season.index, &mut seasons_cache).await?;
             if let Some(sv) = &sv {
                 let mut title = if season.index == 0 { "Specials".to_string() } else { s(sv, "name") };
-                let generic = title.split_once(' ').is_some_and(|(w, n)| {
-                    ["season", "staffel"].contains(&w.to_lowercase().as_str()) && n.bytes().all(|b| b.is_ascii_digit())
-                });
-                if generic {
-                    title = format!("Staffel {}", season.index);
+                // "Season 2" and the like are shown in each viewer's language (see View).
+                if title.is_empty() || crate::media::names::generic_season_title(&title, season.index) {
+                    title = crate::media::names::season_label(season.index, false);
                 }
                 let sm = Metadata {
                     tmdb_id: sv["id"].as_i64().unwrap_or(0),

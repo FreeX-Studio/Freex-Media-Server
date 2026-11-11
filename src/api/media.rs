@@ -45,11 +45,28 @@ pub(super) struct View<'a> {
     user: &'a User,
     progress: HashMap<String, Progress>,
     watchlist: HashSet<String>,
+    /// German default names ("Staffel 2"): the user's display language, or the server's content
+    /// language when the user follows the browser.
+    german: bool,
 }
 
 impl<'a> View<'a> {
     pub(super) fn new(app: &'a AppState, idx: &'a Index, user: &'a User) -> View<'a> {
-        View { app, idx, user, progress: app.db.progress_of(&user.id), watchlist: app.db.watchlist(&user.id).into_iter().collect() }
+        let german = match user.ui_language.as_str() {
+            "de" => true,
+            "" => app.config.tmdb.language.starts_with("de"),
+            _ => false,
+        };
+        View { app, idx, user, progress: app.db.progress_of(&user.id), watchlist: app.db.watchlist(&user.id).into_iter().collect(), german }
+    }
+
+    /// The title as this viewer sees it: default season names in their language.
+    pub(super) fn title_of(&self, it: &Item) -> String {
+        if it.kind == Kind::Season && crate::media::names::generic_season_title(&it.title, it.index) {
+            crate::media::names::season_label(it.index, self.german)
+        } else {
+            it.title.clone()
+        }
     }
 
     /// Whether the viewer may see an entry (library shared, age limit).
@@ -68,6 +85,9 @@ impl<'a> View<'a> {
     /// Item as JSON with watch state, show and season of episodes and episode counts.
     pub(super) fn decorate(&self, it: &Item, full: bool) -> Value {
         let mut m = it.to_public();
+        if it.kind == Kind::Season {
+            m["title"] = json!(self.title_of(it));
+        }
         m["artVersion"] = json!(art_version(self.idx, it));
         if !full && it.kind != Kind::Movie {
             m.as_object_mut().expect("object").remove("summary");

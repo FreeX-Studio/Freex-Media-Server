@@ -24,10 +24,14 @@ It is the core of **FreeX**, a family of apps around one server: the web client 
 there are apps for TVs, phones and tablets and the desktop (see [The FreeX family](#the-freex-family)).
 
 <p align="center">
-  <img src="docs/screenshots/library.png" alt="Movie library with poster grid" width="49%">
-  <img src="docs/screenshots/show.png" alt="Detail page of a TV show" width="49%">
+  <img src="docs/screenshots/home.png" alt="Home screen with Continue watching, Up next and Recently added" width="49%">
+  <img src="docs/screenshots/library.png" alt="Movie library as a poster grid with the A–Z bar" width="49%">
 </p>
-<p align="center"><sub>The titles and artwork in the screenshots are made up for the demo.</sub></p>
+<p align="center">
+  <img src="docs/screenshots/movie.png" alt="Detail page of a movie with cast, media info and resume" width="49%">
+  <img src="docs/screenshots/show.png" alt="Detail page of a TV show with its seasons" width="49%">
+</p>
+<p align="center"><sub>The movies, shows, people and artwork in the screenshots are made up for the demo.</sub></p>
 
 ## Highlights
 

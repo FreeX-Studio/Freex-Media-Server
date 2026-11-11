@@ -80,11 +80,11 @@ With a free API key from [themoviedb.org](https://www.themoviedb.org/settings/ap
 and descriptions, posters and backgrounds, episode titles and stills, cast with photos, directors and writers,
 studio or network, age ratings and trailers:
 
-```yaml
-tmdb:
-  apiKey: "your-key-or-read-access-token"
-  language: "de-DE"
-  region: "DE"
+```toml
+[tmdb]
+api_key = "your-key-or-read-access-token"
+language = "en-US"
+region = "US"
 ```
 
 After every scan, new or changed movies and shows are matched by title and year. The search also tries the title

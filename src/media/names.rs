@@ -241,6 +241,21 @@ pub fn sort_title(title: &str) -> String {
     lower
 }
 
+/// Whether a season title is only the default name ("Season 2", "Staffel 2"), shown in the viewer's
+/// language instead of as stored.
+pub fn generic_season_title(title: &str, index: i32) -> bool {
+    title.split_once(' ').is_some_and(|(w, n)| ["season", "staffel"].contains(&w.to_lowercase().as_str()) && n.parse() == Ok(index))
+}
+
+/// The default name of a season in English or German.
+pub fn season_label(index: i32, german: bool) -> String {
+    match (index, german) {
+        (0, _) => "Specials".to_string(),
+        (_, true) => format!("Staffel {index}"),
+        (_, false) => format!("Season {index}"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -248,6 +263,17 @@ mod tests {
     fn ty(s: &str) -> (String, i32) {
         let t = title_year(s);
         (t.title, t.year)
+    }
+
+    #[test]
+    fn season_names() {
+        assert!(generic_season_title("Staffel 2", 2));
+        assert!(generic_season_title("Season 2", 2));
+        assert!(!generic_season_title("Season 3", 2));
+        assert!(!generic_season_title("The Final Season", 2));
+        assert_eq!(season_label(2, true), "Staffel 2");
+        assert_eq!(season_label(2, false), "Season 2");
+        assert_eq!(season_label(0, true), "Specials");
     }
 
     #[test]

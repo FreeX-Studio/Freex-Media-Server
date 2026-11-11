@@ -556,7 +556,7 @@ impl Build {
             let mut s = Item::new(season_id.clone(), &self.library_id, Kind::Season);
             s.parent_id = Some(show_id.clone());
             s.index = season;
-            s.title = if season == 0 { "Specials".into() } else { format!("Staffel {season}") };
+            s.title = super::names::season_label(season, false);
             s.sort_title = format!("{season:04}");
             s.year = show_year;
             if folder_season >= 0 && show_dir.as_deref() != Some(dir) {

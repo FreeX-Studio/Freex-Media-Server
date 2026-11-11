@@ -54,6 +54,8 @@ static UNIQUE_TVDB: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"(?i)<uniqueid[^>]*type="tvdb"[^>]*>(\d+)</uniqueid>"#).expect("valid pattern"));
 static IMDB_ID: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^tt\d{7,9}$").expect("valid pattern"));
 static TAGS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<[^>]+>").expect("valid pattern"));
+/// Numeric character references: `&#39;`, `&#x27;`, `&#233;`.
+static NUMERIC: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"&#(?:x([0-9a-fA-F]{1,6})|([0-9]{1,7}));").expect("valid pattern"));
 
 /// Applies the values found in the file to the item; missing elements leave fields unchanged.
 pub fn apply(nfo: &Path, item: &mut Item) {
@@ -170,15 +172,17 @@ fn decode(s: &str) -> String {
     if let Some(inner) = r.strip_prefix("<![CDATA[").and_then(|x| x.strip_suffix("]]>")) {
         r = inner;
     }
-    TAGS.replace_all(r, "")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
-        .replace("&#39;", "'")
-        .replace("&amp;", "&")
-        .trim()
-        .to_string()
+    let text = TAGS.replace_all(r, "");
+    let text = NUMERIC.replace_all(&text, |c: &regex::Captures| {
+        let code = match (c.get(1), c.get(2)) {
+            (Some(hex), _) => u32::from_str_radix(hex.as_str(), 16).ok(),
+            (_, Some(dec)) => dec.as_str().parse().ok(),
+            _ => None,
+        };
+        code.and_then(char::from_u32).map_or_else(|| c[0].to_string(), |ch| ch.to_string())
+    });
+    // &amp; last, so "&amp;lt;" stays "&lt;" as written.
+    text.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'").replace("&amp;", "&").trim().to_string()
 }
 
 #[cfg(test)]
@@ -203,5 +207,14 @@ mod tests {
         assert_eq!(it.rating, 8.8);
         assert_eq!(it.tmdb_hint, 27205);
         assert_eq!(it.imdb_hint, "tt1375666");
+    }
+
+    #[test]
+    fn decodes_entities() {
+        assert_eq!(decode("The Cartographer&#x27;s Daughter"), "The Cartographer's Daughter");
+        assert_eq!(decode("Am&#233;lie &amp; Nino"), "Amélie & Nino");
+        assert_eq!(decode("&quot;Quoted&quot; &apos;it&#39;s&apos;"), "\"Quoted\" 'it's'");
+        assert_eq!(decode("&amp;lt;b&amp;gt;"), "&lt;b&gt;");
+        assert_eq!(decode("&#xD800; stays"), "&#xD800; stays");
     }
 }

@@ -179,7 +179,7 @@ impl<'a> Dto<'a> {
         let genres: Vec<&str> = it.genre_list().collect();
         let playable = it.kind.playable();
         let mut m = json!({
-            "Name": it.title,
+            "Name": self.view.title_of(it),
             "OriginalTitle": if it.original_title.is_empty() { Value::Null } else { json!(it.original_title) },
             "ServerId": self.server_id(),
             "Id": id,
@@ -271,7 +271,7 @@ impl<'a> Dto<'a> {
         {
             m["ParentIndexNumber"] = json!(season.index);
             m["SeasonId"] = json!(item_guid(&season.id));
-            m["SeasonName"] = json!(season.title);
+            m["SeasonName"] = json!(self.view.title_of(season));
         }
         if matches!(it.kind, Kind::Show | Kind::Season) {
             let (leaves, _) = self.view.count_leaves(it);

@@ -19,6 +19,12 @@
   nothing is found, with their first words (`The Continental Aus der Welt von John Wick` → `The Continental`), whose
   results need a close title or the right year. Show folders named like season packs (`Show.S01.German…`) no
   longer keep `S01` in the title. Entries without a match are searched again right after the update
+- **Season names in the viewer's language:** seasons without a name of their own are shown as "Season 2" or
+  "Staffel 2" by the display language of the user (or, when the user follows the browser, the server's metadata
+  language), in FreeX Web and the Jellyfin apps; before, they were always "Staffel 2"
+- **`.nfo` files:** numeric character references such as `&#x27;` and `&#233;` are decoded, so titles like *The
+  Cartographer's Daughter* no longer show `&#x27;`
+- **Screenshots** in the README show the current design with a made-up English demo library
 - **APT repository:** the Jenkins build can publish the Debian package to an APT repository of your own
   (reprepro, `packaging/apt/`, stage *Publish* when `APT_REPO` is set), so servers install and update FreeX with
   `apt`. Every build gets its own, increasing package version (`0.21.0+202611110746.git7ccb57a`). See
