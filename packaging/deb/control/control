@@ -6,7 +6,7 @@ Architecture: amd64
 Maintainer: Niklas Linz <niklas.linz@mirranet.de>
 Depends: ffmpeg, adduser, libc6 (>= 2.34)
 Suggests: intel-media-va-driver-non-free, mesa-va-drivers
-Homepage: https://github.com/FreeX-Studio/freex-media-server
+Homepage: https://github.com/FreeX-Studio/Freex-Media-Server
 Description: FreeX Media Server - Your Media. Your Server. Your Freedom.
  The FreeX server organises movie and TV show folders into libraries and
  streams them to the browser, with a web interface in the style of the

@@ -99,7 +99,7 @@ pub fn description(name: &str, udn: &str, version: &str) -> String {
     <modelDescription>FreeX Media Server</modelDescription>
     <modelName>FreeX Media Server</modelName>
     <modelNumber>{version}</modelNumber>
-    <modelURL>https://github.com/FreeX-Studio/freex-media-server</modelURL>
+    <modelURL>https://github.com/FreeX-Studio/Freex-Media-Server</modelURL>
     <serialNumber>{serial}</serialNumber>
     <UDN>{udn}</UDN>
     <sec:ProductCap>smi,DCM10,getMediaInfo.sec,getCaptionInfo.sec</sec:ProductCap>
