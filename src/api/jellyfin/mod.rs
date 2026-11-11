@@ -492,6 +492,15 @@ async fn route(cx: &Cx) -> Out {
 
         // ---------------------------------------------------------- playback files (own access)
         (_, ["videos", _, "hls", _, _]) if read => play::hls_file(cx).await,
+        // The file itself: a sign-in, or the PlaySessionId of the user's playback info.
+        (
+            _,
+            [
+                "videos",
+                _,
+                "stream" | "stream.mkv" | "stream.mp4" | "stream.m4v" | "stream.webm" | "stream.avi" | "stream.ts" | "stream.mov",
+            ],
+        ) if read => play::stream(cx, id(1)).await,
 
         // ---------------------------------------------------------- everything else needs a sign-in
         _ if cx.ctx.user.is_none() => Err(StatusCode::UNAUTHORIZED.into()),
@@ -546,14 +555,6 @@ async fn route(cx: &Cx) -> Out {
 
         // ---------------------------------------------------------- playback
         ("GET" | "POST", ["items", _, "playbackinfo"]) => play::playback_info(cx, id(1)),
-        (
-            _,
-            [
-                "videos",
-                _,
-                "stream" | "stream.mkv" | "stream.mp4" | "stream.m4v" | "stream.webm" | "stream.avi" | "stream.ts" | "stream.mov",
-            ],
-        ) if read => play::stream(cx, id(1)).await,
         (_, ["videos", _, "master.m3u8" | "main.m3u8"]) if read => play::hls_playlist(cx, id(1)).await,
         ("GET", ["videos", _, _, "subtitles", index, .., file]) if file.starts_with("stream.") => {
             play::subtitle(cx, id(1), id(2), index, file).await

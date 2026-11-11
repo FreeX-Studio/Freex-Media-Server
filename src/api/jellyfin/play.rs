@@ -57,6 +57,9 @@ pub struct Play {
     /// in the URL, so later requests of the same playback count for this app and device.
     client_id: String,
     device: String,
+    /// The access token the playback info was asked with: a request without a token that names
+    /// this playback counts for it while it is valid (see [`stream`]).
+    token: String,
 }
 
 // ====================================================================== device profile
@@ -315,6 +318,7 @@ pub fn playback_info(cx: &Cx, raw: &str) -> Out {
         created: now_ms(),
         client_id: cx.req.client.id(),
         device: cx.req.client.label(),
+        token: cx.token().to_string(),
     };
     {
         let mut plays = cx.jf().plays.lock().unwrap();
@@ -328,6 +332,25 @@ pub fn playback_info(cx: &Cx, raw: &str) -> Out {
         plays.insert(play_session.clone(), play);
     }
     json_out(json!({"MediaSources": [source], "PlaySessionId": play_session}))
+}
+
+/// The user of the playback named by the request's PlaySessionId, if it is one for this item and
+/// still valid, for requests that come without a token.
+fn play_user(cx: &Cx, raw: &str) -> Option<crate::db::User> {
+    let Some(Id::Item(item)) = parse_guid(raw) else { return None };
+    let source = cx.req.param("MediaSourceId").and_then(|s| match parse_guid(&s) {
+        Some(Id::Item(id)) => Some(id),
+        _ => None,
+    });
+    let play = cx.jf().plays.lock().unwrap().get(&cx.req.param("PlaySessionId")?).cloned()?;
+    let fresh = now_ms() - play.created < PLAY_TTL_MS;
+    let same = play.item_id == item || source.is_some_and(|s| s == play.item_id);
+    if !fresh || !same {
+        return None;
+    }
+    // The token it was given for must still be valid: signing the app out ends it at once.
+    let max_idle = i64::from(cx.app.config.security.session_days) * 86_400_000;
+    cx.app.db.user_for_token(&play.token, max_idle, &cx.ctx.ip).filter(|u| u.id == play.user_id && !play.token.is_empty())
 }
 
 fn play_of(cx: &Cx, id: Option<String>) -> Option<(String, Play)> {
@@ -353,7 +376,17 @@ fn object(v: Value) -> Map<String, Value> {
 
 /// `GET /Videos/{id}/stream`: the file as it is (direct play), with byte ranges.
 pub async fn stream(cx: &Cx, raw: &str) -> Out {
-    let u = cx.user()?;
+    // Some apps (Swiftfin 1.6) load the file without any token, as Jellyfin serves it to anyone.
+    // Here the PlaySessionId of a playback info stands in for it: random, given only to the
+    // signed-in user who asked for this title, and valid for a day.
+    let by_play;
+    let u = match cx.user() {
+        Ok(u) => u,
+        Err(e) => {
+            by_play = play_user(cx, raw).ok_or(e)?;
+            &by_play
+        }
+    };
     let fi = {
         let idx = cx.app.catalog.snapshot();
         let Some(Id::Item(id)) = parse_guid(raw) else { return Err(not_found()) };
@@ -391,6 +424,7 @@ pub async fn hls_playlist(cx: &Cx, raw: &str) -> Out {
                 created: now_ms(),
                 client_id: cx.req.client.id(),
                 device: cx.req.client.label(),
+                token: cx.token().to_string(),
             };
             (new_id(), play)
         }

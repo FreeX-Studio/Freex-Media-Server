@@ -81,6 +81,9 @@ playbacks in FreeX Web.
   (the `tag` the apps send back): only an app that got the entry from the server, signed in, can load its image.
   The key is kept in `<data>/jellyfin.key`.
 - **Conversion files** are reached through a grant in the address that is valid for one playback, as for Chromecast.
+- **The file itself** (direct play): some apps (Swiftfin 1.6) load it without a token, because Jellyfin serves it to
+  anyone. FreeX accepts such a request only with the `PlaySessionId` the app got from its playback info: random,
+  valid for that one title and a day, and only while the app's sign-in is valid (signing the app out ends it).
 - Library sharing, age limits, brute-force protection and session expiry apply exactly as for FreeX Web.
 - To the apps, accounts are never administrators: the server is managed in FreeX Web only.
 - The apps expect the server to call itself "Jellyfin Server" in its technical information; they refuse other

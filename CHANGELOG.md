@@ -19,6 +19,9 @@
   nothing is found, with their first words (`The Continental Aus der Welt von John Wick` → `The Continental`), whose
   results need a close title or the right year. Show folders named like season packs (`Show.S01.German…`) no
   longer keep `S01` in the title. Entries without a match are searched again right after the update
+- **Swiftfin 1.6 plays directly:** it loads the file without a token (Jellyfin serves it to anyone), which the
+  layer answered with 401. The file is now served for the `PlaySessionId` of the app's own playback info, for that
+  title, for a day and only while the app is signed in
 - **10-bit HEVC in the browser:** FreeX Web asks the browser for HEVC Main10 (HDR, most 4K) separately; browsers
   that decode HEVC only with 8 bits get such files converted instead of copied, which failed in the browser's
   decoder. If the browser still fails on copied video, the player switches to a full conversion by itself and
