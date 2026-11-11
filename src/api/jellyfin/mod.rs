@@ -376,6 +376,7 @@ pub async fn handle(
     if !app.config.jellyfin.enabled {
         return StatusCode::NOT_FOUND.into_response();
     }
+    let started = std::time::Instant::now();
     let path = uri.path().strip_prefix(BASE).unwrap_or("");
     let mut segs: Vec<String> = path.split('/').filter(|s| !s.is_empty()).map(percent_decode).collect();
     // Some apps put the old prefixes in front.
@@ -425,7 +426,10 @@ pub async fn handle(
     // Every request with its answer, for finding out what an app does (without the query, which
     // can hold the access token).
     let status = r.status();
-    let line = format!("{} /{} → {} ({})", cx.req.method, cx.req.segs.join("/"), status.as_u16(), cx.req.client.label());
+    // The time until the answer starts; a file is sent after that, as fast as the network takes it.
+    let ms = started.elapsed().as_millis();
+    let range = cx.req.headers.get(header::RANGE).and_then(|v| v.to_str().ok()).map(|r| format!(" {r}")).unwrap_or_default();
+    let line = format!("{} /{}{range} → {} in {ms} ms ({})", cx.req.method, cx.req.segs.join("/"), status.as_u16(), cx.req.client.label());
     if status.is_server_error() {
         tracing::warn!("Jellyfin layer: {line}");
     } else {

@@ -19,6 +19,8 @@
   nothing is found, with their first words (`The Continental Aus der Welt von John Wick` → `The Continental`), whose
   results need a close title or the right year. Show folders named like season packs (`Show.S01.German…`) no
   longer keep `S01` in the title. Entries without a match are searched again right after the update
+- **Jellyfin layer log:** each request is logged (at debug level) with the requested byte range and the time
+  until the answer starts, so a slow start can be told apart: server, disk or network
 - **Swiftfin 1.6 plays directly:** it loads the file without a token (Jellyfin serves it to anyone), which the
   layer answered with 401. The file is now served for the `PlaySessionId` of the app's own playback info, for that
   title, for a day and only while the app is signed in
