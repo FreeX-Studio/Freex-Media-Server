@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+- **FreeX apps by name:** signed-in devices, the sign-in history and the activity view show FreeX Mobile, FreeX TV
+  and FreeX Desktop with their version and platform (e.g. "FreeX Mobile 1.0.2 on Android") instead of the browser
+  engine they run on. FreeX Desktop needs version 1.1.1 or newer for this
 - **API for the FreeX TV apps:** CORS for apps whose pages have an origin of their own (FreeX TV on Samsung TVs and
   Fire TV), without credentials; from another origin, state-changing requests need the token header, sign-in a
   JSON body, and the first setup stays with the server's own pages. `POST /api/items/{id}/playback` takes

@@ -272,11 +272,18 @@ window.FreeX = (() => {
         // Jellyfin apps: the server records "Jellyfin app; <app> <version> (<device>)".
         const app = /^Jellyfin app; (.+)$/.exec(ua);
         if (app) return app[1];
-        const browser = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Firefox\//.test(ua) ? "Firefox"
-            : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : /curl|wget|python|java/i.test(ua) ? t("Script") : "Browser";
         const os = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android"
             : /Windows/.test(ua) ? "Windows" : /Mac OS X|Macintosh/.test(ua) ? "macOS" : /CrOS/.test(ua) ? "ChromeOS"
-                : /Linux/.test(ua) ? "Linux" : "";
+                : /Tizen|SMART-TV/.test(ua) ? "Samsung TV" : /Linux/.test(ua) ? "Linux" : "";
+        // The FreeX apps add their name and version to the browser engine they show their pages in.
+        const freex = /FreeX(Mobile|Desktop|TV)\/([\w.+-]+)/.exec(ua);
+        if (freex) {
+            const name = `FreeX ${freex[1] === "TV" ? "TV" : freex[1]} ${freex[2]}`;
+            const where = freex[1] === "TV" && /Android/.test(ua) ? (/AFT/.test(ua) ? "Fire TV" : "Android TV") : os;
+            return where ? t("{0} on {1}", name, where) : name;
+        }
+        const browser = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Firefox\//.test(ua) ? "Firefox"
+            : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : /curl|wget|python|java/i.test(ua) ? t("Script") : "Browser";
         return os ? t("{0} on {1}", browser, os) : browser;
     }
 
