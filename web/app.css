@@ -3761,6 +3761,14 @@ select, .field input, .inline input, .filter-field input {
     height: 88px;
 }
 
+/* The TMDB terms want their logo less prominent than the FreeX one (88 px above). */
+.tmdb-logo img {
+    display: block;
+    height: 36px;
+    width: auto;
+    margin-bottom: 8px;
+}
+
 .about-name {
     font-size: 34px;
     font-weight: 800;

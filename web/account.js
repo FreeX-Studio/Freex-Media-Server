@@ -1049,7 +1049,10 @@
             panel(t("Source code"), h("p", null, h("a", {href: "https://github.com/FreeX-Studio/Freex-Media-Server", target: "_blank", rel: "noopener"},
                 "github.com/FreeX-Studio/Freex-Media-Server"))),
             // Required by the TMDB API terms; the notice is given in English on purpose.
-            panel(t("Metadata"), h("p", null, t("Titles, descriptions and images come from {0}.", "The Movie Database (TMDB)")),
+            panel(t("Metadata"),
+                h("a", {href: "https://www.themoviedb.org/", target: "_blank", rel: "noopener", class: "tmdb-logo"},
+                    h("img", {src: "/tmdb.svg", alt: "The Movie Database (TMDB)"})),
+                h("p", null, t("Titles, descriptions and images come from {0}.", "The Movie Database (TMDB)")),
                 h("p", {class: "hint"}, "This product uses the TMDB API but is not endorsed or certified by TMDB."),
                 h("p", null, h("a", {href: "https://www.themoviedb.org/", target: "_blank", rel: "noopener"}, "themoviedb.org"))));
     }
