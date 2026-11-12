@@ -150,7 +150,7 @@ next episode is cast automatically.
 
 ## FreeX Desktop and mpv
 
-In the desktop app [FreeX Desktop](https://github.com/FreeX-Studio/freex-desktop) videos can play in mpv instead of the
+In the desktop app [FreeX Desktop](https://github.com/FreeX-Studio/Freex-Desktop) videos can play in mpv instead of the
 built-in player (*Settings → FreeX Desktop*). mpv decodes practically every format itself, so the file is always
 played directly and the server converts nothing. FreeX Web announces the playback with `"player": "external"`
 (it then appears in the activity view as *FreeX Desktop (mpv)*), hands the stream URL, the chosen audio track and
