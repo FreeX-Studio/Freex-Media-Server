@@ -164,7 +164,7 @@ Section "Install"
     WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayIcon" "$INSTDIR\freex.ico"
     WriteRegStr HKLM "${UNINSTALL_KEY}" "InstallLocation" "$INSTDIR"
     WriteRegStr HKLM "${UNINSTALL_KEY}" "UninstallString" '"$INSTDIR\uninstall.exe"'
-    WriteRegStr HKLM "${UNINSTALL_KEY}" "URLInfoAbout" "https://github.com/FreeX-Studio/freex-media-server"
+    WriteRegStr HKLM "${UNINSTALL_KEY}" "URLInfoAbout" "https://github.com/FreeX-Studio/Freex-Media-Server"
     WriteRegDWORD HKLM "${UNINSTALL_KEY}" "NoModify" 1
     WriteRegDWORD HKLM "${UNINSTALL_KEY}" "NoRepair" 1
 SectionEnd
