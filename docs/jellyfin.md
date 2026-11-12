@@ -19,7 +19,8 @@ The layer speaks the API that the apps call directly, so it works with apps that
 | Jellyfin for Android TV | Android TV, Google TV, Fire TV, NVIDIA Shield |
 | Findroid | Android phones and tablets, Android TV |
 | Swiftfin | iPhone, iPad, Apple TV |
-| Streamyfin, Fladder, Infuse and other apps with an interface of their own | various (not tested yet) |
+| Streamyfin | iPhone, iPad, Android (not tested yet) |
+| Fladder, Infuse and other apps with an interface of their own | various (not tested yet) |
 
 Apps that only show the Jellyfin web interface in a frame do **not** work: the official Jellyfin apps for Android
 phones and iOS, Jellyfin Media Player, and the Jellyfin apps for Samsung (Tizen) and LG (webOS) TVs. They load that
@@ -27,7 +28,8 @@ web interface from the server, which FreeX does not have. For Samsung and Fire T
 
 The layer was built from the requests these apps make (taken from their source code) and tested against the data
 models of the SDKs of Jellyfin for Android TV (Kotlin SDK 1.8) and Findroid (Kotlin SDK 1.9): every answer contains
-the fields and values these models require. Swiftfin uses the same API; it was not tested on a device yet.
+the fields and values these models require. Swiftfin (Swift SDK) was tested on an iPhone: sign-in with Quick Connect, browsing and
+playback work.
 
 ## Connecting an app
 

@@ -43,7 +43,7 @@ there are apps for TVs, phones and tablets and the desktop (see [The FreeX famil
   `.nfo` files and local artwork
 - **Skip intro and credits** – detected automatically from the audio, with a *Next episode* countdown
 - **Chromecast** – cast from Chrome, with the browser as remote control
-- **Jellyfin apps** – optionally, native apps made for Jellyfin (Android TV and Fire TV, Findroid, Swiftfin) can use
+- **Jellyfin apps** – optionally, native apps made for Jellyfin (Android TV and Fire TV, Findroid, Swiftfin, Streamyfin) can use
   your server, with Quick Connect sign-in
 - **DLNA** – optionally, smart TVs, consoles and players in the home network find your server on their own
 - **Watch Together** – watch in sync with other users of your server
@@ -71,8 +71,26 @@ whatever a device cannot decode.
 | **FreeX Mobile** | iPhone and iPad (iOS 15+, AVPlayer, AirPlay, picture in picture) and Android phones and tablets (Android 7+, ExoPlayer); a player made for touch | [FreeX-Studio/FreeX-Mobile](https://github.com/FreeX-Studio/FreeX-Mobile) |
 | **FreeX Desktop** | Windows and Linux app with FreeX Web in its own window; plays every file directly with mpv, several servers, media keys, tray icon | [FreeX-Studio/freex-desktop](https://github.com/FreeX-Studio/freex-desktop) |
 
-Devices without a FreeX app can still play from the server: optionally through native
-[Jellyfin apps](docs/jellyfin.md) or as a [DLNA](docs/dlna.md) server in the home network.
+### Jellyfin apps
+
+With the optional Jellyfin layer switched on, native apps made for Jellyfin can use your FreeX server as well, with
+the same account, libraries and watch state. That way you can, for example, use **Swiftfin** or **Streamyfin** on
+iPhone, iPad and Apple TV, **Findroid** on Android, or **Jellyfin for Android TV** on TVs and streaming sticks.
+
+| App | Platforms | Status |
+|---|---|---|
+| Swiftfin | iPhone, iPad, Apple TV | tested on a device |
+| Streamyfin | iPhone, iPad, Android | not tested yet |
+| Findroid | Android phones and tablets, Android TV | tested against its SDK |
+| Jellyfin for Android TV | Android TV, Google TV, Fire TV, NVIDIA Shield | tested against its SDK |
+
+**Requirement:** the Jellyfin layer is off by default. Switch it on under *Settings → Server → Jellyfin apps* (or
+`[jellyfin] enabled = true` in the configuration), then sign in from the app with Quick Connect. Apps that only show
+the Jellyfin web interface (the official Jellyfin apps for phones, Samsung and LG TVs) do not work. Setup, sign-in and
+limits are described in [Jellyfin apps](docs/jellyfin.md).
+
+Devices without a FreeX or Jellyfin app can still play from the server as a [DLNA](docs/dlna.md) server in the home
+network.
 
 Server and web client are versioned separately: the server uses the version in `Cargo.toml` (e.g. `0.21.0`),
 FreeX Web the version in [`web/version.json`](web/version.json) (e.g. `1.6.0.0`). Both are shown under
