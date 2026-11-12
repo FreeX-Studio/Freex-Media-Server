@@ -1,4 +1,4 @@
-<p><img src="brand/freex-logo.svg" alt="FreeX" width="56"></p>
+<p><img src="docs/brand/freex-logo.svg" alt="FreeX" width="56"></p>
 
 # Security
 
