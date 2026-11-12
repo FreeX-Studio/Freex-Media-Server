@@ -87,7 +87,7 @@ iPhone, iPad and Apple TV, **Findroid** on Android, or **Jellyfin for Android TV
 | App | Platforms | Status |
 |---|---|---|
 | Swiftfin | iPhone, iPad, Apple TV | tested on a device |
-| Streamyfin | iPhone, iPad, Android | not tested yet |
+| Streamyfin | iPhone, iPad, Android | tested on a device |
 | Findroid | Android phones and tablets, Android TV | tested against its SDK |
 | Jellyfin for Android TV | Android TV, Google TV, Fire TV, NVIDIA Shield | tested against its SDK |
 
