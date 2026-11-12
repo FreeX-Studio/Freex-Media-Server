@@ -290,6 +290,20 @@ pub fn playback_info(cx: &Cx, raw: &str) -> Out {
     if let Some(i) = r.int("AudioStreamIndex") {
         source["DefaultAudioStreamIndex"] = json!(i);
     }
+    // Playing the file itself, a player that reads subtitles from it (mpv, VLC, ExoPlayer) takes
+    // the embedded ones from there, as from Jellyfin: no extraction on the server, which for a large
+    // file means reading all of it before the player can start.
+    if direct && let Some(streams) = source["MediaStreams"].as_array_mut() {
+        for s in streams.iter_mut().filter(|s| s["Type"] == "Subtitle" && s["IsExternal"] == false) {
+            if s["Codec"].as_str().is_some_and(|c| embeds_subtitle(profile, c)) {
+                s["DeliveryMethod"] = json!("Embed");
+                if let Some(o) = s.as_object_mut() {
+                    o.remove("DeliveryUrl");
+                    o.remove("IsExternalUrl");
+                }
+            }
+        }
+    }
     if !direct {
         let url = format!("/videos/{item_id}/master.m3u8?PlaySessionId={play_session}&MediaSourceId={}&ApiKey={token}", item_guid(&fi.id));
         source["TranscodingUrl"] = json!(url);

@@ -19,6 +19,10 @@
   nothing is found, with their first words (`The Continental Aus der Welt von John Wick` → `The Continental`), whose
   results need a close title or the right year. Show folders named like season packs (`Show.S01.German…`) no
   longer keep `S01` in the title. Entries without a match are searched again right after the update
+- **Jellyfin apps start faster with subtitles:** when the app plays the file itself, subtitles inside the file are
+  offered as embedded (as Jellyfin does) to players that read them from the file (mpv, VLC, ExoPlayer), instead of
+  as a separate file the server first has to extract, which for a large file meant reading all of it before the
+  player started
 - **Jellyfin layer log:** each request is logged (at debug level) with the requested byte range and the time
   until the answer starts, so a slow start can be told apart: server, disk or network
 - **Swiftfin 1.6 plays directly:** it loads the file without a token (Jellyfin serves it to anyone), which the
