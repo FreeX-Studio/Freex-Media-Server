@@ -102,6 +102,11 @@ Run `freex-media-server-<version>-setup.exe` (Windows 10 or 11, 64-bit). It brin
 - allows it in the Windows firewall for private and domain networks,
 - adds *FreeX* (opens the web interface) and *Configuration and logs* to the start menu.
 
+> **Windows SmartScreen:** the installer is not code-signed, so Windows may show *Windows protected your PC*
+> when you start it. Click *More info* and then *Run anyway*. If your browser blocks the download, keep it from the
+> download list. You can check the file against `SHA256SUMS` from the same build first
+> (`Get-FileHash freex-media-server-<version>-setup.exe` in PowerShell).
+
 At the end the installer opens the web interface; create the admin account there. If other devices cannot reach
 the server, check that Windows treats your network as *private*.
 

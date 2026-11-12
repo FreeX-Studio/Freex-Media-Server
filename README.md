@@ -124,6 +124,11 @@ runs as the user `freex`, which needs read access to your media, for example
 Run `freex-media-server-<version>-setup.exe`. It brings ffmpeg along, sets up a Windows service and opens the web
 interface when it is done.
 
+> **Windows SmartScreen:** the installer is not code-signed, so Windows may show *Windows protected your PC*
+> when you start it. Click *More info* and then *Run anyway*. If your browser blocks the download, keep it from the
+> download list. You can check the file against `SHA256SUMS` from the same build first
+> (`Get-FileHash freex-media-server-<version>-setup.exe` in PowerShell).
+
 ### Any Linux or Windows system
 
 Unpack the archive of a release (or build with `cargo build --release`) and start the program:
