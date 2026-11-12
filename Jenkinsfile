@@ -28,6 +28,10 @@
 // repository on the build machine (for example /var/www/apt, set under Manage Jenkins → System →
 // Global properties), the Publish stage adds the .deb to it, in the suite APT_SUITE (default
 // "stable"). Builds of other branches than main are not published. See docs/apt-repository.md.
+//
+// TMDB key: when the environment variable FREEX_TMDB_KEY is set (Manage Jenkins → System →
+// Global properties, like APT_REPO), it is built into the programs and used by servers whose
+// tmdb.api_key is empty. Builds without it need a key in the configuration as before.
 
 pipeline {
     agent any

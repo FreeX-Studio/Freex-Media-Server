@@ -140,8 +140,12 @@ fn run(config_path: PathBuf) -> Result<Outcome, String> {
         let api = std::env::var("FREEX_TMDB_API").unwrap_or_else(|_| "https://api.themoviedb.org/3".into());
         let images = std::env::var("FREEX_TMDB_IMAGES").unwrap_or_else(|_| "https://image.tmdb.org/t/p".into());
         let tvmaze_api = std::env::var("FREEX_TVMAZE_API").unwrap_or_else(|_| "https://api.tvmaze.com".into());
-        let key = t.api_key.trim();
-        let tmdb = (!key.is_empty()).then(|| metadata::tmdb::Tmdb::new(&api, &images, key, &t.language));
+        let tmdb = t.key().map(|(key, builtin)| {
+            if builtin {
+                tracing::info!("TMDB: using the key built into this server (tmdb.api_key is empty)");
+            }
+            metadata::tmdb::Tmdb::new(&api, &images, key, &t.language)
+        });
         if tmdb.is_none() {
             tracing::info!("No TMDB key set (tmdb.api_key): only local .nfo files and artwork are used");
         }

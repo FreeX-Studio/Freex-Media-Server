@@ -39,7 +39,7 @@ TMDB key is never sent to the browser.
 | `[security]` `min_password_length` | `10` | Minimum length of new passwords |
 | `[ffmpeg]` `ffprobe` | `ffprobe` | ffprobe: a name on the PATH or a full path; an `ffmpeg` folder next to the server program is tried first |
 | `[ffmpeg]` `ffmpeg` | `ffmpeg` | ffmpeg, likewise |
-| `[tmdb]` `api_key` | empty | TMDB API key (v3) or read access token (v4); empty = local metadata only |
+| `[tmdb]` `api_key` | empty | TMDB API key (v3) or read access token (v4); empty = the key built into the server (release builds), without one local metadata only |
 | `[tmdb]` `language` | `de-DE` | Language of titles and descriptions (English where no translation exists) |
 | `[tmdb]` `region` | `DE` | Country for age ratings |
 | `[tmdb]` `tvmaze` | `true` | Ask TVmaze (free, no key) for shows the TMDB search does not find |

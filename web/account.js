@@ -1047,7 +1047,11 @@
                     app ? kv(`${app.app} (${t(app.os === "linux" ? "Linux app" : "Windows app")})`, app.version) : null,
                     kv(t("Server name"), st.name))),
             panel(t("Source code"), h("p", null, h("a", {href: "https://github.com/FreeX-Studio/Freex-Media-Server", target: "_blank", rel: "noopener"},
-                "github.com/FreeX-Studio/Freex-Media-Server"))));
+                "github.com/FreeX-Studio/Freex-Media-Server"))),
+            // Required by the TMDB API terms; the notice is given in English on purpose.
+            panel(t("Metadata"), h("p", null, t("Titles, descriptions and images come from {0}.", "The Movie Database (TMDB)")),
+                h("p", {class: "hint"}, "This product uses the TMDB API but is not endorsed or certified by TMDB."),
+                h("p", null, h("a", {href: "https://www.themoviedb.org/", target: "_blank", rel: "noopener"}, "themoviedb.org"))));
     }
 
     // ------------------------------------------------------------------ server settings
@@ -1068,7 +1072,7 @@
             ["security.sessionDays", "Sign-in stays valid (days without use)"],
             ["security.minPasswordLength", "Minimum length of new passwords"]]],
         ["Metadata", [
-            ["tmdb.apiKey", "TMDB key", "API key (v3) or read access token (v4) from themoviedb.org. Without a key only local .nfo files and images are used."],
+            ["tmdb.apiKey", "TMDB key", "API key (v3) or read access token (v4) from themoviedb.org. Empty = the key built into this server, if it has one. Without any key only local .nfo files and images are used."],
             ["tmdb.language", "Language", "For titles and descriptions, e.g. en-US or de-DE"],
             ["tmdb.region", "Country for age ratings", "e.g. US or DE"],
             ["tmdb.tvmaze", "Ask TVmaze for shows TMDB does not find", "Free, needs no key."],

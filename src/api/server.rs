@@ -44,6 +44,7 @@ pub async fn status(State(app): State<Arc<AppState>>, Extension(ctx): Extension<
             m["transcoder"] = json!(app.transcoder.is_some());
             m["activeTranscodes"] = json!(app.transcoder.as_ref().map_or(0, |t| t.active_sessions()));
             m["playing"] = json!(app.activity.count());
+            m["tmdbBuiltinKey"] = json!(crate::config::BUILTIN_TMDB_KEY.is_some());
         }
     }
     ok(m)

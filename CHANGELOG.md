@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+- **Built-in TMDB key:** release builds can carry a TMDB key (environment variable `FREEX_TMDB_KEY` at build time,
+  set in Jenkins); servers whose `tmdb.api_key` is empty use it, a key of their own still takes precedence. The
+  *About* page names TMDB as the source of the metadata, as the TMDB API terms require
 - **FreeX apps by name:** signed-in devices, the sign-in history and the activity view show FreeX Mobile, FreeX TV
   and FreeX Desktop with their version and platform (e.g. "FreeX Mobile 1.0.2 on Android") instead of the browser
   engine they run on. FreeX Desktop needs version 1.1.1 or newer for this

@@ -172,6 +172,21 @@ pub struct TmdbConfig {
     pub tvmaze: bool,
 }
 
+/// TMDB key built into this program: the environment variable `FREEX_TMDB_KEY` at build time
+/// (set by the release builds); `None` for builds without it.
+pub const BUILTIN_TMDB_KEY: Option<&str> = match option_env!("FREEX_TMDB_KEY") {
+    Some(k) if !k.is_empty() => Some(k),
+    _ => None,
+};
+
+impl TmdbConfig {
+    /// The key to use: the configured one, else the built-in one. The flag says which.
+    pub fn key(&self) -> Option<(&str, bool)> {
+        let own = self.api_key.trim();
+        if !own.is_empty() { Some((own, false)) } else { BUILTIN_TMDB_KEY.map(|k| (k.trim(), true)) }
+    }
+}
+
 impl Default for TmdbConfig {
     fn default() -> Self {
         TmdbConfig { api_key: String::new(), language: "de-DE".into(), region: "DE".into(), tvmaze: true }
