@@ -71,6 +71,13 @@ whatever a device cannot decode.
 | **FreeX Mobile** | iPhone and iPad (iOS 15+, AVPlayer, AirPlay, picture in picture) and Android phones and tablets (Android 7+, ExoPlayer); a player made for touch | [FreeX-Studio/FreeX-Mobile](https://github.com/FreeX-Studio/FreeX-Mobile) |
 | **FreeX Desktop** | Windows and Linux app with FreeX Web in its own window; plays every file directly with mpv, several servers, media keys, tray icon | [FreeX-Studio/freex-desktop](https://github.com/FreeX-Studio/freex-desktop) |
 
+> **Note on iOS and Samsung TVs:** FreeX Mobile for iPhone and iPad and FreeX TV for Samsung TVs are not in the
+> App Store or the Samsung app store; they can only be installed by sideloading (Xcode or a signing service on iOS,
+> the TV's developer mode on Samsung). On iPhone, iPad and Apple TV the recommended way is therefore the
+> [Jellyfin layer](#jellyfin-apps) with Swiftfin or Streamyfin from the App Store. Samsung TVs have no native
+> Jellyfin app that works with FreeX (the Jellyfin app for Tizen only shows the Jellyfin web interface); there,
+> the [DLNA](docs/dlna.md) server is the way without sideloading.
+
 ### Jellyfin apps
 
 With the optional Jellyfin layer switched on, native apps made for Jellyfin can use your FreeX server as well, with
