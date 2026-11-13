@@ -21,7 +21,8 @@ browser, converting on the fly when a device cannot play a file. No account with
 telemetry: your media stays on your hardware.
 
 It is the core of **FreeX**, a family of apps around one server: the web client **FreeX Web** is built in, and
-there are apps for TVs, phones and tablets and the desktop and an add-on for Kodi (see [The FreeX family](#the-freex-family)).
+there are apps for TVs, phones and tablets and the desktop and an add-on for Kodi
+(see [The FreeX family](#the-freex-family)).
 
 <p align="center">
   <img src="docs/screenshots/home.png" alt="Home screen with Continue watching, Up next and Recently added" width="49%">
