@@ -21,7 +21,7 @@ browser, converting on the fly when a device cannot play a file. No account with
 telemetry: your media stays on your hardware.
 
 It is the core of **FreeX**, a family of apps around one server: the web client **FreeX Web** is built in, and
-there are apps for TVs, phones and tablets and the desktop (see [The FreeX family](#the-freex-family)).
+there are apps for TVs, phones and tablets and the desktop and an add-on for Kodi (see [The FreeX family](#the-freex-family)).
 
 <p align="center">
   <img src="docs/screenshots/home.png" alt="Home screen with Continue watching, Up next and Recently added" width="49%">
@@ -70,6 +70,7 @@ whatever a device cannot decode.
 | **FreeX TV** | Samsung Smart TVs (Tizen 4.0+, models from 2018) with the TV's own player; Fire TV and Android TV with ExoPlayer. A home screen and player made for the remote | [FreeX-Studio/FreeX-TV-Apps](https://github.com/FreeX-Studio/FreeX-TV-Apps) |
 | **FreeX Mobile** | iPhone and iPad (iOS 15+, AVPlayer, AirPlay, picture in picture) and Android phones and tablets (Android 7+, ExoPlayer); a player made for touch | [FreeX-Studio/FreeX-Mobile](https://github.com/FreeX-Studio/FreeX-Mobile) |
 | **FreeX Desktop** | Windows and Linux app with FreeX Web in its own window; plays every file directly with mpv, several servers, media keys, tray icon | [FreeX-Studio/Freex-Desktop](https://github.com/FreeX-Studio/Freex-Desktop) |
+| **FreeX for Kodi** | Kodi add-on (Kodi 20+ on every platform, also LibreELEC, CoreELEC, Raspberry Pi): your libraries like a Kodi library, Kodi's own player plays almost every file directly, skip intro and Up Next | [FreeX-Studio/FreeX-Kodi-Addon](https://github.com/FreeX-Studio/FreeX-Kodi-Addon) |
 
 > **Note on iOS and Samsung TVs:** FreeX Mobile for iPhone and iPad and FreeX TV for Samsung TVs are not in the
 > App Store or the Samsung app store; they can only be installed by sideloading (Xcode or a signing service on iOS,
