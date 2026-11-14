@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+- **APT repository on another machine:** with `APT_HOST` (user@host) set in Jenkins, the *Publish* stage copies
+  the package there by SSH and runs reprepro on that machine, so the repository and its signing key can live on a
+  VM of their own
 - **Built-in TMDB key:** release builds can carry a TMDB key (environment variable `FREEX_TMDB_KEY` at build time,
   set in Jenkins); servers whose `tmdb.api_key` is empty use it, a key of their own still takes precedence. The
   *About* page names TMDB as the source of the metadata, as the TMDB API terms require

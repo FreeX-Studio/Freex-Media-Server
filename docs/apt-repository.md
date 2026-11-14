@@ -9,7 +9,9 @@ build ([Jenkinsfile](../Jenkinsfile), stage *Publish*). One suite serves Debian 
 later alike.
 
 This page describes a repository on the machine that runs Jenkins, at `/var/www/apt`, published as
-`https://apt.mirranet.de`. Replace the address with your own.
+`https://apt.mirranet.de`. Replace the address with your own. The repository can also live on another machine (a
+VM of its own, say); Jenkins then hands the packages over by SSH, see
+[Repository on another machine](#repository-on-another-machine).
 
 ## Setting up the repository (once)
 
@@ -84,6 +86,48 @@ To add a package by hand:
 ```sh
 sudo -u jenkins packaging/apt/publish.sh /var/www/apt stable dist/freex-media-server_*_amd64.deb
 ```
+
+## Repository on another machine
+
+The repository, its signing key and the web server can be on a machine other than the one that runs Jenkins. The
+build then copies the package and `publish.sh` there by SSH and runs reprepro on that machine; the signing key
+never leaves it. Jenkins only needs the `ssh` and `scp` commands.
+
+**On the repository machine**, create a user of its own for the repository, for example `aptrepo`:
+
+```sh
+sudo adduser --system --group --home /var/lib/aptrepo --shell /bin/bash aptrepo
+```
+
+Then follow steps 1 to 4 above on this machine, with `aptrepo` in place of `jenkins` (`-o aptrepo -g aptrepo`,
+`sudo -u aptrepo …`), so the directory, the key and the configuration belong to that user.
+
+**SSH from Jenkins:** give the Jenkins user a key (skip the first command if it already has one) and allow it for
+`aptrepo`:
+
+```sh
+# on the Jenkins machine
+sudo -u jenkins sh -c 'test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519'
+sudo -u jenkins cat ~jenkins/.ssh/id_ed25519.pub
+
+# on the repository machine, with the line printed above
+sudo install -d -o aptrepo -g aptrepo -m 700 /var/lib/aptrepo/.ssh
+echo 'ssh-ed25519 AAAA… jenkins@…' | sudo -u aptrepo tee -a /var/lib/aptrepo/.ssh/authorized_keys
+
+# on the Jenkins machine: connect once to accept the host key; it has to print "ok"
+sudo -u jenkins ssh aptrepo@<repository-machine> echo ok
+```
+
+**In Jenkins**, set the environment variables as in step 5, plus the address:
+
+| Name | Value |
+|---|---|
+| `APT_HOST` | `aptrepo@<repository-machine>` |
+| `APT_REPO` | `/var/www/apt` (the directory on the repository machine) |
+| `APT_SUITE` | `stable` (optional, the default) |
+
+A failed upload or reprepro error fails the build, and the temporary files on the repository machine are removed
+either way.
 
 ## Package versions
 
