@@ -68,14 +68,14 @@ whatever a device cannot decode.
 |---|---|---|
 | **FreeX Media Server** | The core: libraries, users, streaming, conversion and the API; Linux and Windows | this repository |
 | **FreeX Web** | Web interface for every modern browser, built into the server | this repository (`web/`) |
-| **FreeX TV** | Samsung Smart TVs (Tizen 4.0+, models from 2018) with the TV's own player; Fire TV and Android TV with ExoPlayer. A home screen and player made for the remote | [FreeX-Studio/FreeX-TV-Apps](https://github.com/FreeX-Studio/FreeX-TV-Apps) |
+| **FreeX TV** | Samsung Smart TVs (Tizen 4.0+, models from 2018) with the TV's own player; LG TVs (webOS 5+, models from 2020) with the TV's media pipeline; Fire TV and Android TV with ExoPlayer. A home screen and player made for the remote | [FreeX-Studio/FreeX-TV-Apps](https://github.com/FreeX-Studio/FreeX-TV-Apps) |
 | **FreeX Mobile** | iPhone and iPad (iOS 15+, AVPlayer, AirPlay, picture in picture) and Android phones and tablets (Android 7+, ExoPlayer); a player made for touch | [FreeX-Studio/FreeX-Mobile](https://github.com/FreeX-Studio/FreeX-Mobile) |
 | **FreeX Desktop** | Windows and Linux app with FreeX Web in its own window; plays every file directly with mpv, several servers, media keys, tray icon | [FreeX-Studio/Freex-Desktop](https://github.com/FreeX-Studio/Freex-Desktop) |
 | **FreeX for Kodi** | Kodi add-on (Kodi 20+ on every platform, also LibreELEC, CoreELEC, Raspberry Pi): your libraries like a Kodi library, Kodi's own player plays almost every file directly, skip intro and Up Next | [FreeX-Studio/FreeX-Kodi-Addon](https://github.com/FreeX-Studio/FreeX-Kodi-Addon) |
 
-> **Note on iOS and Samsung TVs:** FreeX Mobile for iPhone and iPad and FreeX TV for Samsung TVs are not in the
-> App Store or the Samsung app store; they can only be installed by sideloading (Xcode or a signing service on iOS,
-> the TV's developer mode on Samsung). On iPhone, iPad and Apple TV the recommended way is therefore the
+> **Note on iOS, Samsung and LG TVs:** FreeX Mobile for iPhone and iPad and FreeX TV for Samsung and LG TVs are not
+> in the App Store or the TV makers' app stores; they can only be installed by sideloading (Xcode or a signing service
+> on iOS, the TV's developer mode on Samsung and LG). On iPhone, iPad and Apple TV the recommended way is therefore the
 > [Jellyfin layer](#jellyfin-apps) with Swiftfin or Streamyfin from the App Store. Samsung TVs have no native
 > Jellyfin app that works with FreeX (the Jellyfin app for Tizen only shows the Jellyfin web interface); there,
 > the [DLNA](docs/dlna.md) server is the way without sideloading.

@@ -12,7 +12,7 @@ sign-in cookie is only accepted for `GET` requests (images, video, subtitles), s
 actions on behalf of a signed-in user. Requests that change state must also come from the server's own origin or
 without an `Origin` header (native apps).
 
-Apps whose pages have an origin of their own (FreeX TV on Samsung TVs and Fire TV) may call the API across origins:
+Apps whose pages have an origin of their own (FreeX TV on Samsung and LG TVs and Fire TV) may call the API across origins:
 the server answers CORS preflights and lets any origin read API answers, but never with credentials, so the cookie
 does not count there. From another origin, state-changing requests are accepted when they carry the token in
 `X-FreeX-Token` (or `Authorization: Bearer`), and `POST /api/login` and `/api/login/verify` with a JSON body;

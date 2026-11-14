@@ -24,7 +24,7 @@ The layer speaks the API that the apps call directly, so it works with apps that
 
 Apps that only show the Jellyfin web interface in a frame do **not** work: the official Jellyfin apps for Android
 phones and iOS, Jellyfin Media Player, and the Jellyfin apps for Samsung (Tizen) and LG (webOS) TVs. They load that
-web interface from the server, which FreeX does not have. For Samsung and Fire TV there are the FreeX TV apps.
+web interface from the server, which FreeX does not have. For Samsung, LG and Fire TV there are the FreeX TV apps.
 
 The layer was built from the requests these apps make (taken from their source code) and tested against the data
 models of the SDKs of Jellyfin for Android TV (Kotlin SDK 1.8) and Findroid (Kotlin SDK 1.9): every answer contains
