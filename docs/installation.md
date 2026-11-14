@@ -21,8 +21,8 @@ plain archives work on any other Linux.
 
 ## Debian / Ubuntu package
 
-From the APT repository, if one is set up ([APT repository](apt-repository.md)); updates then come with
-`apt upgrade`:
+From the MirraNET APT repository at `apt.mirranet.de`; updates then come with `apt upgrade`. The first two commands
+import the repository's signing key (`https://apt.mirranet.de/mirranet.gpg`), with which APT checks every package:
 
 ```bash
 sudo install -d /etc/apt/keyrings

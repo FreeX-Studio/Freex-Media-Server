@@ -109,13 +109,23 @@ FreeX Web the version in [`web/version.json`](web/version.json) (e.g. `1.6.0.0`)
 
 ### Debian / Ubuntu
 
-Add the APT repository (see [APT repository](docs/apt-repository.md)) and install with
-`sudo apt install freex-media-server`, or take the package from a release or your CI (or build it, see
-[Development](docs/development.md)) and install it; ffmpeg comes in as a dependency:
+Install from the MirraNET APT repository at `apt.mirranet.de` (Debian 12+, Ubuntu 22.04+). First import its signing
+key, then add the repository and install; ffmpeg comes in as a dependency, and every new build arrives with
+`sudo apt upgrade`:
 
 ```bash
-sudo apt install ./freex-media-server_<version>_amd64.deb
+# Signing key of the repository
+sudo install -d /etc/apt/keyrings
+sudo curl -fsSL https://apt.mirranet.de/mirranet.gpg -o /etc/apt/keyrings/mirranet.gpg
+
+# Repository and package
+echo "deb [signed-by=/etc/apt/keyrings/mirranet.gpg] https://apt.mirranet.de stable main" \
+    | sudo tee /etc/apt/sources.list.d/mirranet.list
+sudo apt update && sudo apt install freex-media-server
 ```
+
+Without the repository, install a package file from a release or your CI (or build it, see
+[Development](docs/development.md)) with `sudo apt install ./freex-media-server_<version>_amd64.deb`.
 
 Open `http://<your-server>:32500/`, create the admin account and add your movie and TV show folders. The service
 runs as the user `freex`, which needs read access to your media, for example
