@@ -131,8 +131,8 @@
         ["server", "Server", true],
         ["webhooks", "Webhooks", true],
         ["log", "Log", true],
-        // Only inside the desktop app (see desktop.js).
-        ...(M.desktop ? [["desktop", "FreeX Desktop", false]] : []),
+        // Only inside the desktop app (see desktop.js): what is set for this PC, stored in the app.
+        ...(M.desktop ? [["desktop", "Client options", false]] : []),
         ["about", "About FreeX", false],
     ];
 

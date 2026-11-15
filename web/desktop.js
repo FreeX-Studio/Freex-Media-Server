@@ -11,13 +11,17 @@
  */
 
 /*
- * FreeX Web, FreeX Desktop part: only active when FreeX Web runs inside the desktop app for Windows
- * and Linux (github.com/FreeX-Studio/Freex-Desktop), which loads it straight from the server and gives its pages
+ * FreeX Web, FreeX Desktop part: only active when FreeX Web runs inside the desktop app for Windows,
+ * Linux and macOS (github.com/FreeX-Studio/Freex-Desktop), which loads it straight from the server and gives its pages
  * a few app commands. In a browser this file does nothing and M.desktop stays undefined.
  *
  * The app adds: switching to another server, real full screen for the player, playback in
  * mpv. With mpv every file plays directly (no conversion on the server); the position comes back
  * from the app as events and is saved here, just as the built-in player does.
+ *
+ * Settings → Client options shows what belongs to this PC: switching to the app's TV mode, the
+ * player, the server. These are stored in the app, not on the server; "All client options" opens
+ * the app's own settings window (start in TV mode at login and more).
  */
 (() => {
     "use strict";
@@ -44,6 +48,16 @@
         invoke("show_servers").catch((e) => M.toast(String(e), true));
     }
 
+    /** Switches the app to its TV mode (FreeX Web closes, the TV interface opens). */
+    function tvMode() {
+        invoke("tv_enter").catch((e) => M.toast(String(e), true));
+    }
+
+    /** The app's own settings window (stored in the app on this PC). */
+    function clientOptions() {
+        invoke("settings_open").catch((e) => M.toast(String(e), true));
+    }
+
     // The page's full screen (player) also makes the window full screen.
     document.addEventListener("fullscreenchange", () => {
         const win = tauri.window && tauri.window.getCurrentWindow && tauri.window.getCurrentWindow();
@@ -54,7 +68,7 @@
 
     async function settingsPage(c) {
         const i = await info(true);
-        if (!i) return c.append(h("h1", null, "FreeX Desktop"));
+        if (!i) return c.append(h("h1", null, t("Client options")));
         const player = h("select", {id: "d-player"},
             h("option", {value: "builtin"}, t("FreeX player")),
             h("option", {value: "mpv", disabled: !i.mpvAvailable && i.player !== "mpv"}, t("mpv (plays every file directly)")));
@@ -82,7 +96,13 @@
         player.addEventListener("change", save);
         fs.addEventListener("change", save);
         sync();
-        c.append(h("h1", null, "FreeX Desktop"),
+        c.append(h("h1", null, t("Client options")),
+            h("p", {class: "muted"}, t("Settings of the FreeX Desktop app on this PC. They are stored in the app, not on the server.")),
+            h("section", {class: "panel"}, h("h2", null, t("Display")),
+                i.tvAvailable ? h("p", {class: "muted"}, t("The TV mode shows the interface of the FreeX TV apps in full screen, for a remote control, with mpv as its player. FreeX Web closes and comes back when you leave it (also Ctrl+Shift+T).")) : null,
+                h("div", {class: "actions"},
+                    i.tvAvailable ? h("button", {class: "btn primary", onclick: tvMode}, t("Switch to TV mode")) : null,
+                    h("button", {class: "btn", onclick: clientOptions}, t("All client options …")))),
             h("section", {class: "panel"}, h("h2", null, t("Player")),
                 h("div", {class: "field"}, h("label", {for: "d-player"}, t("Play videos with")), player, hint),
                 fsRow),
@@ -236,5 +256,5 @@
         }
     }
 
-    M.desktop = {info, usesMpv, switchServer, settingsPage, playInMpv};
+    M.desktop = {info, usesMpv, switchServer, tvMode, clientOptions, settingsPage, playInMpv};
 })();

@@ -4,9 +4,10 @@
 
 ## Unreleased
 
-- **FreeX Desktop:** the options of the app itself (TV mode, start at login) are in the app's own settings window,
-  not in FreeX Web; *Settings → FreeX Desktop* keeps the player and the server.
-  FreeX Web 1.6.1.0
+- **Client options (FreeX Desktop):** *Settings → Client options* (also in the account menu) switches the app to its
+  TV mode and opens the app's own settings window; it keeps the player and the server. These options belong to the
+  PC and are stored in the app, not on the server (start in TV mode at login is only in the app).
+  FreeX Web 1.6.2.0
 - **APT repository on another machine:** with `APT_HOST` (user@host) set in Jenkins, the *Publish* stage copies
   the package there by SSH and runs reprepro on that machine, so the repository and its signing key can live on a
   VM of their own
