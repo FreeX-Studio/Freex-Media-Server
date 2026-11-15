@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+- **TV mode of FreeX Desktop:** in FreeX Desktop 1.2 or newer, *Settings → FreeX Desktop* has a *TV mode* section to
+  switch to it (the interface of the FreeX TV apps in full screen, with mpv) and to start the app in it at login.
+  FreeX Web 1.6.1.0
 - **APT repository on another machine:** with `APT_HOST` (user@host) set in Jenkins, the *Publish* stage copies
   the package there by SSH and runs reprepro on that machine, so the repository and its signing key can live on a
   VM of their own

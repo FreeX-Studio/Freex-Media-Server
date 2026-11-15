@@ -746,4 +746,9 @@ FreeXI18n.add("de", {
     "Normal (info)": "Normal (Info)",
     "Detailed (debug)": "Ausführlich (Debug)",
     "Normal, Jellyfin apps detailed": "Normal, Jellyfin-Apps ausführlich",
+    "TV mode": "TV-Modus",
+    "Start TV mode": "TV-Modus starten",
+    "Start in TV mode at login": "Bei der Anmeldung im TV-Modus starten",
+    "The interface of the FreeX TV apps in full screen, for a remote control or a keyboard, with mpv as the player. Also with Ctrl+Shift+T and from the tray menu.":
+        "Die Oberfläche der FreeX-TV-Apps im Vollbild, für Fernbedienung oder Tastatur, mit mpv als Player. Auch mit Strg+Umschalt+T und über das Tray-Menü.",
 });

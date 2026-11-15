@@ -15,8 +15,8 @@
  * and Linux (github.com/FreeX-Studio/Freex-Desktop), which loads it straight from the server and gives its pages
  * a few app commands. In a browser this file does nothing and M.desktop stays undefined.
  *
- * The app adds: switching to another server, real full screen for the player, and playback in
- * mpv. With mpv every file plays directly (no conversion on the server); the position comes back
+ * The app adds: switching to another server, real full screen for the player, playback in
+ * mpv, and its TV mode (the interface of the FreeX TV apps in full screen, FreeX Desktop 1.2+). With mpv every file plays directly (no conversion on the server); the position comes back
  * from the app as events and is saved here, just as the built-in player does.
  */
 (() => {
@@ -83,6 +83,7 @@
         fs.addEventListener("change", save);
         sync();
         c.append(h("h1", null, "FreeX Desktop"),
+            i.tvAvailable ? tvPanel() : null,
             h("section", {class: "panel"}, h("h2", null, t("Player")),
                 h("div", {class: "field"}, h("label", {for: "d-player"}, t("Play videos with")), player, hint),
                 fsRow),
@@ -91,6 +92,30 @@
                 h("button", {class: "btn", onclick: switchServer}, t("Switch server"))),
             h("section", {class: "panel"}, h("h2", null, t("Versions")),
                 h("dl", {class: "kv"}, h("dt", null, i.app), h("dd", null, i.version))));
+    }
+
+    /** FreeX Desktop 1.2+: switch to the TV mode, and start in it at login. */
+    function tvPanel() {
+        const auto = h("input", {type: "checkbox", id: "d-tv-auto"});
+        const autoRow = h("label", {class: "check", hidden: true}, auto, h("span", null, t("Start in TV mode at login")));
+        // Apps without this permission (older builds) keep the row hidden.
+        invoke("autostart_get").then((on) => {
+            auto.checked = !!on;
+            autoRow.hidden = false;
+        }).catch(() => null);
+        auto.addEventListener("change", async () => {
+            try {
+                auto.checked = await invoke("autostart_set", {on: auto.checked});
+            } catch (e) {
+                auto.checked = !auto.checked;
+                M.toast(String(e), true);
+            }
+        });
+        return h("section", {class: "panel"}, h("h2", null, t("TV mode")),
+            h("p", {class: "muted"}, t("The interface of the FreeX TV apps in full screen, for a remote control or a keyboard, with mpv as the player. Also with Ctrl+Shift+T and from the tray menu.")),
+            autoRow,
+            h("button", {class: "btn primary", onclick: () => invoke("tv_enter").catch((e) => M.toast(String(e), true))},
+                icon("play"), t("Start TV mode")));
     }
 
     // ------------------------------------------------------------------ playback in mpv
