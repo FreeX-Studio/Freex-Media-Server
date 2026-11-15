@@ -21,7 +21,7 @@ browser, converting on the fly when a device cannot play a file. No account with
 telemetry: your media stays on your hardware.
 
 It is the core of **FreeX**, a family of apps around one server: the web client **FreeX Web** is built in, and
-there are apps for TVs, phones and tablets and the desktop and an add-on for Kodi
+there are apps for TVs, phones and tablets and the desktop, an add-on for Kodi and the system image FreeXHT
 (see [The FreeX family](#the-freex-family)).
 
 <p align="center">
@@ -72,6 +72,10 @@ whatever a device cannot decode.
 | **FreeX Mobile** | iPhone and iPad (iOS 15+, AVPlayer, AirPlay, picture in picture) and Android phones and tablets (Android 7+, ExoPlayer); a player made for touch | [FreeX-Studio/FreeX-Mobile](https://github.com/FreeX-Studio/FreeX-Mobile) |
 | **FreeX Desktop** | Windows and Linux app with FreeX Web in its own window; plays every file directly with mpv, several servers, media keys, tray icon | [FreeX-Studio/Freex-Desktop](https://github.com/FreeX-Studio/Freex-Desktop) |
 | **FreeX for Kodi** | Kodi add-on (Kodi 20+ on every platform, also LibreELEC, CoreELEC, Raspberry Pi): your libraries like a Kodi library, Kodi's own player plays almost every file directly, skip intro and Up Next | [FreeX-Studio/FreeX-Kodi-Addon](https://github.com/FreeX-Studio/FreeX-Kodi-Addon) |
+| **FreeXHT** | System image that turns a Raspberry Pi (3, 4, 5) or a small PC into a FreeX box: boots straight into the FreeX TV interface with mpv as player, controlled with the TV remote over HDMI-CEC | [FreeX-Studio/FreeX-HT](https://github.com/FreeX-Studio/FreeX-HT) |
+
+> **Note on FreeXHT and the Raspberry Pi 3:** FreeXHT runs on a Pi 3, 3+ and Zero 2 W, but the interface is very
+> laggy there. For a smooth interface use a Raspberry Pi 4 or 5 or a PC.
 
 > **Note on iOS, Samsung and LG TVs:** FreeX Mobile for iPhone and iPad and FreeX TV for Samsung and LG TVs are not
 > in the App Store or the TV makers' app stores; they can only be installed by sideloading (Xcode or a signing service
