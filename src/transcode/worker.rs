@@ -28,8 +28,11 @@ use std::process::{Child, Command, ExitStatus, Stdio};
 
 /// All timestamps are shifted by this, so that no track starts below zero (e.g. AAC priming).
 pub const TS_OFFSET_MS: i64 = 1000;
-/// How far a fragment may start before a segment border and still count as its first one.
-const TOLERANCE_MS: i64 = 200;
+/// How far from a segment border the fragment that starts the segment may lie. Fragment starts are
+/// decode times; with copied video they lie before the keyframe times of the index by the
+/// reordering delay of the B-frames, which is a few frames but can exceed 200 ms with HEVC
+/// encodes (many B-frames, open GOPs). The fragment closest to the border is taken.
+const TOLERANCE_MS: i64 = 1000;
 /// A segment at most this far ahead of the running ffmpeg is waited for instead of restarting.
 const WAIT_AHEAD_MS: i64 = 20_000;
 /// Pause ffmpeg when it is this far ahead of the player; continue below the lower mark.
@@ -134,11 +137,13 @@ pub struct Worker {
     active: bool,
     run_number: u32,
     last_requested: usize,
+    /// Why the last segment could not be made, when it was not ffmpeg's fault.
+    problem: Option<String>,
 }
 
 impl Worker {
     pub fn new(dir: PathBuf, segments: Segments, command: Box<dyn Fn(i64) -> Vec<String> + Send>, priority: Vec<String>) -> Worker {
-        Worker { dir, segments, command, priority, runs: Vec::new(), active: false, run_number: 0, last_requested: 0 }
+        Worker { dir, segments, command, priority, runs: Vec::new(), active: false, run_number: 0, last_requested: 0, problem: None }
     }
 
     /// Process ids of the running ffmpeg processes.
@@ -182,9 +187,10 @@ impl Worker {
         }
         self.last_requested = i;
         let (s, e) = (self.segments.start(i), self.segments.end(i));
+        let last = i + 1 == self.segments.count();
         for r in &mut self.runs {
             r.refresh();
-            if let Some(parts) = collect(r, s, e, i) {
+            if let Some(parts) = collect(r, s, e, i, last) {
                 return Step::Done(parts);
             }
         }
@@ -198,6 +204,8 @@ impl Worker {
             // Restarted exactly here and still the segment did not come out (no keyframe at its
             // border): give up instead of restarting over and over.
             if r.start_ms == seg_start && passed(r, seg_end) {
+                let near = fragments_near(r, seg_start);
+                self.problem = Some(format!("segment {i} ({seg_start}–{seg_end} ms) does not start at a keyframe, {near}"));
                 return Step::Failed;
             }
         }
@@ -266,12 +274,14 @@ impl Worker {
         }
     }
 
-    /// The last lines of ffmpeg's output, for error messages.
+    /// The last lines of ffmpeg's output, for error messages; first why the segment could not be
+    /// assembled, if that was the reason.
     pub fn log(&self) -> String {
-        let Some(r) = self.runs.first() else { return String::new() };
+        let problem = self.problem.clone().map(|p| p + "\n").unwrap_or_default();
+        let Some(r) = self.runs.first() else { return problem };
         let text = std::fs::read_to_string(r.dir.join("ffmpeg.log")).unwrap_or_default();
         let lines: Vec<&str> = text.lines().collect();
-        lines[lines.len().saturating_sub(5)..].join("\n")
+        problem + &lines[lines.len().saturating_sub(5)..].join("\n")
     }
 
     pub fn stop(&mut self) {
@@ -290,28 +300,56 @@ fn passed(r: &mut Run, e: i64) -> bool {
     r.produced_until() > e + TOLERANCE_MS || r.finished()
 }
 
-/// The fragments of a segment in a run, if the run has all of them.
-fn collect(r: &mut Run, s: i64, e: i64, i: usize) -> Option<Vec<PathBuf>> {
-    let mut parts = Vec::new();
-    let mut complete = false;
-    for f in &r.fragments {
-        if f.start_ms < s - TOLERANCE_MS {
-            continue;
-        }
-        if f.start_ms >= e - TOLERANCE_MS {
-            complete = true;
-            break;
-        }
-        // The first fragment has to start at the border, or the run began inside the segment.
-        if parts.is_empty() && f.start_ms > s + TOLERANCE_MS && !(i == 0 && r.start_ms == 0) {
+/// Index of the fragment that starts closest to `t`, at most [`TOLERANCE_MS`] away; only once no
+/// closer one can follow (a later fragment exists beyond the window, or the run is done).
+fn border_fragment(r: &mut Run, t: i64) -> Option<usize> {
+    let decided = r.fragments.last().is_some_and(|f| f.start_ms > t + TOLERANCE_MS) || r.finished();
+    if !decided {
+        return None;
+    }
+    r.fragments
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| (f.start_ms - t).abs() <= TOLERANCE_MS)
+        .min_by_key(|(_, f)| (f.start_ms - t).abs())
+        .map(|(k, _)| k)
+}
+
+/// The fragments of a segment in a run, if the run has all of them. A segment runs from the
+/// fragment closest to its start border to the one closest to its end border, so neighbouring
+/// segments always meet at the same fragment.
+fn collect(r: &mut Run, s: i64, e: i64, i: usize, last: bool) -> Option<Vec<PathBuf>> {
+    let first = if i == 0 && r.start_ms == 0 {
+        // The very first segment starts with whatever ffmpeg wrote first.
+        if r.fragments.is_empty() {
             return None;
         }
-        parts.push(f.path.clone());
-    }
-    if !complete && !parts.is_empty() && r.finished() {
-        complete = true; // the end of the title
-    }
-    (complete && !parts.is_empty()).then_some(parts)
+        0
+    } else {
+        // None also when the run began inside the segment (no fragment near the border).
+        border_fragment(r, s)?
+    };
+    let end = if last {
+        if !r.finished() {
+            return None;
+        }
+        r.fragments.len()
+    } else {
+        match border_fragment(r, e) {
+            Some(k) => k,
+            // The end of the title came before the border.
+            None if r.finished() && r.fragments.last().is_some_and(|f| f.start_ms < e) => r.fragments.len(),
+            None => return None,
+        }
+    };
+    (end > first).then(|| r.fragments[first..end].iter().map(|f| f.path.clone()).collect())
+}
+
+/// Starts of the fragments of a run around a time, for the log when a segment cannot be made.
+fn fragments_near(r: &Run, t: i64) -> String {
+    let near: Vec<String> =
+        r.fragments.iter().filter(|f| (f.start_ms - t).abs() <= 3 * TOLERANCE_MS).map(|f| f.start_ms.to_string()).collect();
+    format!("run from {} ms, fragments near {t} ms: [{}]", r.start_ms, near.join(", "))
 }
 
 enum Signal {

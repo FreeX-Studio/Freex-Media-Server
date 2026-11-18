@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+- **Fix: copied HEVC video jumping back and forth:** with many B-frames (common in HEVC encodes) the fragments ffmpeg
+  writes start up to a few hundred milliseconds before the keyframes in the file's index. More than 200 ms off, a
+  segment could not be put together, the player restarted again and again and played only a second at a time. The
+  fragment closest to each segment border is now taken (up to one second off), and the log says which border and
+  fragments did not fit if a segment still cannot be made
 - **Client options (FreeX Desktop):** *Settings → Client options* (also in the account menu) switches the app to its
   TV mode and opens the app's own settings window; it keeps the player and the server. These options belong to the
   PC and are stored in the app, not on the server (start in TV mode at login is only in the app).
