@@ -13,9 +13,9 @@
   TV mode and opens the app's own settings window; it keeps the player and the server. These options belong to the
   PC and are stored in the app, not on the server (start in TV mode at login is only in the app).
   FreeX Web 1.6.2.0
-- **APT repository on another machine:** with `APT_HOST` (user@host) set in Jenkins, the *Publish* stage copies
-  the package there by SSH and runs reprepro on that machine, so the repository and its signing key can live on a
-  VM of their own
+- **Releases from GitHub:** *Actions → Release → Run workflow* sets the version, tags it and builds the release with
+  GitHub Actions (`.github/workflows`); the release's `.deb` goes into the MirraNET APT repository at
+  `apt.mirranet.de`. Jenkins only builds and archives now (no more *Publish* stage)
 - **Built-in TMDB key:** release builds can carry a TMDB key (environment variable `FREEX_TMDB_KEY` at build time,
   set in Jenkins); servers whose `tmdb.api_key` is empty use it, a key of their own still takes precedence. The
   *About* page names TMDB as the source of the metadata, as the TMDB API terms require

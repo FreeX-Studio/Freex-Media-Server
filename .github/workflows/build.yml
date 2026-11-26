@@ -1,0 +1,151 @@
+# Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3.
+#
+# GitHub build of FreeX Media Server, next to the Jenkins build (Jenkinsfile) and with the same
+# scripts: checks and tests, the Linux and Windows programs, the Debian package, the Windows
+# installer, the plain archives and SHA256SUMS. A tag v* (made by the Release workflow)
+# publishes them as a GitHub release and puts the .deb into the MirraNET APT repository.
+#
+# Secrets (organization or repository): FREEX_TMDB_KEY, the TMDB key built into the programs
+# (optional, see docs/configuration.md); APT_HOST, APT_PORT, APT_REPO, APT_SSH_KEY and
+# APT_KNOWN_HOSTS for the apt job (skipped without them).
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+  # ffmpeg and WinSW for the installer, kept between runs (actions/cache).
+  FREEX_DOWNLOAD_CACHE: ${{ github.workspace }}/.download-cache
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Toolchain (rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - name: rustfmt, Clippy, tests
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+
+  package:
+    needs: check
+    # The oldest supported Ubuntu: the package then runs on Debian 12+ and Ubuntu 22.04+ (glibc).
+    runs-on: ubuntu-22.04
+    env:
+      FREEX_TMDB_KEY: ${{ secrets.FREEX_TMDB_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 dpkg nsis curl unzip python3
+      - name: Toolchain (rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/cache@v5
+        with:
+          path: .download-cache
+          key: freex-build-${{ hashFiles('packaging/windows/build-installer.sh') }}
+      - name: Linux and Windows programs
+        run: |
+          cargo build --locked --release
+          cargo build --locked --release --target x86_64-pc-windows-gnu
+      - name: Debian package, installer, archives
+        run: |
+          VERSION="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)"
+          # A release has the plain version; other builds one of their own, as in Jenkins.
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            DEB_VERSION="$VERSION"
+          else
+            DEB_VERSION="$VERSION+$(date -u +%Y%m%d%H%M).git${GITHUB_SHA::7}"
+          fi
+          packaging/deb/build-deb.sh "$DEB_VERSION" target/release/freex-media-server dist
+          packaging/windows/build-installer.sh "$VERSION" target/x86_64-pc-windows-gnu/release/freex-media-server.exe dist
+          packaging/dist.sh
+          ls -l dist
+      - uses: actions/upload-artifact@v6
+        with:
+          name: packages
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: package
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          pattern: packages
+          merge-multiple: true
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ls -l dist
+          # The release notes: this version's section of the changelog.
+          awk -v v="FreeX Media Server ${TAG#v} " 'index($0, "## " v) == 1 {on = 1; next} /^## / {on = 0} on' CHANGELOG.md > notes.md
+          printf '\n**Linux (Debian, Ubuntu):** the `.deb`, or from the APT repository apt.mirranet.de · **Windows:** `freex-media-server-%s-setup.exe`\n' "${TAG#v}" >> notes.md
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --title "FreeX Media Server ${TAG#v}" \
+              --notes-file notes.md --verify-tag
+
+  apt:
+    # Publish the release .deb to the MirraNET APT repository (apt.mirranet.de).
+    # reprepro and the signing key live on the server; skipped when the deploy
+    # secrets are not configured.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          pattern: packages
+          merge-multiple: true
+      - name: Publish to APT repository
+        env:
+          APT_HOST: ${{ secrets.APT_HOST }}
+          APT_SSH_KEY: ${{ secrets.APT_SSH_KEY }}
+          APT_KNOWN_HOSTS: ${{ secrets.APT_KNOWN_HOSTS }}
+          APT_REPO: ${{ secrets.APT_REPO }}
+          APT_PORT: ${{ secrets.APT_PORT }}
+          APT_SUITE: stable
+        run: |
+          if [ -z "${APT_HOST:-}" ]; then
+            echo "::notice::APT deploy secrets not set; skipping APT publish."
+            exit 0
+          fi
+          mkdir -p debs
+          find dist -name '*.deb' -exec cp {} debs/ \;
+          if ! ls debs/*.deb >/dev/null 2>&1; then echo "::error::no .deb found in artifacts"; exit 1; fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$APT_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$APT_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          opt="-o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o Port=${APT_PORT:-22} -i $HOME/.ssh/id_deploy"
+          tmp=$(ssh $opt "$APT_HOST" mktemp -d)
+          scp $opt -q packaging/apt/publish.sh debs/*.deb "$APT_HOST:$tmp/"
+          ssh $opt "$APT_HOST" bash -s -- "$tmp" "$APT_REPO" "$APT_SUITE" <<'EOF'
+          rc=0
+          bash "$1/publish.sh" "$2" "$3" "$1"/*.deb || rc=$?
+          rm -rf "$1"
+          exit $rc
+          EOF

@@ -33,7 +33,6 @@ cargo build --release --target x86_64-pc-windows-gnu   # target/x86_64-pc-window
 packaging/deb/build-deb.sh <version> target/release/freex-media-server dist                                  # needs dpkg-deb
 packaging/windows/build-installer.sh <version> target/x86_64-pc-windows-gnu/release/freex-media-server.exe dist   # needs makensis, curl, unzip
 packaging/dist.sh                                                                                             # plain archives and SHA256SUMS
-packaging/apt/publish.sh /var/www/apt stable dist/*.deb                                                       # into the APT repository, needs reprepro
 ```
 
 The installer script downloads ffmpeg (the essentials build by Gyan) and WinSW in fixed versions into
@@ -54,7 +53,23 @@ sudo apt install build-essential gcc-mingw-w64-x86-64 dpkg nsis curl unzip pytho
 Stages: toolchain (installs the pinned toolchain), checks (`cargo fmt --check`, clippy with warnings as errors), tests,
 both release builds, packaging. Artifacts: the `.deb`, the setup `.exe`, the archives and `SHA256SUMS` in `dist/`;
 `dist/` is emptied before packaging, so a build only publishes the packages of its own version.
-The build needs to reach crates.io, github.com and gyan.dev.
+The build needs to reach crates.io, github.com and gyan.dev. Jenkins only builds and archives; releases are made by
+GitHub Actions.
+
+### GitHub Actions
+
+Next to Jenkins, GitHub builds the same with the same scripts (`.github/workflows/build.yml`) on every push to `main`
+and every pull request: checks and tests, then on Ubuntu 22.04 (so the package runs on Debian 12+ and Ubuntu 22.04+)
+both programs, the `.deb`, the installer, the archives and `SHA256SUMS`. The files are in the run's *Artifacts*. The
+secret `FREEX_TMDB_KEY` builds the TMDB key in, as in Jenkins.
+
+### Releases
+
+A release is made by hand: *Actions → Release → Run workflow*, with the version (`X.Y.Z`; empty: the current version
+if it has no tag yet, otherwise the next patch version). The workflow sets the version in `Cargo.toml`, turns the
+*Unreleased* section of the changelog into `FreeX Media Server X.Y.Z · FreeX Web <web version>`, commits and tags it
+(`vX.Y.Z`) and starts the build for the tag. That build publishes the GitHub release, with the changelog section as
+notes, and its job `apt` puts the `.deb` into the APT repository ([APT repository](apt-repository.md)).
 
 ## Project structure
 
@@ -83,7 +98,7 @@ web/                FreeX Web (plain JavaScript, no build step), compiled into t
 i18n/               server messages in English and German
 packaging/deb/      Debian package: build script, control files, systemd service, default configuration
 packaging/windows/  Windows installer: build script, NSIS script, WinSW service definition, icon
-packaging/apt/      APT repository: publish script and reprepro configuration templates (docs/apt-repository.md)
+packaging/apt/      APT repository: publish script, run on the repository server (docs/apt-repository.md)
 docs/               documentation, screenshots and brand assets
 ```
 

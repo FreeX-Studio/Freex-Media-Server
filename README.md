@@ -163,7 +163,7 @@ See [Installation](docs/installation.md) for details, paths, updates and running
 | | |
 |---|---|
 | [Installation](docs/installation.md) | Debian package, Windows installer, manual setup, file locations, backups |
-| [APT repository](docs/apt-repository.md) | Your own APT repository for the Debian package: setup with reprepro, Jenkins publishing, client sources |
+| [APT repository](docs/apt-repository.md) | Installing from apt.mirranet.de, how releases get there |
 | [Configuration](docs/configuration.md) | All settings, the settings page, HTTPS and reverse proxies |
 | [Organizing your media](docs/media-library.md) | Folder and file naming, local artwork, `.nfo` files, TMDB |
 | [Playback](docs/playback.md) | Direct play and conversion, hardware acceleration, subtitles, skip intro, Watch Together, Chromecast |

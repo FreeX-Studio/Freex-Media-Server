@@ -24,15 +24,11 @@
 // ~/.cache/freex-build. Artifacts in dist/: the .deb, the setup .exe, the plain archives and
 // SHA256SUMS.
 //
-// APT repository: when the environment variable APT_REPO names the directory of a reprepro
-// repository (for example /var/www/apt, set under Manage Jenkins → System → Global properties),
-// the Publish stage adds the .deb to it, in the suite APT_SUITE (default "stable"). The
-// repository is on the build machine, or with APT_HOST (user@host) on another machine, reached
-// with the SSH key of the Jenkins user. Builds of other branches than main are not published.
-// See docs/apt-repository.md.
+// Releases, the GitHub release and the APT repository (apt.mirranet.de) are made by GitHub
+// Actions (.github/workflows); Jenkins only builds and archives.
 //
 // TMDB key: when the environment variable FREEX_TMDB_KEY is set (Manage Jenkins → System →
-// Global properties, like APT_REPO), it is built into the programs and used by servers whose
+// Global properties), it is built into the programs and used by servers whose
 // tmdb.api_key is empty. Builds without it need a key in the configuration as before.
 
 pipeline {
@@ -104,33 +100,6 @@ pipeline {
                     packaging/windows/build-installer.sh "$VERSION" "target/$WINDOWS_TARGET/release/freex-media-server.exe" dist
                     packaging/dist.sh
                 '''
-            }
-        }
-
-        stage('Publish') {
-            when {
-                expression { env.APT_REPO?.trim() && (env.BRANCH_NAME == null || env.BRANCH_NAME == 'main') }
-            }
-            steps {
-                script {
-                    if (env.APT_HOST?.trim()) {
-                        // Repository on another machine: copy the packages and the script there and
-                        // run it with that machine's reprepro and signing key.
-                        sh '''
-                            set -eu
-                            tmp=$(ssh -o BatchMode=yes "$APT_HOST" mktemp -d)
-                            scp -o BatchMode=yes -q packaging/apt/publish.sh dist/*.deb "$APT_HOST:$tmp/"
-                            ssh -o BatchMode=yes "$APT_HOST" bash -s -- "$tmp" "$APT_REPO" "${APT_SUITE:-stable}" <<'EOF'
-rc=0
-bash "$1/publish.sh" "$2" "$3" "$1"/*.deb || rc=$?
-rm -rf "$1"
-exit $rc
-EOF
-                        '''
-                    } else {
-                        sh 'packaging/apt/publish.sh "$APT_REPO" "${APT_SUITE:-stable}" dist/*.deb'
-                    }
-                }
             }
         }
     }
