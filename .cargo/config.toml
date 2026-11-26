@@ -1,0 +1,5 @@
+# C code built by build scripts (SQLite in libsqlite3-sys) for Windows targets Windows 10, like
+# the Rust code. Older MinGW-w64 (Ubuntu 22.04) defaults to Windows XP, which lacks
+# GetTickCount64 and fails the SQLite build.
+[env]
+CFLAGS_x86_64_pc_windows_gnu = "-D_WIN32_WINNT=0x0A00"
