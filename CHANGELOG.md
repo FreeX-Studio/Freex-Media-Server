@@ -2,7 +2,7 @@
 
 # Changelog
 
-## Unreleased
+## FreeX Media Server 0.21.0 · FreeX Web 1.6.2.0
 
 - **Fix: copied HEVC video jumping back and forth:** with many B-frames (common in HEVC encodes) the fragments ffmpeg
   writes start up to a few hundred milliseconds before the keyframes in the file's index. More than 200 ms off, a
