@@ -2,6 +2,10 @@
 
 # Changelog
 
+## Unreleased
+
+- **Builds only in GitHub Actions:** the `Jenkinsfile` is gone; GitHub Actions builds, tests and makes the releases
+
 ## FreeX Media Server 0.21.0 · FreeX Web 1.6.2.0
 
 - **Fix: copied HEVC video jumping back and forth:** with many B-frames (common in HEVC encodes) the fragments ffmpeg

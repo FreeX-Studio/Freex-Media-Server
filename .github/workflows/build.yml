@@ -1,7 +1,6 @@
 # Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3.
 #
-# GitHub build of FreeX Media Server, next to the Jenkins build (Jenkinsfile) and with the same
-# scripts: checks and tests, the Linux and Windows programs, the Debian package, the Windows
+# Build of FreeX Media Server: checks and tests, the Linux and Windows programs, the Debian package, the Windows
 # installer, the plain archives and SHA256SUMS. A tag v* (made by the Release workflow)
 # publishes them as a GitHub release and puts the .deb into the MirraNET APT repository.
 #
@@ -65,7 +64,7 @@ jobs:
       - name: Debian package, installer, archives
         run: |
           VERSION="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)"
-          # A release has the plain version; other builds one of their own, as in Jenkins.
+          # A release has the plain version; other builds one of their own (version, date and commit).
           if [ "$GITHUB_REF_TYPE" = tag ]; then
             DEB_VERSION="$VERSION"
           else

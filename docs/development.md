@@ -40,28 +40,22 @@ The installer script downloads ffmpeg (the essentials build by Gyan) and WinSW i
 it where gyan.dev is not reachable; `WINSW_SHA256` pins WinSW, which has no published checksum) and packs them with
 the server. To update one of them, change its version at the top of the script.
 
-### Jenkins
+### GitHub Actions
 
-The `Jenkinsfile` runs on a Linux agent with rustup, the MinGW-w64 cross compiler, dpkg, NSIS, curl, unzip and
-python3:
+Builds run only in GitHub Actions (`.github/workflows/build.yml`), on every push to `main` and every pull request:
+checks (`cargo fmt --check`, clippy with warnings as errors) and tests, then on Ubuntu 22.04 (so the package runs on
+Debian 12+ and Ubuntu 22.04+) both release builds, the `.deb`, the installer, the archives and `SHA256SUMS`. The
+files are in the run's *Artifacts*. The secret `FREEX_TMDB_KEY` builds the TMDB key in.
+
+To build the same packages on your own machine (Debian or Ubuntu), install rustup, the MinGW-w64 cross compiler,
+dpkg, NSIS, curl, unzip and python3, then run the commands of [Packages](#packages):
 
 ```bash
 curl https://sh.rustup.rs -sSf | sh -s -- -y
 sudo apt install build-essential gcc-mingw-w64-x86-64 dpkg nsis curl unzip python3
 ```
 
-Stages: toolchain (installs the pinned toolchain), checks (`cargo fmt --check`, clippy with warnings as errors), tests,
-both release builds, packaging. Artifacts: the `.deb`, the setup `.exe`, the archives and `SHA256SUMS` in `dist/`;
-`dist/` is emptied before packaging, so a build only publishes the packages of its own version.
-The build needs to reach crates.io, github.com and gyan.dev. Jenkins only builds and archives; releases are made by
-GitHub Actions.
-
-### GitHub Actions
-
-Next to Jenkins, GitHub builds the same with the same scripts (`.github/workflows/build.yml`) on every push to `main`
-and every pull request: checks and tests, then on Ubuntu 22.04 (so the package runs on Debian 12+ and Ubuntu 22.04+)
-both programs, the `.deb`, the installer, the archives and `SHA256SUMS`. The files are in the run's *Artifacts*. The
-secret `FREEX_TMDB_KEY` builds the TMDB key in, as in Jenkins.
+The build needs to reach crates.io, github.com and gyan.dev.
 
 ### Releases
 

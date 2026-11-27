@@ -14,7 +14,7 @@
 #
 #   build-installer.sh <version> <freex-media-server.exe> <output directory>
 #
-# The Jenkins pipeline runs it after the Windows cross build. It downloads ffmpeg and WinSW in
+# The GitHub build runs it after the Windows cross build. It downloads ffmpeg and WinSW in
 # fixed versions into a cache (FREEX_DOWNLOAD_CACHE, default ~/.cache/freex-build), checks them
 # against the checksums of their publishers and packs them with the server into one installer.
 # Needs: makensis, curl, unzip, sha256sum.
@@ -39,7 +39,7 @@ FFMPEG_SHA256="${FFMPEG_SHA256:-}"
 WINSW_VERSION="2.12.0"
 WINSW_FILE="WinSW.NET461.exe" # needs .NET Framework 4.6.1, which every Windows 10 and 11 has
 WINSW_URL="https://github.com/winsw/winsw/releases/download/v$WINSW_VERSION/$WINSW_FILE"
-# WinSW publishes no checksum files. Set WINSW_SHA256 (e.g. in the Jenkins job) to pin the file.
+# WinSW publishes no checksum files. Set WINSW_SHA256 to pin the file.
 WINSW_SHA256="${WINSW_SHA256:-}"
 
 CACHE="${FREEX_DOWNLOAD_CACHE:-$HOME/.cache/freex-build}"
